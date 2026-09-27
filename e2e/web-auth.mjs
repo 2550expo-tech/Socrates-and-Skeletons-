@@ -179,7 +179,11 @@ function check(name, ok, detail = '') {
   if (!ok && IN_CI) console.log(`::error title=${ENGINE} browser test::${name}${detail ? ` (${detail.replace(/\n/g, ' ').slice(0, 300)})` : ''}`);
 }
 const browser = await (ENGINE === 'webkit' ? webkit : chromium).launch();
-const phone = ENGINE === 'webkit' ? { isMobile: true, hasTouch: true } : {};
+const phone = {
+  ...(ENGINE === 'webkit' ? { isMobile: true, hasTouch: true } : {}),
+  // E2E_SCHEME=dark runs everything with the phone in dark mode.
+  colorScheme: process.env.E2E_SCHEME === 'dark' ? 'dark' : 'light',
+};
 async function freshPage(tag) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'th-TH', ...phone });
   const page = await ctx.newPage();

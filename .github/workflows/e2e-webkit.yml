@@ -1,8 +1,9 @@
-# Runs the browser tests on Safari's engine (WebKit), set up like an iPhone,
-# because many users open MindPay in Safari on iPhone. This does not block the
+# Runs the browser tests on Safari's engine (WebKit), set up like an iPhone in
+# dark mode, because many users open MindPay in Safari on iPhone (the deploy
+# gate in web.yml covers Chromium in light mode). This does not block the
 # website deploy (web.yml runs the same tests on Chromium as the gate).
 # Failed checks show as annotations on the run; screenshots are attached.
-name: Browser tests on Safari engine (iPhone)
+name: Browser tests on Safari engine (iPhone, dark mode)
 
 on:
   push:
@@ -45,9 +46,10 @@ jobs:
       - name: Install Safari engine
         run: npx playwright install --with-deps webkit
 
-      - name: Browser tests (WebKit, iPhone-like)
+      - name: Browser tests (WebKit, iPhone-like, dark mode)
         env:
           E2E_BROWSER: webkit
+          E2E_SCHEME: dark
         run: node e2e/web-auth.mjs dist e2e-shots
 
       - name: Keep screenshots
