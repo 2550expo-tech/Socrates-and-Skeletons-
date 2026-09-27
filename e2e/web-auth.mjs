@@ -603,6 +603,64 @@ try {
     await ctx.close();
     state.confirmEmail = true;
   }
+
+  // 14. Runway: "can I buy this?" shows the days before/after and hands the question to the coach
+  {
+    const { ctx, page } = await freshPage('runway');
+    await page.goto(APP);
+    await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
+    await introGone(page);
+    await page.getByText('ลองใช้ด้วยข้อมูลตัวอย่าง').click();
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    await page.goto(`${APP}runway`);
+    await introGone(page);
+    await page.fill('#runway-price', '2000');
+    check('Runway: buying ฿2,000 shows the days before and after', (await visible(page, 'ถ้าซื้อ ฿2,000')) && (await visible(page, 'ตอนนี้')));
+    await button(page, 'ถามโค้ชเรื่องนี้').click();
+    const asked = await page.locator('#coach-input').inputValue().catch(() => '');
+    check('Runway: "ask the coach" opens the coach with the question ready', asked.includes('฿2,000'), asked);
+    await ctx.close();
+  }
+
+  // 15. Unclear slip: waits in "รอยืนยัน" and counts only after the user confirms it
+  {
+    state.confirmEmail = false;
+    const bkkDay = (daysAgo) => new Date(Date.now() + 7 * 3600e3 - daysAgo * 86400e3).toISOString().slice(0, 10);
+    state.slipReadings = [
+      { isSlip: true, direction: 'expense', amount: '89.00', dateText: 'x', dateIso: bkkDay(0), time: '12:10', counterparty: 'ร้านชัด', bank: 'KBank', reference: 'E2E101', confidence: { amount: 0.98, date: 0.95, counterparty: 0.95 } },
+      { isSlip: true, direction: 'expense', amount: '45.00', dateText: 'x', dateIso: bkkDay(0), time: '13:20', counterparty: 'ร้านเบลอ', bank: 'SCB', reference: 'E2E102', confidence: { amount: 0.5, date: 0.9, counterparty: 0.6 } },
+    ];
+    const { ctx, page } = await freshPage('review');
+    await page.goto(APP);
+    await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
+    await introGone(page);
+    await page.getByText('สมัครสมาชิก', { exact: true }).click();
+    await page.fill('#name', 'ตรวจ');
+    await page.fill('#email', 'review@example.com');
+    await page.fill('#password', 'secret123');
+    await button(page, 'สร้างบัญชี').click();
+    await visible(page, 'สมัครบัญชีสำเร็จ');
+    await button(page, 'ไปตั้งค่าเงิน').click();
+    await page.fill('#ob-balance', '1000');
+    await button(page, 'เริ่มใช้ MindPay').click();
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    await page.goto(`${APP}scan`);
+    await introGone(page);
+    const chooser = page.waitForEvent('filechooser');
+    await button(page, 'เลือกรูปสลิป').click();
+    await (await chooser).setFiles(['photo-1.jpg', 'photo-2.jpg'].map((f) => join(FIXTURES, f)));
+    check('Unclear slip: only the clear one counts at once', (await visible(page, 'อ่านเสร็จแล้ว ได้ 2 รายการ', 20000)) && (await visible(page, 'รวมในยอดเงินแล้ว 1 รายการ')));
+    await button(page, 'ตรวจ 1 รายการที่อ่านไม่ชัด').click();
+    check('Unclear slip: listed under "ต้องตรวจก่อน"', await visible(page, 'ต้องตรวจก่อน (1)'));
+    await page.getByText('ร้านเบลอ').first().click();
+    await button(page, 'ยืนยันและรวมในยอดเงิน').click();
+    check('Unclear slip: confirmed by the user', await visible(page, 'ยืนยันรายการแล้ว'));
+    check('Nothing left to review', await visible(page, 'เคลียร์หมดแล้ว', 8000));
+    const row = state.txRows.find((r) => r.title === 'ร้านเบลอ');
+    check('Unclear slip: saved as confirmed only after the user confirmed', row?.status === 'confirmed');
+    await ctx.close();
+    state.confirmEmail = true;
+  }
 } catch (e) {
   check('Test run crashed', false, e.stack?.slice(0, 500));
 }
