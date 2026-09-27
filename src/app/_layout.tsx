@@ -17,6 +17,7 @@ import { AutoScanProvider } from '../services/AutoScanProvider';
 import { AuthNoticeHost } from '../ui/AuthNotice';
 import { ToastProvider } from '../ui/feedback';
 import { LaunchIntro } from '../ui/LaunchIntro';
+import { UpdateBanner } from '../ui/UpdateBanner';
 import { useTheme } from '../ui/theme';
 
 // The native splash stays until the opening animation (LaunchIntro) takes over.
@@ -84,6 +85,7 @@ function Navigator({ ready }: { ready: boolean }) {
       <StatusBar style={!introDone || theme.dark ? 'light' : 'dark'} />
       {loading ? null : <Screens signedIn={signedIn} needsOnboarding={needsOnboarding} inApp={inApp} />}
       {loading || !introDone ? null : <AuthNoticeHost />}
+      {loading || !introDone ? null : <UpdateBanner />}
       <LaunchIntro ready={!loading} fontsReady={ready} onDone={finishIntro} />
     </>
   );

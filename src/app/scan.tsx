@@ -21,6 +21,7 @@ import { relativeDayLabel } from '../domain/dates';
 import { formatBaht } from '../domain/money';
 import { scanCounts } from '../domain/scanQueue';
 import { groupByDay } from '../domain/summary';
+import { useAutoScan } from '../services/AutoScanProvider';
 import { galleryAvailable } from '../services/slips';
 import { useSlipScanner } from '../services/useSlipScanner';
 import { Buddy, BuddySays } from '../ui/Buddy';
@@ -35,6 +36,9 @@ export default function Scan() {
   const toast = useToast();
   const { repo, txs, confirmTxs } = useApp();
   const s = useSlipScanner('1m');
+  const auto = useAutoScan();
+  // The automatic scan (on app open) may still be reading: wait for it, then skip what it read.
+  const autoBusy = auto.state.phase === 'scanning';
   const { state } = s;
   const counts = scanCounts(state);
   const running = state.phase === 'running';
@@ -45,12 +49,12 @@ export default function Scan() {
 
   // Phone app: start searching as soon as the screen opens (after the first frame).
   useEffect(() => {
-    if (started.current || demo || !galleryAvailable || !repo) return;
+    if (started.current || demo || !galleryAvailable || !repo || autoBusy) return;
     started.current = true;
     const t = setTimeout(() => s.loadFromGallery('1m'), 250);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [demo, repo]);
+  }, [demo, repo, autoBusy]);
 
   const recorded = useMemo(() => {
     const ids = new Set(s.runTxIds);
@@ -99,6 +103,13 @@ export default function Scan() {
               เว็บเบราว์เซอร์ทุกตัวไม่อนุญาตให้เว็บเปิดดูรูปในเครื่องเอง จึงต้องกดเลือก 1 ครั้ง ในแอป Android {BUDDY_NAME}หาสลิปให้เองตั้งแต่เปิดแอป
             </T>
           </Card>
+        ) : null}
+
+        {/* Phone: the automatic scan from opening the app is still running */}
+        {galleryAvailable && autoBusy && !s.searched && !s.finding ? (
+          <BuddySays mood="thinking">
+            {`${BUDDY_NAME}กำลังอ่านสลิปใหม่ที่เจอตอนเปิดแอปอยู่${auto.state.total ? ` (${auto.state.processed}/${auto.state.total})` : ''} เสร็จแล้วจะค้นต่อให้เลย`}
+          </BuddySays>
         ) : null}
 
         {/* Phone: searching the gallery */}
