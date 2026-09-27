@@ -2,7 +2,8 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
+import { Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   Anuphan_400Regular,
@@ -28,12 +29,36 @@ export default function RootLayout() {
   });
   return (
     <SafeAreaProvider>
-      <AppProvider>
-        <ToastProvider>
-          <Navigator ready={fontsLoaded || !!fontError} />
-        </ToastProvider>
-      </AppProvider>
+      <WebFrame>
+        <AppProvider>
+          <ToastProvider>
+            <Navigator ready={fontsLoaded || !!fontError} />
+          </ToastProvider>
+        </AppProvider>
+      </WebFrame>
     </SafeAreaProvider>
+  );
+}
+
+/** On a computer browser, show the app at phone width in the middle of the screen. */
+function WebFrame({ children }: { children: ReactNode }) {
+  const theme = useTheme();
+  if (Platform.OS !== 'web') return <>{children}</>;
+  return (
+    <View style={{ flex: 1, alignItems: 'center', backgroundColor: theme.dark ? '#050B08' : '#DDE6DF' }}>
+      <View
+        style={{
+          flex: 1,
+          width: '100%',
+          maxWidth: 440,
+          backgroundColor: theme.bg,
+          overflow: 'hidden',
+          boxShadow: '0 0 40px rgba(8, 30, 22, 0.18)',
+        }}
+      >
+        {children}
+      </View>
+    </View>
   );
 }
 

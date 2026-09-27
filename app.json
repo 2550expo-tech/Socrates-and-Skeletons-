@@ -30,7 +30,12 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "output": "single",
+      "bundler": "metro",
+      "name": "MindPay",
+      "themeColor": "#0E3B2C",
+      "backgroundColor": "#F2F5F1"
     },
     "plugins": [
       "expo-router",
@@ -67,7 +72,8 @@
     ],
     "scheme": "mindpay",
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "baseUrl": "/Socrates-and-Skeletons-"
     }
   }
 }

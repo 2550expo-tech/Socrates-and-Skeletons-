@@ -3,7 +3,7 @@
  * plus the actions screens call. Numbers shown on screen are always derived
  * from this state with the pure functions in src/domain, never stored twice.
  */
-import Storage from 'expo-sqlite/kv-store';
+import { Storage } from './storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { averageDailyExpense, computeRunway } from '../domain/runway';
 import { computeBalance } from '../domain/summary';

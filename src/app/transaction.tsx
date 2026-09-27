@@ -10,7 +10,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../data/AppProvider';
 import { categoriesFor, defaultCategory, suggestCategory } from '../domain/categories';
-import { bkkDayKey, bkkTime, bkkToIso, formatThaiDay } from '../domain/dates';
+import { bkkDayKey, bkkTime, bkkToIso, formatThaiDay, parseSlipDate, parseSlipTime } from '../domain/dates';
 import { parseBahtToSatang, satangToInput } from '../domain/money';
 import { FLAG_LABEL, type ReviewFlag } from '../domain/slip';
 import type { TxKind } from '../domain/types';
@@ -39,6 +39,9 @@ export default function TransactionForm() {
   const [busy, setBusy] = useState(false);
   const [askDelete, setAskDelete] = useState(false);
   const [amountError, setAmountError] = useState<string | null>(null);
+  // Web only: the browser build has no native date picker, so dates are typed.
+  const [dayText, setDayText] = useState(() => { const [y, m, d] = day.split('-'); return `${d}/${m}/${Number(y) + 543}`; });
+  const [timeText, setTimeText] = useState(time);
 
   const cats = categoriesFor(kind);
   const pickerDate = new Date(bkkToIso(day, time));
@@ -231,7 +234,35 @@ export default function TransactionForm() {
 
           <View style={{ gap: 6 }}>
             <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi }}>วันและเวลา</T>
-            {Platform.OS === 'android' ? (
+            {Platform.OS === 'web' ? (
+              <Row gap={space.sm} align="flex-start">
+                <View style={{ flex: 1 }}>
+                  <Field
+                    id="tx-day"
+                    label="วันที่ (วว/ดด/ปปปป)"
+                    value={dayText}
+                    onChangeText={(s) => {
+                      setDayText(s);
+                      const parsed = parseSlipDate(s);
+                      if (parsed && parsed <= bkkDayKey(new Date())) setDay(parsed);
+                    }}
+                    error={parseSlipDate(dayText) ? null : 'เช่น 27/09/2569'}
+                  />
+                </View>
+                <View style={{ width: 110 }}>
+                  <Field
+                    id="tx-time"
+                    label="เวลา"
+                    value={timeText}
+                    onChangeText={(s) => {
+                      setTimeText(s);
+                      const t = parseSlipTime(s);
+                      if (t) setTime(t);
+                    }}
+                  />
+                </View>
+              </Row>
+            ) : Platform.OS === 'android' ? (
               <Row gap={space.sm}>
                 {pill(`📅 ${formatThaiDay(day)}`, () => openAndroidPicker('date'), flagged('date'), 'เลือกวันที่')}
                 {pill(`🕒 ${time}`, () => openAndroidPicker('time'), false, 'เลือกเวลา')}

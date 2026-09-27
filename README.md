@@ -6,6 +6,15 @@
 
 ---
 
+## ลองใช้
+
+| ที่ไหน | ลิงก์ |
+|---|---|
+| 💻 เว็บ (คอม / iPhone / มือถือทุกรุ่น) | https://2550expo-tech.github.io/Socrates-and-Skeletons-/ |
+| 🤖 แอป Android (.apk) | https://github.com/2550expo-tech/Socrates-and-Skeletons-/releases/tag/latest-apk |
+
+ทั้งสองอัปเดตอัตโนมัติทุกครั้งที่ push ขึ้น `main` เวอร์ชันเว็บทำได้ทุกอย่าง ยกเว้นการสแกนทั้งแกลเลอรี (ใช้ "เลือกรูปสลิป" แทน)
+
 ## MVP: 5 Functional Requirements (ตาม M1 Team Charter)
 
 | FR | ฟีเจอร์ | ในแอป |

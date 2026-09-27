@@ -5,7 +5,7 @@
  *   - DemoRepo:  on-device only, starts with sample data (for trying the app
  *                without an account and as a fallback during a presentation)
  */
-import Storage from 'expo-sqlite/kv-store';
+import { Storage } from './storage';
 import { buildSampleTransactions } from '../domain/sample';
 import type { Profile, Transaction, TransactionInput } from '../domain/types';
 import { supabase } from './supabase';

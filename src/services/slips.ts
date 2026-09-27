@@ -8,50 +8,12 @@
 import { scanFromURLAsync } from 'expo-camera';
 import * as Crypto from 'expo-crypto';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-import { Asset, AssetField, MediaType, Query, requestPermissionsAsync } from 'expo-media-library';
-import Storage from 'expo-sqlite/kv-store';
+import { Storage } from '../data/storage';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { parseSlipQr, type SlipQr, type SlipReading } from '../domain/slip';
 import { supabase } from '../data/supabase';
 
-// ---------------------------------------------------------------------------
-// Gallery
-// ---------------------------------------------------------------------------
-
-export type GalleryAccess = 'all' | 'limited' | 'denied' | 'blocked';
-
-export async function requestGalleryAccess(): Promise<GalleryAccess> {
-  const res = await requestPermissionsAsync(false, ['photo']);
-  if (res.granted) return res.accessPrivileges === 'limited' ? 'limited' : 'all';
-  return res.canAskAgain ? 'denied' : 'blocked';
-}
-
-export interface GalleryImage {
-  assetId: string;
-  createdAt: number;
-  width: number | null;
-  height: number | null;
-}
-
-/**
- * Photos created since `sinceMs`, newest first. Landscape photos are skipped:
- * bank slips are always portrait, which removes most camera photos cheaply.
- */
-export async function findGalleryImages(sinceMs: number, max = 3000): Promise<GalleryImage[]> {
-  const rows = await new Query()
-    .eq(AssetField.MEDIA_TYPE, MediaType.IMAGE)
-    .gte(AssetField.CREATION_TIME, sinceMs)
-    .orderBy({ key: AssetField.CREATION_TIME, ascending: false })
-    .limit(max)
-    .exeForMetadata();
-  return rows
-    .filter((r) => !r.width || !r.height || r.height >= r.width * 1.1)
-    .map((r) => ({ assetId: r.id, createdAt: r.creationTime ?? sinceMs, width: r.width, height: r.height }));
-}
-
-export function galleryUri(assetId: string): Promise<string> {
-  return new Asset(assetId).getUri();
-}
+export * from './gallery';
 
 // Remember which photos were already checked, so a second scan skips them.
 const scannedKey = (userId: string) => `mindpay.scanned.${userId}`;

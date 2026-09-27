@@ -1,0 +1,49 @@
+# Publishes the web version of MindPay to GitHub Pages on every push to main:
+#   https://2550expo-tech.github.io/Socrates-and-Skeletons-/
+# The web version shows the app at phone width, works with real accounts and
+# demo data, and reads slips from photos the user uploads. Scanning the whole
+# gallery is only in the phone app.
+name: Deploy web app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: web-pages
+  cancel-in-progress: true
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: App settings (public Supabase URL and publishable key)
+        run: cp .env.example .env
+
+      - name: Export web build
+        run: npx expo export --platform web --output-dir dist
+
+      - name: Single-page app fallback for deep links
+        run: cp dist/index.html dist/404.html
+
+      - name: Publish to the gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          force_orphan: true
+          commit_message: 'Deploy web app'

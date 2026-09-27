@@ -4,7 +4,7 @@
  * database decides what each signed-in user can read and write.
  * The Anthropic API key is NOT here; it lives only in the Edge Functions.
  */
-import 'expo-sqlite/localStorage/install';
+import './sessionStorageSetup';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { AppState } from 'react-native';
 

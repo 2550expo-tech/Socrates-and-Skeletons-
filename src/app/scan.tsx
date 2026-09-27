@@ -14,6 +14,7 @@ import { RANGE_LABEL, RANGE_ORDER } from '../domain/dates';
 import { formatBaht } from '../domain/money';
 import { milestones, scanCounts, type ItemStatus } from '../domain/scanQueue';
 import type { RangeKey } from '../domain/types';
+import { galleryAvailable } from '../services/slips';
 import { useSlipScanner } from '../services/useSlipScanner';
 import { Badge, Button, Card, Divider, IconButton, Ionicons, ProgressBar, Row, Segmented, T, type IconName } from '../ui/components';
 import { useToast } from '../ui/feedback';
@@ -79,7 +80,22 @@ export default function Scan() {
           </T>
         </View>
 
-        {state.items.length === 0 && state.phase === 'idle' ? (
+        {state.items.length === 0 && state.phase === 'idle' && !galleryAvailable ? (
+          <Card style={{ gap: space.md }}>
+            <Row gap={space.md} align="flex-start">
+              <Ionicons name="desktop-outline" size={26} color={theme.primary} />
+              <View style={{ flex: 1, gap: 4 }}>
+                <T v="h3">เลือกรูปสลิปจากเครื่องนี้</T>
+                <T v="small">
+                  เวอร์ชันเว็บค้นหาทั้งแกลเลอรีไม่ได้ เลือกรูปสลิปได้ครั้งละไม่เกิน 30 รูป ระบบจะอ่านทุกรูปที่เลือก ส่วนการสแกนแกลเลอรีอัตโนมัติมีในแอปมือถือ
+                </T>
+              </View>
+            </Row>
+            <Button label="เลือกรูปสลิป" icon="images-outline" onPress={s.loadPicked} disabled={demo} />
+          </Card>
+        ) : null}
+
+        {state.items.length === 0 && state.phase === 'idle' && galleryAvailable ? (
           <Card style={{ gap: space.md }}>
             <Row gap={space.md} align="flex-start">
               <Ionicons name="images-outline" size={26} color={theme.primary} />
