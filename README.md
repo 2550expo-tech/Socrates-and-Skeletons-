@@ -89,6 +89,15 @@ Expo Go เป็นแอปตัวช่วยตอนเขียนโค
 
 ### 3. ติดตั้งเป็นแอป Mind pay จริงบน Android (.apk)
 
+**วิธีง่ายสุด: ดาวน์โหลดไฟล์ที่ build ไว้แล้ว**
+ทุกครั้งที่ push ขึ้น `main` GitHub จะ build APK ให้อัตโนมัติ (ไฟล์ `.github/workflows/android-apk.yml`) ใช้เวลาประมาณ 15–25 นาที
+เปิดหน้านี้บนมือถือ Android → แตะ `mind-pay.apk` → ติดตั้ง:
+https://github.com/2550expo-tech/Socrates-and-Skeletons-/releases/tag/latest-apk
+
+ไฟล์นี้เซ็นด้วย debug key ใช้ทดสอบและพรีเซนต์ได้ แต่ยังไม่ใช่เวอร์ชันลง Play Store
+
+**หรือ build เองผ่าน EAS (บัญชี Expo)**
+
 ```bash
 npx eas-cli@latest login
 npx eas-cli@latest build --profile preview --platform android

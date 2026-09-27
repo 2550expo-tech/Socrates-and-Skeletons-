@@ -1,0 +1,77 @@
+# Builds an installable Android APK of Mind pay on GitHub's servers.
+#
+# Runs on every push to main (and can be started by hand from the Actions tab).
+# The finished APK is attached to the release "Mind pay (latest APK)":
+#   https://github.com/2550expo-tech/Socrates-and-Skeletons-/releases/tag/latest-apk
+# Open that page on an Android phone, tap mind-pay.apk, and install.
+#
+# The APK is signed with the Android debug key: fine for testing and for the
+# class demo, not for the Play Store (use EAS Build for that, see README).
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: App settings (public Supabase URL and publishable key)
+        run: cp .env.example .env
+
+      - name: Generate the native Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build release APK
+        working-directory: android
+        # arm64 only: covers practically every Android phone from the last 7 years and builds much faster.
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk mind-pay.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mind-pay-apk
+          path: mind-pay.apk
+
+      - name: Publish to the "latest-apk" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest-apk --yes --cleanup-tag || true
+          gh release create latest-apk mind-pay.apk \
+            --title "Mind pay (latest APK)" \
+            --notes "Built from ${GITHUB_SHA::7} on $(date -u +'%Y-%m-%d %H:%M UTC'). Open this page on an Android phone, tap mind-pay.apk, and install. Debug-signed build for testing." \
+            --prerelease
