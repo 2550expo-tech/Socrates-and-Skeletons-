@@ -88,8 +88,34 @@ const READER_MESSAGES: Record<SlipReaderError['code'], string> = {
   reader_error: 'อ่านรูปนี้ไม่สำเร็จ',
 };
 
-/** Send the prepared image to the slip reader (Edge Function parse-slip). */
-export async function readSlip(base64: string): Promise<SlipReading> {
+/**
+ * Seconds to wait before asking again when the AI is rate-limited. The free
+ * Gemini tier allows only a few requests per minute, so a first scan with many
+ * slips can hit the limit; waiting a little is better than stopping the scan.
+ */
+export const BUSY_WAITS_S = [20, 40];
+
+/** Shown while the reader waits for the AI's rate limit to reset. */
+export const waitMessage = (seconds: number) => `AI มีคิวเยอะ รออีก ${seconds} วินาทีแล้วอ่านต่อให้เอง`;
+
+/**
+ * Send the prepared image to the slip reader (Edge Function parse-slip).
+ * When the AI is busy, waits and tries again (onWait tells the screen).
+ */
+export async function readSlip(base64: string, onWait?: (seconds: number) => void): Promise<SlipReading> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await readSlipOnce(base64);
+    } catch (e) {
+      const wait = BUSY_WAITS_S[attempt];
+      if (!(e instanceof SlipReaderError) || e.code !== 'busy' || wait === undefined) throw e;
+      onWait?.(wait);
+      await new Promise((resolve) => setTimeout(resolve, wait * 1000));
+    }
+  }
+}
+
+async function readSlipOnce(base64: string): Promise<SlipReading> {
   if (!supabase) throw new SlipReaderError('cloud_required', READER_MESSAGES.cloud_required);
   const { data, error } = await supabase.functions.invoke('parse-slip', {
     body: { imageBase64: base64, mediaType: 'image/jpeg' },

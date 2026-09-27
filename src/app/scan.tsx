@@ -178,6 +178,9 @@ export default function Scan() {
               </View>
             </Row>
             {!done ? <ProgressBar value={counts.total ? counts.finished / counts.total : 0} color={theme.accent} /> : null}
+            {running && s.waiting ? (
+              <T v="small">{s.waiting}</T>
+            ) : null}
             {running ? <Button label="หยุดชั่วคราว" kind="soft" small icon="pause" onPress={s.pause} /> : null}
             {paused && !s.notice ? <Button label="อ่านต่อ" small icon="play" onPress={s.resume} /> : null}
             {done && readyIds.length > 0 ? (

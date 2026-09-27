@@ -61,6 +61,26 @@ export function isZeroQuota(body: string): boolean {
   return /limit:\s*0\b/.test(body);
 }
 
+/**
+ * What to do after a failed Gemini call:
+ * - invalid_key: stop, the key is wrong (tell the app "not configured")
+ * - plain_schema: retry the same model with the schema described in the prompt
+ * - next_model: this model is not available to this key; try the next one
+ * - busy: rate limit or overload on this model. Each model has its own free
+ *   quota, so try the next model first and wait only when all are busy.
+ * - fail: anything else
+ */
+export type GeminiStep = 'invalid_key' | 'plain_schema' | 'next_model' | 'busy' | 'fail';
+
+export function geminiStep(status: number, body: string, usingJsonSchema: boolean): GeminiStep {
+  if (isInvalidKey(status, body)) return 'invalid_key';
+  if (status === 404) return 'next_model';
+  if (status === 429 && isZeroQuota(body)) return 'next_model';
+  if (status === 400 && usingJsonSchema) return 'plain_schema';
+  if (status === 429 || status === 500 || status === 503) return 'busy';
+  return 'fail';
+}
+
 /** Gemini 429 bodies carry RetryInfo such as "retryDelay": "7s". Returns milliseconds, or null. */
 export function retryDelayMs(body: string): number | null {
   const m = body.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/);

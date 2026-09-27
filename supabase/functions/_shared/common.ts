@@ -5,9 +5,9 @@ import {
   CLAUDE_KEY_NAMES,
   GEMINI_KEY_NAMES,
   geminiModels,
+  geminiStep,
   geminiText,
   isInvalidKey,
-  isZeroQuota,
   pickProvider,
   readKey,
   retryDelayMs,
@@ -172,55 +172,58 @@ async function callGemini(req: AiRequest): Promise<{ text: string; model: string
     c.type === 'text' ? { text: c.text } : { inlineData: { mimeType: c.mediaType, data: c.data } },
   );
   let useJsonSchema = !!req.schema;
-  let waited = false;
   let lastError = 'Gemini: no model available';
+  const models = geminiModels(Deno.env.get('GEMINI_MODEL'));
 
-  for (const model of geminiModels(Deno.env.get('GEMINI_MODEL'))) {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      // maxOutputTokens also covers the model's internal thinking, so leave room.
-      const generationConfig: Record<string, unknown> = { maxOutputTokens: Math.max(2048, req.maxTokens * 4) };
-      let system = req.system;
-      if (req.schema) {
-        generationConfig.responseMimeType = 'application/json';
-        if (useJsonSchema) generationConfig.responseJsonSchema = req.schema;
-        else system += `\n\nReply with one JSON object that matches this JSON Schema:\n${JSON.stringify(req.schema)}`;
-      }
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: 'POST',
-        headers: { 'x-goog-api-key': key, 'content-type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: 'user', parts }],
-          generationConfig,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const text = geminiText(data);
-        if (!text) {
-          const why = data?.candidates?.[0]?.finishReason ?? data?.promptFeedback?.blockReason ?? 'unknown';
-          throw new Error(`Gemini ${model} returned no text (${why})`);
+  // Try every model; if some were only busy, wait once and try them all again.
+  for (let round = 0; round < 2; round++) {
+    let busyDelayMs: number | null = null;
+    for (const model of models) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        // maxOutputTokens also covers the model's internal thinking, so leave room.
+        const generationConfig: Record<string, unknown> = { maxOutputTokens: Math.max(2048, req.maxTokens * 4) };
+        let system = req.system;
+        if (req.schema) {
+          generationConfig.responseMimeType = 'application/json';
+          if (useJsonSchema) generationConfig.responseJsonSchema = req.schema;
+          else system += `\n\nReply with one JSON object that matches this JSON Schema:\n${JSON.stringify(req.schema)}`;
         }
-        return { text, model };
-      }
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: 'POST',
+          headers: { 'x-goog-api-key': key, 'content-type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: system }] },
+            contents: [{ role: 'user', parts }],
+            generationConfig,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const text = geminiText(data);
+          if (!text) {
+            const why = data?.candidates?.[0]?.finishReason ?? data?.promptFeedback?.blockReason ?? 'unknown';
+            throw new Error(`Gemini ${model} returned no text (${why})`);
+          }
+          return { text, model };
+        }
 
-      const detail = await res.text();
-      lastError = `Gemini ${model} ${res.status}: ${detail.slice(0, 300)}`;
-      if (isInvalidKey(res.status, detail)) throw new NotConfiguredError(lastError);
-      if (res.status === 404) break; // this key cannot use this model: try the next one
-      if (res.status === 429 && isZeroQuota(detail)) break; // no free quota for this model
-      if (res.status === 400 && useJsonSchema) {
-        useJsonSchema = false; // describe the schema in the prompt instead
-        continue;
+        const detail = await res.text();
+        lastError = `Gemini ${model} ${res.status}: ${detail.slice(0, 300)}`;
+        const step = geminiStep(res.status, detail, useJsonSchema);
+        if (step === 'invalid_key') throw new NotConfiguredError(lastError);
+        if (step === 'fail') throw new Error(lastError);
+        if (step === 'plain_schema') {
+          useJsonSchema = false; // describe the schema in the prompt instead
+          continue;
+        }
+        if (step === 'busy') busyDelayMs = Math.max(busyDelayMs ?? 0, retryDelayMs(detail) ?? 3000);
+        break; // next_model or busy: the next model has its own quota
       }
-      if (res.status === 429 || res.status === 503) {
-        if (waited) throw new BusyError(lastError);
-        waited = true;
-        await sleep(Math.min(retryDelayMs(detail) ?? 3000, 15000));
-        continue;
-      }
-      throw new Error(lastError);
     }
+    if (busyDelayMs === null) break; // no model is usable with this key
+    if (round === 1) throw new BusyError(lastError);
+    console.warn(JSON.stringify({ ai: 'gemini', task: req.task, waitMs: Math.min(busyDelayMs, 12000) }));
+    await sleep(Math.min(busyDelayMs, 12000));
   }
   throw new Error(lastError);
 }

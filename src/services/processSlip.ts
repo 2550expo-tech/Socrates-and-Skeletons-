@@ -37,6 +37,8 @@ export async function processSlipImage(opts: {
   autoConfirm: boolean;
   /** Used as the transaction time when the slip date could not be read. */
   fallbackTimeMs: number;
+  /** Called when the AI is busy and the reader waits before trying again. */
+  onWait?: (seconds: number) => void;
 }): Promise<ProcessResult> {
   const qr = await detectSlipQr(opts.uri);
   if (!qr && opts.requireQr) return { status: 'not_slip', message: 'ไม่พบ QR ของสลิป' };
@@ -44,7 +46,7 @@ export async function processSlipImage(opts: {
   const prepared = await prepareImage(opts.uri, opts.width);
   if (opts.index.hashes.has(prepared.hash)) return { status: 'duplicate', message: 'รูปนี้เคยบันทึกแล้ว' };
 
-  const reading = await readSlip(prepared.base64);
+  const reading = await readSlip(prepared.base64, opts.onWait);
   if (!reading.isSlip) return { status: 'not_slip', message: 'ไม่ใช่สลิปโอนเงิน' };
 
   const c = normalizeReading(reading, { qr, imageHash: prepared.hash });

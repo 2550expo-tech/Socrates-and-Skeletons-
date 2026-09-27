@@ -59,6 +59,7 @@ const state = {
   calls: [],
   txRows: [], // transactions saved through the REST API
   slipReadings: [], // queue of answers from the slip reader (parse-slip)
+  slipBusy: 0, // this many next parse-slip calls answer "AI busy" (free-tier rate limit)
   coach: { status: 200, body: { text: 'สัปดาห์นี้ใช้ไป ฿0 ยังไม่มีรายจ่ายเลยนะ' } }, // answer of the coach function
 };
 let seq = 0;
@@ -163,6 +164,10 @@ async function supabase(route) {
   }
   if (p === '/functions/v1/coach') return reply(state.coach);
   if (p === '/functions/v1/parse-slip') {
+    if (state.slipBusy > 0) {
+      state.slipBusy -= 1;
+      return reply({ status: 503, body: { error: { code: 'busy', message: 'x' } } });
+    }
     const reading = state.slipReadings.shift();
     return reading ? reply({ body: { reading } }) : reply(err(502, 'reader_error', 'x'));
   }
@@ -432,6 +437,7 @@ try {
       { isSlip: false, direction: 'unknown', amount: null, dateText: null, dateIso: null, time: null, counterparty: null, bank: null, reference: null, confidence: { amount: 0, date: 0, counterparty: 0 } },
     ];
     const { ctx, page } = await freshPage('scan');
+    await page.clock.install(); // real time, but the AI-busy wait below can be skipped
     await page.goto(APP);
     await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
     await introGone(page);
@@ -451,7 +457,11 @@ try {
     await shot(page, '14-scan-start');
     const chooser = page.waitForEvent('filechooser');
     await button(page, 'เลือกรูปสลิป').click();
+    state.slipBusy = 1;
     await (await chooser).setFiles(['photo-1.jpg', 'photo-2.jpg', 'photo-3.jpg'].map((f) => join(FIXTURES, f)));
+    check('AI busy (free-tier limit): the scan says it will wait instead of failing', await visible(page, 'AI มีคิวเยอะ รออีก 20 วินาที', 10000));
+    await shot(page, '14b-scan-ai-busy');
+    await page.clock.fastForward(21_000);
     check('Reading starts by itself and finishes', await visible(page, 'อ่านเสร็จแล้ว ได้ 2 รายการ', 20000));
     await page.waitForTimeout(600);
     await shot(page, '15-scan-done');

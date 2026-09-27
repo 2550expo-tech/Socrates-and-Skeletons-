@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   geminiModels,
+  geminiStep,
   geminiText,
   isInvalidKey,
   isZeroQuota,
@@ -36,6 +37,18 @@ describe('AI provider', () => {
     expect(retryDelayMs('{"retryDelay": "7s"}')).toBe(7000);
     expect(retryDelayMs('{"retryDelay":"0.5s"}')).toBe(500);
     expect(retryDelayMs('slow down')).toBeNull();
+  });
+
+  it('TC-55 a busy model hands over to the next model (each has its own free quota)', () => {
+    expect(geminiStep(429, '{"retryDelay":"20s"} limit: 15', true)).toBe('busy');
+    expect(geminiStep(503, 'overloaded', false)).toBe('busy');
+    expect(geminiStep(500, 'internal', false)).toBe('busy');
+    expect(geminiStep(429, 'limit: 0, model: x', true)).toBe('next_model');
+    expect(geminiStep(404, 'not found', true)).toBe('next_model');
+    expect(geminiStep(400, 'Unknown name "responseJsonSchema"', true)).toBe('plain_schema');
+    expect(geminiStep(400, 'bad request', false)).toBe('fail');
+    expect(geminiStep(400, '{"reason":"API_KEY_INVALID"}', true)).toBe('invalid_key');
+    expect(geminiStep(403, '', false)).toBe('invalid_key');
   });
 
   it('TC-40 reads the reply text: skips thinking parts, fenced JSON, markdown', () => {

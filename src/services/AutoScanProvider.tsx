@@ -27,6 +27,7 @@ import {
   rememberScanned,
   requestGalleryAccess,
   SlipReaderError,
+  waitMessage,
 } from './slips';
 
 export type AutoScanPhase = 'idle' | 'needs_permission' | 'scanning' | 'done' | 'error';
@@ -54,7 +55,7 @@ interface AutoScanContextValue {
   dismiss(): void;
 }
 
-const IDLE: AutoScanState = { phase: 'idle', total: 0, processed: 0, confirmed: [], drafts: 0, message: null };
+const IDLE: AutoScanState ={ phase: 'idle', total: 0, processed: 0, confirmed: [], drafts: 0, message: null };
 const AutoScanContext = createContext<AutoScanContextValue | null>(null);
 
 export function useAutoScan() {
@@ -107,6 +108,7 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
               repo,
               autoConfirm: p.autoConfirm,
               fallbackTimeMs: img.createdAt,
+              onWait: (seconds) => setState((s) => ({ ...s, message: waitMessage(seconds) })),
             });
             if (r.tx) {
               upsertLocal(r.tx);
@@ -122,7 +124,7 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
             // One unreadable image: skip it this time, try again next run.
           }
           processed += 1;
-          setState((s) => ({ ...s, processed, confirmed: [...confirmed], drafts }));
+          setState((s) => ({ ...s, processed, confirmed: [...confirmed], drafts, message: null }));
         }
 
         await rememberScanned(userId, scanned);

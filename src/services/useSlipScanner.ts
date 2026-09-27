@@ -26,6 +26,7 @@ import {
   rememberScanned,
   requestGalleryAccess,
   SlipReaderError,
+  waitMessage,
   type GalleryAccess,
 } from './slips';
 
@@ -45,6 +46,8 @@ export function useSlipScanner(initialRange: RangeKey = '1m') {
   const [skippedKnown, setSkippedKnown] = useState(0);
   const [requireQr, setRequireQr] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
+  /** Set while the reader waits for the AI's rate limit (free tier) before trying again. */
+  const [waiting, setWaiting] = useState<string | null>(null);
   /** Transactions recorded by this scan, to show them grouped by date. */
   const [runTxIds, setRunTxIds] = useState<string[]>([]);
 
@@ -131,7 +134,11 @@ export function useSlipScanner(initialRange: RangeKey = '1m') {
       repo: repo!,
       autoConfirm: prefs.autoConfirm,
       fallbackTimeMs: item.createdAt,
+      onWait: (seconds) => {
+        if (mounted.current) setWaiting(waitMessage(seconds));
+      },
     });
+    if (mounted.current) setWaiting(null);
     if (r.tx) {
       upsertLocal(r.tx);
       const id = r.tx.id;
@@ -162,6 +169,7 @@ export function useSlipScanner(initialRange: RangeKey = '1m') {
           apply({ type: 'itemFinished', runId, assetId: item.assetId, ...result });
           if (!pickedRef.current.has(item.assetId) && userId) scannedRef.current.add(item.assetId);
         } catch (e) {
+          if (mounted.current) setWaiting(null);
           if (e instanceof SlipReaderError && e.code !== 'reader_error' && e.code !== 'network') {
             // Problems that affect every image: stop and tell the user. This image is retried on resume.
             setNotice(e.message);
@@ -192,6 +200,7 @@ export function useSlipScanner(initialRange: RangeKey = '1m') {
     requireQr,
     setRequireQr,
     notice,
+    waiting,
     runTxIds,
     setRange,
     loadFromGallery,
