@@ -88,7 +88,7 @@
 
 ## Automated tests
 
-รัน `npm test` · ไฟล์ `src/domain/__tests__/domain.test.ts` · ผลล่าสุด **32/32 ผ่าน**
+รัน `npm test` · ไฟล์ `src/domain/__tests__/domain.test.ts` · ผลล่าสุด **40/40 ผ่าน** (รวม TC-33: ข้อมูลตัวอย่างต้องมียอดเงินเป็นบวกและ Runway ≥ 10 วัน ไม่ว่าจะเปิดแอปวันไหน)
 
 ## Manual test plan (ทีมทดสอบบนมือถือจริง แล้วกรอกผล)
 

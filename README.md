@@ -133,7 +133,7 @@ Supabase Dashboard → **Edge Functions → Secrets** → เพิ่ม
 ## คำสั่งสำหรับนักพัฒนา
 
 ```bash
-npm test            # unit test ของกฎทั้งหมด (32 เคส)
+npm test            # unit test ของกฎทั้งหมด (40 เคส)
 npm run typecheck   # ตรวจ TypeScript
 npx expo lint       # ESLint
 npx expo start      # เปิด dev server

@@ -6,7 +6,7 @@
  *                without an account and as a fallback during a presentation)
  */
 import { Storage } from './storage';
-import { buildSampleTransactions } from '../domain/sample';
+import { buildSampleTransactions, DEMO_OPENING_BALANCE_SATANG } from '../domain/sample';
 import type { Profile, Transaction, TransactionInput } from '../domain/types';
 import { supabase } from './supabase';
 
@@ -180,7 +180,8 @@ export function createCloudRepo(userId: string): Repo {
 // Demo (on-device)
 // ---------------------------------------------------------------------------
 
-const DEMO_KEY = 'mindpay.demo.v1';
+// v2: rebalanced sample data (v1 could show a negative balance). Old v1 data is simply ignored.
+const DEMO_KEY = 'mindpay.demo.v2';
 
 interface DemoState {
   profile: Profile;
@@ -190,9 +191,9 @@ interface DemoState {
 const demoProfile: Profile = {
   id: 'demo',
   displayName: 'ผู้ทดลองใช้',
-  openingBalanceSatang: 400_000,
+  openingBalanceSatang: DEMO_OPENING_BALANCE_SATANG,
   runwayFloorSatang: 50_000,
-  monthlyBudgetSatang: 900_000,
+  monthlyBudgetSatang: 1_000_000,
   coachTone: 'friend',
   onboarded: true,
 };
