@@ -55,6 +55,8 @@ describe('Reading the AI key', () => {
     expect(readKey(env({ GEMINI_API_KEY: '  abc123\n' }), GEMINI_KEY_NAMES)).toBe('abc123');
     expect(readKey(env({ GEMINI_API_KEY: '"abc123"' }), GEMINI_KEY_NAMES)).toBe('abc123');
     expect(readKey(env({ GOOGLE_API_KEY: 'xyz' }), GEMINI_KEY_NAMES)).toBe('xyz');
+    expect(readKey(env({ 'GEMINI API KEY': 'spaced' }), GEMINI_KEY_NAMES)).toBe('spaced');
+    expect(readKey(env({ GEMINI_API_KEY: 'right', 'GEMINI API KEY': 'spaced' }), GEMINI_KEY_NAMES)).toBe('right');
     expect(readKey(env({ GEMINI_API_KEY: '   ' }), GEMINI_KEY_NAMES)).toBeNull();
     expect(readKey(env({}), GEMINI_KEY_NAMES)).toBeNull();
   });

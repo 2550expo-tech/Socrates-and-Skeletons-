@@ -3,9 +3,20 @@
 
 export type AiProvider = 'claude' | 'gemini';
 
-/** Secret names accepted for each service (Google's own tools also read GOOGLE_API_KEY). */
-export const GEMINI_KEY_NAMES = ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY'];
-export const CLAUDE_KEY_NAMES = ['ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'];
+/**
+ * Secret names accepted for each service. The first is the documented one;
+ * the rest are Google's other standard name and common typing slips seen in
+ * the Supabase dashboard (a secret saved as "GEMINI API KEY", 28 ก.ย. 2569).
+ */
+export const GEMINI_KEY_NAMES = [
+  'GEMINI_API_KEY',
+  'GOOGLE_API_KEY',
+  'GOOGLE_GENERATIVE_AI_API_KEY',
+  'GEMINI API KEY',
+  'GEMINI-API-KEY',
+  'GEMINI_KEY',
+];
+export const CLAUDE_KEY_NAMES = ['ANTHROPIC_API_KEY', 'CLAUDE_API_KEY', 'ANTHROPIC API KEY'];
 
 /**
  * The first secret that is set, with spaces, line breaks or quotes from

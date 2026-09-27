@@ -13,7 +13,14 @@ import {
   retryDelayMs,
 } from './helpers.ts';
 
-const env = (name: string) => Deno.env.get(name);
+/** Read one environment variable; a name the runtime refuses counts as "not set". */
+const env = (name: string) => {
+  try {
+    return Deno.env.get(name);
+  } catch {
+    return undefined;
+  }
+};
 const geminiKey = () => readKey(env, GEMINI_KEY_NAMES);
 const claudeKey = () => readKey(env, CLAUDE_KEY_NAMES);
 
