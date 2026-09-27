@@ -205,10 +205,10 @@ try {
   {
     const { ctx, page } = await freshPage('intro');
     await page.goto(APP);
-    await page.waitForTimeout(450);
+    const introSeen = await page.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'attached', timeout: 8000 }).then(() => true, () => false);
+    await page.waitForTimeout(400);
     await shot(page, '01-intro-mid');
-    const introSeen = await page.getByLabel('กำลังเปิด MindPay').count();
-    check('Opening animation is shown on launch', introSeen > 0);
+    check('Opening animation is shown on launch', introSeen);
     check('Opening animation lifts away and shows the welcome screen', await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000));
     const removed = await page.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);
     check('Opening animation is removed after it ends', removed);
@@ -321,7 +321,9 @@ try {
     await page.fill('#email', 'beam@example.com');
     await page.fill('#password', 'secret123');
     await button(page, 'สร้างบัญชี').click();
-    check('Confirmation off: popup at once, then money setup behind it', (await visible(page, 'สมัครบัญชีสำเร็จ')) && (await page.locator('#ob-name').count()) > 0);
+    const popup = await visible(page, 'สมัครบัญชีสำเร็จ');
+    const setupBehind = await page.locator('#ob-name').waitFor({ state: 'attached', timeout: 8000 }).then(() => true, () => false);
+    check('Confirmation off: popup at once, then money setup behind it', popup && setupBehind);
     await ctx.close();
     state.confirmEmail = true;
   }
