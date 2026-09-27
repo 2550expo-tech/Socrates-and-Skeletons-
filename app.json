@@ -72,8 +72,7 @@
     ],
     "scheme": "mindpay",
     "experiments": {
-      "typedRoutes": true,
-      "baseUrl": "/Socrates-and-Skeletons-"
+      "typedRoutes": true
     },
     "runtimeVersion": {
       "policy": "appVersion"

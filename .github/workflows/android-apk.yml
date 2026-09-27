@@ -67,7 +67,7 @@ jobs:
         working-directory: android
         # arm64 only: covers practically every Android phone from the last 7 years and builds much faster.
         # lintVitalAnalyzeRelease is skipped: it is a code-style check that is not needed to produce the APK.
-        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a -x lintVitalAnalyzeRelease
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a -x lintVitalAnalyzeRelease --stacktrace
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/release/app-release.apk mind-pay.apk

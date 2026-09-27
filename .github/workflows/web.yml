@@ -35,6 +35,8 @@ jobs:
         run: cp .env.example .env
 
       - name: Export web build
+        env:
+          EXPO_WEB_BASE_URL: /Socrates-and-Skeletons-
         run: npx expo export --platform web --output-dir dist
 
       - name: Single-page app fallback for deep links
