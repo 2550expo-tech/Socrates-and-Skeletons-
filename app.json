@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "MindPay",
+    "name": "Mind pay",
     "slug": "mindpay",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,7 +10,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.socratesandskeletons.mindpay",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "MindPay ตรวจรูปในแกลเลอรีเพื่อหาสลิปโอนเงินและบันทึกรายการให้อัตโนมัติ"
+        "NSPhotoLibraryUsageDescription": "Mind pay ตรวจรูปในแกลเลอรีเพื่อหาสลิปโอนเงินและบันทึกรายการให้อัตโนมัติ"
       }
     },
     "android": {
@@ -40,7 +40,7 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "MindPay ตรวจรูปในแกลเลอรีเพื่อหาสลิปโอนเงินและบันทึกรายการให้อัตโนมัติ",
+          "photosPermission": "Mind pay ตรวจรูปในแกลเลอรีเพื่อหาสลิปโอนเงินและบันทึกรายการให้อัตโนมัติ",
           "savePhotosPermission": false,
           "isAccessMediaLocationEnabled": false,
           "granularPermissions": [
@@ -51,7 +51,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "เลือกรูปสลิปเพื่อให้ MindPay อ่านรายการ",
+          "photosPermission": "เลือกรูปสลิปเพื่อให้ Mind pay อ่านรายการ",
           "cameraPermission": false,
           "microphonePermission": false
         }

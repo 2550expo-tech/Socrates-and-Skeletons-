@@ -42,3 +42,4 @@ yarn-error.*
 
 # secrets
 .env
+node_modules

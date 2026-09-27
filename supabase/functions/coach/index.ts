@@ -13,7 +13,7 @@ const PERSONAS: Record<string, string> = {
 };
 
 function systemPrompt(tone: string) {
-  return `You are the MindPay coach inside a Thai personal finance app for students and first-jobbers.
+  return `You are the Mind pay coach inside a Thai personal finance app for students and first-jobbers.
 Persona: ${PERSONAS[tone] ?? PERSONAS.friend}
 
 Rules:

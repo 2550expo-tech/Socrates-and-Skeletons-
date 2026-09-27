@@ -84,7 +84,7 @@ export default function Welcome() {
         >
           <ContourLines width={420} height={320} color={palette.goldBright} />
           <MoneyTree health={0.85} size={120} trunk="#E8E1CC" leaf={palette.goldBright} bare="#7FA491" />
-          <T v="display" color="#F4F1E6" style={{ marginTop: space.sm }}>MindPay</T>
+          <T v="display" color="#F4F1E6" style={{ marginTop: space.sm }}>Mind pay</T>
           <T v="body" color="#B9CEC2" center>รู้ก่อนจ่าย เห็นว่าเงินจะอยู่ได้อีกกี่วัน</T>
         </View>
 

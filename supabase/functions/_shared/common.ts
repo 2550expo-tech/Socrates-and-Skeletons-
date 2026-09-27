@@ -1,4 +1,4 @@
-// Shared helpers for MindPay Edge Functions (Deno runtime on Supabase).
+// Shared helpers for Mind pay Edge Functions (Deno runtime on Supabase).
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 export const corsHeaders = {

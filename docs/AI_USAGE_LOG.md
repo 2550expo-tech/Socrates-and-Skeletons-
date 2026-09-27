@@ -1,6 +1,6 @@
 # AI Usage Log
 
-บันทึกการใช้ AI ในการพัฒนา MindPay ตามที่ SRS กำหนด (Tool / Prompt-purpose / Output / สิ่งที่แก้ไข / Human verification / Evidence)
+บันทึกการใช้ AI ในการพัฒนา Mind pay ตามที่ SRS กำหนด (Tool / Prompt-purpose / Output / สิ่งที่แก้ไข / Human verification / Evidence)
 
 > ทีมต้องเติมคอลัมน์ "Human verification" ด้วยสิ่งที่สมาชิกตรวจเองจริง และแนบหลักฐาน (ภาพหน้าจอ, commit, ผลทดสอบ) อย่าเขียนว่า AI ทำทั้งหมดเอง
 

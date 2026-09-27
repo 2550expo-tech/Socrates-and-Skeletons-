@@ -1,5 +1,5 @@
 /**
- * Core data types for MindPay.
+ * Core data types for Mind pay.
  *
  * Money is always stored as an integer number of satang (1 baht = 100 satang)
  * so that adding many amounts never produces floating-point errors
@@ -43,7 +43,7 @@ export type CoachTone = 'friend' | 'coach' | 'senior';
 export interface Profile {
   id: string;
   displayName: string;
-  /** Money the user had when they started using MindPay. Balance = opening + income − expense. */
+  /** Money the user had when they started using Mind pay. Balance = opening + income − expense. */
   openingBalanceSatang: number;
   /** FR-6: the "low" line. Runway counts the days until balance would reach this amount. */
   runwayFloorSatang: number;
