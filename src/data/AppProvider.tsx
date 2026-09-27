@@ -5,7 +5,9 @@
  */
 import { Storage } from './storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { AppState } from 'react-native';
 import { authErrorMessage, authLinkErrorMessage, parseAuthLink } from '../domain/auth';
+import { bkkDayKey, msUntilNextBkkMidnight } from '../domain/dates';
 import { averageDailyExpense, computeRunway } from '../domain/runway';
 import { computeBalance } from '../domain/summary';
 import type { Profile, Transaction, TransactionInput } from '../domain/types';
@@ -14,6 +16,7 @@ import { clearLinkFromAddressBar, onIncomingLink, openingLink } from './authLink
 import { supabase } from './supabase';
 
 const MODE_KEY = 'mindpay.mode';
+const LAST_DAY_KEY = 'mindpay.lastOpenDay';
 
 type AuthStatus = 'loading' | 'signedOut' | 'ready';
 
@@ -45,6 +48,10 @@ interface AppContextValue {
   authNotice: AuthNotice | null;
   showAuthNotice(notice: AuthNotice): void;
   dismissAuthNotice(): void;
+  /** Today's Bangkok day ("2026-09-28"). Changes at 00:00, so everything about "วันนี้" starts over. */
+  today: string;
+  /** True for the first session of a new day (greets the user and sums up yesterday). */
+  newDay: boolean;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -64,6 +71,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [authNotice, setAuthNotice] = useState<AuthNotice | null>(null);
+  const [today, setToday] = useState(() => bkkDayKey(Date.now()));
+  const [newDay, setNewDay] = useState(false);
+  const todayRef = useRef(today);
   const repoRef = useRef<Repo | null>(null);
   /** The account whose data is loaded (or being loaded): prevents loading the same account twice. */
   const activeUserRef = useRef<string | null>(null);
@@ -101,6 +111,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setProfile(null);
     setTxs([]);
     setStatus('signedOut');
+  }, []);
+
+  // A new day starts at 00:00 Bangkok time: while the app is open (timer) or
+  // when it comes back to the screen the next morning (AppState / tab focus).
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const check = () => {
+      const now = bkkDayKey(Date.now());
+      if (now !== todayRef.current) {
+        todayRef.current = now;
+        setToday(now);
+        setNewDay(true);
+        Storage.setItem(LAST_DAY_KEY, now).catch(() => {});
+      }
+      clearTimeout(timer);
+      timer = setTimeout(check, msUntilNextBkkMidnight() + 1000);
+    };
+    check();
+    // First open on a different day from the last one.
+    Storage.getItem(LAST_DAY_KEY)
+      .then((last) => {
+        if (last && last !== todayRef.current) setNewDay(true);
+        return Storage.setItem(LAST_DAY_KEY, todayRef.current);
+      })
+      .catch(() => {});
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') check();
+    });
+    return () => {
+      clearTimeout(timer);
+      sub.remove();
+    };
   }, []);
 
   /**
@@ -247,8 +289,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       dismissAuthNotice() {
         setAuthNotice(null);
       },
+      today,
+      newDay,
     }),
-    [status, repo, userId, profile, txs, loadError, refreshing, authNotice, loadAll, activateRepo, clear],
+    [status, repo, userId, profile, txs, loadError, refreshing, authNotice, today, newDay, loadAll, activateRepo, clear],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
@@ -256,7 +300,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 /** Derived money numbers used across screens (FR-2 balance, FR-6 runway). */
 export function useMoney() {
-  const { profile, txs } = useApp();
+  const { profile, txs, today } = useApp();
   return useMemo(() => {
     const opening = profile?.openingBalanceSatang ?? 0;
     const floor = profile?.runwayFloorSatang ?? 50_000;
@@ -265,5 +309,7 @@ export function useMoney() {
     const runway = computeRunway({ balanceSatang: balance, floorSatang: floor, averageSatang: average.averageSatang });
     const drafts = txs.filter((t) => t.status === 'draft');
     return { balance, average, runway, drafts };
-  }, [profile, txs]);
+    // `today` makes the runway and averages start over at midnight.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, txs, today]);
 }

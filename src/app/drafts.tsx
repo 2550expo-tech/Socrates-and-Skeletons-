@@ -3,6 +3,7 @@
  * drafts with unsure fields open the form with those fields highlighted.
  */
 import { router } from 'expo-router';
+import { goBack } from '../ui/nav';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -40,7 +41,7 @@ export default function Drafts() {
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
       <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
-        <IconButton icon="chevron-back" label="กลับ" onPress={() => router.back()} />
+        <IconButton icon="chevron-back" label="กลับ" onPress={() => goBack()} />
         <T v="h3">สลิปรอยืนยัน</T>
         <IconButton icon="scan-outline" label="สแกนเพิ่ม" onPress={() => router.push('/scan')} />
       </Row>

@@ -4,7 +4,8 @@
  * button confirms the draft so it starts counting in totals.
  */
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { goBack } from '../ui/nav';
 import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -106,7 +107,7 @@ export default function TransactionForm() {
         });
         toast({ message: 'บันทึกรายการแล้ว' });
       }
-      router.back();
+      goBack();
     } catch (e) {
       toast({ message: e instanceof Error && e.name === 'DuplicateSlipError' ? 'มีรายการจากสลิปนี้อยู่แล้ว' : 'บันทึกไม่สำเร็จ ลองอีกครั้ง', tone: 'error' });
     } finally {
@@ -120,7 +121,7 @@ export default function TransactionForm() {
     setBusy(true);
     try {
       const removed = await removeTx(existing.id);
-      router.back();
+      goBack();
       toast({
         message: 'ลบรายการแล้ว',
         action: removed
@@ -166,7 +167,7 @@ export default function TransactionForm() {
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
-          <IconButton icon="close" label="ปิด" onPress={() => router.back()} />
+          <IconButton icon="close" label="ปิด" onPress={() => goBack()} />
           <T v="h3">{!existing ? 'จดรายการ' : isDraft ? 'ตรวจสลิป' : 'แก้ไขรายการ'}</T>
           {existing ? (
             <IconButton icon="trash-outline" label="ลบรายการ" color={theme.critical} onPress={() => setAskDelete(true)} />

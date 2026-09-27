@@ -1,49 +1,65 @@
 /**
  * FR-4 Automatic Gallery Slip Detection.
  *
- * Flow: choose range -> find photos -> check each one (QR on the phone, then the
- * slip reader) -> drafts appear in the review list -> confirm.
- * The range is locked while a scan runs (see scanQueue.ts), and leaving the
- * screen pauses; drafts already saved stay saved.
+ * New flow (28 ก.ย. 2569, from user feedback): nothing to choose first.
+ *   - Phone app: opening this screen searches the gallery (last 30 days, new
+ *     photos only) and starts reading right away.
+ *   - Web (iPhone/computer): browsers cannot look through the photo library, so
+ *     one tap opens the picker; reading starts as soon as photos are chosen.
+ * Every slip is recorded under the date printed on it, and clear ones count
+ * in the balance at once (auto-confirm). The results are then shown by period
+ * (วันนี้ 00:00–23:59, 7 วัน, 1 เดือน) and by day.
  */
 import { router } from 'expo-router';
-import { Linking, ScrollView, Switch, View } from 'react-native';
+import { goBack } from '../ui/nav';
+import { useEffect, useMemo, useRef } from 'react';
+import { Linking, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../data/AppProvider';
-import { RANGE_LABEL, RANGE_ORDER } from '../domain/dates';
+import { BUDDY_NAME } from '../domain/buddy';
+import { relativeDayLabel } from '../domain/dates';
 import { formatBaht } from '../domain/money';
-import { milestones, scanCounts, type ItemStatus } from '../domain/scanQueue';
-import type { RangeKey } from '../domain/types';
+import { scanCounts } from '../domain/scanQueue';
+import { groupByDay } from '../domain/summary';
 import { galleryAvailable } from '../services/slips';
 import { useSlipScanner } from '../services/useSlipScanner';
-import { Badge, Button, Card, Divider, IconButton, Ionicons, ProgressBar, Row, Segmented, T, type IconName } from '../ui/components';
-import { BuddySays } from '../ui/Buddy';
+import { Buddy, BuddySays } from '../ui/Buddy';
+import { Button, Card, Divider, IconButton, Ionicons, ProgressBar, Row, T } from '../ui/components';
 import { useToast } from '../ui/feedback';
-import { fonts, radius, space, useTheme } from '../ui/theme';
-
-const STATUS: Record<ItemStatus, { label: string; icon: IconName; tone: 'good' | 'watch' | 'neutral' | 'critical' }> = {
-  queued: { label: 'รอตรวจ', icon: 'ellipse-outline', tone: 'neutral' },
-  working: { label: 'กำลังอ่าน', icon: 'sync', tone: 'neutral' },
-  ready: { label: 'พร้อมยืนยัน', icon: 'checkmark-circle', tone: 'good' },
-  needs_review: { label: 'ต้องตรวจ', icon: 'alert-circle', tone: 'watch' },
-  duplicate: { label: 'ซ้ำ', icon: 'copy-outline', tone: 'neutral' },
-  out_of_range: { label: 'นอกช่วง', icon: 'calendar-outline', tone: 'neutral' },
-  not_slip: { label: 'ไม่ใช่สลิป', icon: 'image-outline', tone: 'neutral' },
-  failed: { label: 'อ่านไม่ได้', icon: 'close-circle', tone: 'critical' },
-};
+import { PeriodSummary } from '../ui/PeriodSummary';
+import { TxRow } from '../ui/TxRow';
+import { radius, space, useTheme } from '../ui/theme';
 
 export default function Scan() {
   const theme = useTheme();
   const toast = useToast();
-  const { repo, confirmTxs } = useApp();
-  const s = useSlipScanner('7d');
+  const { repo, txs, confirmTxs } = useApp();
+  const s = useSlipScanner('1m');
   const { state } = s;
   const counts = scanCounts(state);
-  const locked = state.phase === 'running' || state.phase === 'paused';
+  const running = state.phase === 'running';
+  const paused = state.phase === 'paused';
+  const done = state.phase === 'done';
   const demo = repo?.mode === 'demo';
-  const readyIds = state.items.filter((i) => i.status === 'ready' && i.txId && !i.confirmed).map((i) => i.txId!);
-  const autoCounted = state.items.filter((i) => i.confirmed).length;
-  const shown = state.items.filter((i) => i.status !== 'queued' && i.status !== 'not_slip').slice(0, 60);
+  const started = useRef(false);
+
+  // Phone app: start searching as soon as the screen opens (after the first frame).
+  useEffect(() => {
+    if (started.current || demo || !galleryAvailable || !repo) return;
+    started.current = true;
+    const t = setTimeout(() => s.loadFromGallery('1m'), 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demo, repo]);
+
+  const recorded = useMemo(() => {
+    const ids = new Set(s.runTxIds);
+    return txs.filter((t) => ids.has(t.id));
+  }, [txs, s.runTxIds]);
+  const byDay = useMemo(() => groupByDay(recorded), [recorded]);
+  const drafts = recorded.filter((t) => t.status === 'draft');
+  const readyIds = drafts.filter((t) => t.reviewFlags.length === 0).map((t) => t.id);
+  const counted = recorded.filter((t) => t.status === 'confirmed').length;
 
   async function confirmReady() {
     try {
@@ -54,183 +70,154 @@ export default function Scan() {
     }
   }
 
+  const idle = state.phase === 'idle' && state.items.length === 0;
+  const nothingNew = (state.phase === 'idle' || done) && state.items.length === 0 && !s.finding && s.searched;
+
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
       <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
-        <IconButton icon="close" label="ปิด" onPress={() => router.back()} />
+        <IconButton icon="close" label="ปิด" onPress={() => goBack()} />
         <T v="h3">สแกนสลิป</T>
         <View style={{ width: 42 }} />
       </Row>
 
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxxl }}>
         {demo ? (
-          <BuddySays mood="calm">โหมดทดลองยังอ่านสลิปไม่ได้นะ เพราะต้องใช้เซิร์ฟเวอร์ เข้าสู่ระบบด้วยบัญชีจริง แล้วกล้าจะอ่านให้เลย</BuddySays>
+          <BuddySays mood="calm">โหมดทดลองยังอ่านสลิปไม่ได้นะ เพราะต้องใช้เซิร์ฟเวอร์ เข้าสู่ระบบด้วยบัญชีจริง แล้ว{BUDDY_NAME}จะอ่านให้เลย</BuddySays>
         ) : null}
 
-        <View style={{ gap: space.sm }}>
-          <T v="h2">ย้อนหลังกี่วัน</T>
-          <Segmented<RangeKey>
-            options={RANGE_ORDER.map((k) => ({ key: k, label: RANGE_LABEL[k] }))}
-            value={state.range}
-            onChange={s.setRange}
-            disabled={locked}
-          />
-          <T v="micro">
-            {locked ? 'ล็อกช่วงเวลาไว้ระหว่างสแกน กด "ยกเลิก" ก่อนถ้าต้องการเปลี่ยน' : galleryAvailable
-                ? 'ตรวจจากรูปใหม่ไปเก่า: 1 วัน → 7 วัน → 1 เดือน → 6 เดือน → 1 ปี'
-                : 'บันทึกเฉพาะสลิปที่วันที่อยู่ในช่วงนี้ สลิปเก่ากว่านั้นจะถูกข้าม'}
-          </T>
-        </View>
-
-        {state.items.length === 0 && state.phase === 'idle' && !galleryAvailable ? (
-          <Card style={{ gap: space.md }}>
-            <Row gap={space.md} align="flex-start">
-              <Ionicons name="desktop-outline" size={26} color={theme.primary} />
-              <View style={{ flex: 1, gap: 4 }}>
-                <T v="h3">เลือกรูปสลิปจากเครื่องนี้</T>
-                <T v="small">
-                  เวอร์ชันเว็บค้นหาทั้งแกลเลอรีไม่ได้ เลือกรูปสลิปได้ครั้งละไม่เกิน 30 รูป ระบบจะอ่านทุกรูปที่เลือก ส่วนการสแกนแกลเลอรีอัตโนมัติมีในแอปมือถือ
-                </T>
-              </View>
-            </Row>
-            <Button label="เลือกรูปสลิป" icon="images-outline" onPress={s.loadPicked} disabled={demo} />
+        {/* Web: one tap to choose photos, then everything else is automatic */}
+        {!galleryAvailable && idle && !demo ? (
+          <Card style={{ gap: space.md, alignItems: 'center' }}>
+            <Buddy mood="happy" size={92} />
+            <T v="h2" center>เลือกรูปสลิป แล้ว{BUDDY_NAME}จัดการที่เหลือให้</T>
+            <T v="small" center>
+              เลือกได้ครั้งละหลายรูป (สูงสุด 30) {BUDDY_NAME}จะอ่านยอด แยกตามวันที่บนสลิป และรวมเข้ายอดเงินให้ทันที
+            </T>
+            <Button label="เลือกรูปสลิป" kind="gold" icon="images-outline" onPress={s.loadPicked} style={{ alignSelf: 'stretch' }} />
+            <T v="micro" center>
+              เว็บเบราว์เซอร์ทุกตัวไม่อนุญาตให้เว็บเปิดดูรูปในเครื่องเอง จึงต้องกดเลือก 1 ครั้ง ในแอป Android {BUDDY_NAME}หาสลิปให้เองตั้งแต่เปิดแอป
+            </T>
           </Card>
         ) : null}
 
-        {state.items.length === 0 && state.phase === 'idle' && galleryAvailable ? (
-          <Card style={{ gap: space.md }}>
-            <Row gap={space.md} align="flex-start">
-              <Ionicons name="images-outline" size={26} color={theme.primary} />
-              <View style={{ flex: 1, gap: 4 }}>
-                <T v="h3">ค้นหาสลิปในแกลเลอรี</T>
-                <T v="small">
-                  ตรวจทุกรูปในช่วง {RANGE_LABEL[state.range]} บนมือถือก่อน รูปที่มี QR ของสลิปธนาคารเท่านั้นที่จะถูกส่งไปอ่าน รูปอื่นไม่ออกจากเครื่อง
-                </T>
-              </View>
-            </Row>
-            <Row justify="space-between" gap={space.md}>
-              <View style={{ flex: 1 }}>
-                <T v="small" color={theme.ink}>อ่านเฉพาะรูปที่มี QR สลิป</T>
-                <T v="micro">ปิดเพื่อส่งรูปแนวตั้งทุกรูปไปอ่าน (ช้าและใช้โควตามากขึ้น)</T>
-              </View>
-              <Switch
-                value={s.requireQr}
-                onValueChange={s.setRequireQr}
-                trackColor={{ true: theme.primary, false: theme.line }}
-                accessibilityLabel="อ่านเฉพาะรูปที่มี QR สลิป"
-              />
-            </Row>
-            <Button label={s.finding ? 'กำลังค้นหารูป…' : 'ค้นหาสลิปในแกลเลอรี'} icon="search" onPress={s.loadFromGallery} loading={s.finding} disabled={demo} />
-            <Button label="เลือกรูปเอง (สูงสุด 30 รูป)" kind="soft" icon="hand-left-outline" onPress={s.loadPicked} disabled={demo} />
-          </Card>
+        {/* Phone: searching the gallery */}
+        {galleryAvailable && s.finding ? (
+          <BuddySays mood="thinking">{BUDDY_NAME}กำลังหาสลิปใหม่ในแกลเลอรี 30 วันล่าสุด…</BuddySays>
         ) : null}
 
         {s.access === 'denied' || s.access === 'blocked' ? (
           <Card tone="alt">
             <T v="h3">ยังไม่ได้อนุญาตให้เข้าถึงรูปภาพ</T>
-            <T v="small">
-              MindPay ต้องเห็นรูปในแกลเลอรีเพื่อหาสลิป ถ้าไม่อยากให้สิทธิ์ ยังใช้ “เลือกรูปเอง” ได้
-            </T>
-            {s.access === 'blocked' ? <Button label="เปิดการตั้งค่า" kind="soft" small onPress={() => Linking.openSettings()} /> : <Button label="ขอสิทธิ์อีกครั้ง" kind="soft" small onPress={s.loadFromGallery} />}
+            <T v="small">MindPay ต้องเห็นรูปในแกลเลอรีเพื่อหาสลิปเอง ถ้าไม่อยากให้สิทธิ์ ยังกด “เลือกรูปเอง” ได้</T>
+            {s.access === 'blocked' ? (
+              <Button label="เปิดการตั้งค่า" kind="soft" small onPress={() => Linking.openSettings()} />
+            ) : (
+              <Button label="ขอสิทธิ์อีกครั้ง" kind="soft" small onPress={() => s.loadFromGallery('1m')} />
+            )}
+            <Button label="เลือกรูปเอง" kind="soft" small icon="hand-left-outline" onPress={s.loadPicked} />
           </Card>
         ) : null}
-        {s.access === 'limited' ? (
-          <T v="small">คุณอนุญาตเฉพาะบางรูป MindPay จะตรวจได้เฉพาะรูปที่เลือกไว้</T>
+        {s.access === 'limited' ? <T v="small">คุณอนุญาตเฉพาะบางรูป MindPay จะตรวจได้เฉพาะรูปที่เลือกไว้</T> : null}
+
+        {galleryAvailable && nothingNew && s.access !== 'denied' && s.access !== 'blocked' && !demo ? (
+          <Card style={{ gap: space.md, alignItems: 'center' }}>
+            <Buddy mood="calm" size={84} />
+            <T v="h3" center>ไม่มีรูปใหม่ใน 30 วันล่าสุด</T>
+            <T v="small" center>
+              {s.skippedKnown > 0 ? `ทุกรูปเคยตรวจแล้ว (${s.skippedKnown} รูป) ` : ''}ถ้ามีสลิปเก่ากว่านั้น ค้นหาย้อนหลังได้ถึง 1 ปี
+            </T>
+            <Button label="ค้นหาย้อนหลัง 1 ปี" kind="soft" icon="time-outline" onPress={() => s.loadFromGallery('1y')} style={{ alignSelf: 'stretch' }} />
+            <Button label="เลือกรูปเอง" kind="ghost" small icon="hand-left-outline" onPress={s.loadPicked} />
+          </Card>
         ) : null}
 
         {s.notice ? (
           <Card tone="alt">
             <Row gap={space.sm}>
-              <Ionicons name="pause-circle-outline" size={20} color={theme.watch} />
+              <Buddy mood="worried" size={40} still />
               <T v="body" style={{ flex: 1 }}>{s.notice}</T>
             </Row>
+            {paused ? <Button label="อ่านต่อ" icon="play" small onPress={s.resume} /> : null}
           </Card>
         ) : null}
 
-        {state.items.length > 0 || state.phase === 'done' ? (
+        {/* Progress */}
+        {state.items.length > 0 ? (
           <Card style={{ gap: space.md }}>
-            <Row justify="space-between">
-              <T v="h3">
-                {state.phase === 'done' ? 'ตรวจครบแล้ว' : state.phase === 'running' ? 'กำลังตรวจ…' : state.phase === 'paused' ? 'หยุดชั่วคราว' : `พบ ${counts.total} รูป`}
-              </T>
-              <T v="small" style={{ fontVariant: ['tabular-nums'] }}>
-                {counts.finished} / {counts.total}
-              </T>
+            <Row gap={space.md}>
+              <Buddy mood={done ? (counted > 0 ? 'cheer' : 'calm') : 'thinking'} size={52} />
+              <View style={{ flex: 1, gap: 4 }}>
+                <T v="h3">
+                  {done
+                    ? recorded.length > 0
+                      ? `อ่านเสร็จแล้ว ได้ ${recorded.length} รายการ`
+                      : 'อ่านเสร็จแล้ว ไม่พบสลิปใหม่'
+                    : paused
+                      ? 'หยุดไว้ชั่วคราว'
+                      : `${BUDDY_NAME}กำลังอ่านสลิป ${counts.finished}/${counts.total}`}
+                </T>
+                <T v="micro">
+                  {counted > 0 ? `รวมในยอดเงินแล้ว ${counted} รายการ` : ''}
+                  {counts.duplicate > 0 ? `${counted > 0 ? ' · ' : ''}ซ้ำ ${counts.duplicate}` : ''}
+                  {counts.not_slip > 0 ? ` · ไม่ใช่สลิป ${counts.not_slip}` : ''}
+                  {counts.failed > 0 ? ` · อ่านไม่ได้ ${counts.failed}` : ''}
+                  {counts.out_of_range > 0 ? ` · เก่ากว่า 1 ปี ${counts.out_of_range}` : ''}
+                </T>
+              </View>
             </Row>
-            <ProgressBar value={counts.total ? counts.finished / counts.total : 0} color={theme.accent} />
-            {s.skippedKnown > 0 ? <T v="micro">ข้าม {s.skippedKnown} รูปที่เคยตรวจแล้ว</T> : null}
+            {!done ? <ProgressBar value={counts.total ? counts.finished / counts.total : 0} color={theme.accent} /> : null}
+            {running ? <Button label="หยุดชั่วคราว" kind="soft" small icon="pause" onPress={s.pause} /> : null}
+            {paused && !s.notice ? <Button label="อ่านต่อ" small icon="play" onPress={s.resume} /> : null}
+            {done && readyIds.length > 0 ? (
+              <Button label={`ยืนยัน ${readyIds.length} รายการที่อ่านชัด`} kind="gold" icon="checkmark-done" onPress={confirmReady} />
+            ) : null}
+            {done && drafts.length - readyIds.length > 0 ? (
+              <Button label={`ตรวจ ${drafts.length - readyIds.length} รายการที่อ่านไม่ชัด`} kind="soft" icon="receipt-outline" onPress={() => router.replace('/drafts')} />
+            ) : null}
+            {done ? (
+              <Row gap={space.sm}>
+                <Button label="สแกนอีกครั้ง" kind="ghost" small icon="refresh" onPress={() => (galleryAvailable ? s.loadFromGallery('1m') : s.loadPicked())} style={{ flex: 1 }} />
+                <Button label="เสร็จ" small onPress={() => goBack()} style={{ flex: 1 }} />
+              </Row>
+            ) : null}
+          </Card>
+        ) : null}
 
-            <Row gap={6} style={{ flexWrap: 'wrap' }}>
-              {milestones(state).map((m) => (
-                <Badge key={m.range} label={`${m.complete ? '✓ ' : ''}${RANGE_LABEL[m.range]}`} tone={m.complete ? 'good' : 'neutral'} />
-              ))}
-            </Row>
-
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-              {([
-                ['ready', 'พร้อมยืนยัน'],
-                ['needs_review', 'ต้องตรวจ'],
-                ['duplicate', 'ซ้ำ'],
-                ['out_of_range', 'นอกช่วง'],
-                ['not_slip', 'ไม่ใช่สลิป'],
-                ['failed', 'อ่านไม่ได้'],
-              ] as [ItemStatus, string][]).map(([k, label]) => (
-                <View key={k} style={{ width: '31%', flexGrow: 1, backgroundColor: theme.surfaceAlt, borderRadius: radius.md, padding: space.sm }}>
-                  <T v="h2" style={{ fontVariant: ['tabular-nums'] }}>{counts[k]}</T>
-                  <T v="micro">{label}</T>
-                </View>
+        {/* Results by period, then by day */}
+        {recorded.length > 0 ? (
+          <>
+            <PeriodSummary txs={txs} title="ยอดเงินเข้า–ออกตามช่วงเวลา" />
+            <View style={{ gap: space.sm }}>
+              <T v="h3">สลิปที่อ่านรอบนี้ แยกตามวันที่</T>
+              {byDay.map((g) => (
+                <Card key={g.day} style={{ paddingVertical: space.sm, gap: 0 }}>
+                  <Row justify="space-between" style={{ paddingVertical: space.xs }}>
+                    <T v="body" style={{ fontFamily: undefined }}>{relativeDayLabel(g.day)}</T>
+                    <T v="small" color={g.netSatang >= 0 ? theme.income : theme.expense}>
+                      สุทธิ {formatBaht(g.netSatang, { sign: true, decimals: false })}
+                    </T>
+                  </Row>
+                  {g.items.map((t) => (
+                    <View key={t.id}>
+                      <Divider />
+                      <TxRow tx={t} />
+                    </View>
+                  ))}
+                </Card>
               ))}
             </View>
-
-            {state.phase === 'idle' && counts.total > 0 ? (
-              <Button label={`เริ่มตรวจ ${counts.total} รูป`} kind="gold" icon="play" onPress={s.start} />
-            ) : null}
-            {state.phase === 'idle' && counts.total === 0 ? (
-              <T v="body">ไม่พบรูปใหม่ในช่วง {RANGE_LABEL[state.range]} ลองเลือกช่วงที่ยาวขึ้น</T>
-            ) : null}
-            {state.phase === 'running' ? <Button label="หยุดชั่วคราว" kind="soft" icon="pause" onPress={s.pause} /> : null}
-            {state.phase === 'paused' ? <Button label="ตรวจต่อ" icon="play" onPress={s.resume} /> : null}
-            {autoCounted > 0 ? (
-              <T v="small" color={theme.good}>รวมในยอดเงินแล้ว {autoCounted} รายการ (อ่านชัดทุกช่อง)</T>
-            ) : null}
-            {state.phase === 'done' && readyIds.length > 0 ? (
-              <Button label={`ยืนยัน ${readyIds.length} รายการที่พร้อม`} kind="gold" icon="checkmark-done" onPress={confirmReady} />
-            ) : null}
-            {state.phase === 'done' ? (
-              <Button label="ตรวจสอบแบบร่างทั้งหมด" kind="soft" icon="receipt-outline" onPress={() => router.replace('/drafts')} />
-            ) : null}
-            <Button label={locked ? 'ยกเลิกการสแกน' : 'เริ่มใหม่'} kind="ghost" small onPress={s.reset} />
-          </Card>
+          </>
         ) : null}
 
-        {shown.length > 0 ? (
-          <Card style={{ paddingVertical: space.xs, gap: 0 }}>
-            {shown.map((i, n) => {
-              const st = STATUS[i.status];
-              const color = st.tone === 'good' ? theme.good : st.tone === 'watch' ? theme.watch : st.tone === 'critical' ? theme.critical : theme.inkFaint;
-              return (
-                <View key={i.assetId}>
-                  {n > 0 ? <Divider /> : null}
-                  <Row gap={space.md} style={{ paddingVertical: space.md }}>
-                    <Ionicons name={st.icon} size={20} color={color} />
-                    <View style={{ flex: 1 }}>
-                      <T v="body" numberOfLines={1} style={{ fontFamily: fonts.sansMedium }}>{i.label ?? st.label}</T>
-                      <T v="micro" numberOfLines={2}>{i.message ?? st.label}</T>
-                    </View>
-                    {i.amountSatang ? <T v="body" style={{ fontVariant: ['tabular-nums'] }}>{formatBaht(i.amountSatang)}</T> : null}
-                    {i.txId && (i.status === 'ready' || i.status === 'needs_review') ? (
-                      <IconButton icon="create-outline" label="ตรวจรายการ" onPress={() => router.push({ pathname: '/transaction', params: { id: i.txId } })} />
-                    ) : null}
-                  </Row>
-                </View>
-              );
-            })}
-          </Card>
-        ) : null}
-
-        <T v="micro" center>
-          รูปสลิปใช้อ่านข้อมูลครั้งเดียวและไม่ถูกเก็บบนเซิร์ฟเวอร์ · รายการจากสลิปเป็นแบบร่างจนกว่าคุณจะยืนยัน
-        </T>
+        <View style={{ backgroundColor: theme.surfaceAlt, borderRadius: radius.md, padding: space.md, gap: 4 }}>
+          <Row gap={6}>
+            <Ionicons name="shield-checkmark-outline" size={16} color={theme.inkSoft} />
+            <T v="micro" style={{ flex: 1 }}>
+              รูปสลิปใช้อ่านครั้งเดียวและไม่ถูกเก็บบนเซิร์ฟเวอร์ · สลิปที่อ่านชัดทุกช่องรวมในยอดทันที ส่วนที่ไม่ชัดรอให้ตรวจ (ปิดได้ในตั้งค่า)
+            </T>
+          </Row>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

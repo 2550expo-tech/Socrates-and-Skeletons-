@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { suggestCategory } from '../categories';
-import { bkkDayKey, bkkToIso, parseSlipDate, parseSlipTime, rangeDays } from '../dates';
+import { bkkDayKey, bkkToIso, formatRangeSpan, parseSlipDate, parseSlipTime, rangeDays } from '../dates';
 import { buildInsights, findCategoryIncrease } from '../insights';
 import { formatBaht, parseBahtToSatang } from '../money';
 import {
@@ -388,5 +388,26 @@ describe('FR-5 budget wording', () => {
       expect(budget.message).toContain('฿600');
       expect(budget.message).not.toMatch(/นิดนึง|นิดหน่อย/);
     }
+  });
+});
+
+describe('Periods shown to the user', () => {
+  it('TC-52 today is 00:00–23:59 of the Bangkok day, 7 days are 7 full days ending today', () => {
+    const late = new Date('2026-09-28T16:30:00Z'); // 23:30 on 28 Sep in Bangkok
+    expect(formatRangeSpan('today', late)).toBe('28 ก.ย. 2569 · 00:00–23:59');
+    expect(formatRangeSpan('7d', late)).toBe('22 – 28 ก.ย. 2569 · 7 วันเต็ม');
+    expect(formatRangeSpan('1m', late)).toBe('30 ส.ค. – 28 ก.ย. 2569 · 30 วันเต็ม');
+    const early = new Date('2026-09-27T17:05:00Z'); // 00:05 on 28 Sep in Bangkok
+    expect(formatRangeSpan('today', early)).toBe('28 ก.ย. 2569 · 00:00–23:59');
+    const list = [
+      tx({ day: '2026-09-28', amount: 100 }),
+      tx({ day: '2026-09-28', amount: 500, kind: 'income' }),
+      tx({ day: '2026-09-22', amount: 40 }),
+      tx({ day: '2026-09-21', amount: 999 }),
+    ];
+    const today = summarizeRange(list, 'today', late);
+    expect([today.incomeSatang, today.expenseSatang, today.netSatang]).toEqual([50_000, 10_000, 40_000]);
+    const week = summarizeRange(list, '7d', late);
+    expect(week.expenseSatang).toBe(14_000); // 21 Sep is outside the 7 days
   });
 });

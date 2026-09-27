@@ -21,12 +21,16 @@ export interface BuddyLine {
   text: string;
 }
 
+/** Confirmed spending on one Bangkok day (default: today). */
+export function spentOnDay(txs: Transaction[], dayKey: string): number {
+  return txs
+    .filter((t) => t.status === 'confirmed' && t.kind === 'expense' && bkkDayKey(t.occurredAt) === dayKey)
+    .reduce((sum, t) => sum + t.amountSatang, 0);
+}
+
 /** Confirmed spending today (Bangkok day). */
 export function spentToday(txs: Transaction[], now: Date = new Date()): number {
-  const today = bkkDayKey(now);
-  return txs
-    .filter((t) => t.status === 'confirmed' && t.kind === 'expense' && bkkDayKey(t.occurredAt) === today)
-    .reduce((sum, t) => sum + t.amountSatang, 0);
+  return spentOnDay(txs, bkkDayKey(now));
 }
 
 /** A slip the app recorded today by itself (shown with a "ใหม่" mark, like MeowJot). */
@@ -45,12 +49,20 @@ export function buddyLine(p: {
   spentTodaySatang: number;
   draftsToReview: number;
   hasAnyTransaction: boolean;
+  /** Set on the first look at the home screen on a new day: yesterday's confirmed spending. */
+  newDay?: { yesterdaySpentSatang: number } | null;
 }): BuddyLine {
   if (!p.hasAnyTransaction) {
     return { mood: 'sleepy', text: `ยังไม่มีรายการให้${BUDDY_NAME}ดูเลย ลองสแกนสลิปหรือจดรายการแรกกันนะ` };
   }
   if (p.draftsToReview > 0) {
     return { mood: 'thinking', text: `มีสลิป ${p.draftsToReview} ใบที่${BUDDY_NAME}อ่านไม่ชัด ช่วยดูให้หน่อยนะ` };
+  }
+  if (p.newDay && p.status !== 'below_floor' && p.status !== 'critical') {
+    const y = p.newDay.yesterdaySpentSatang;
+    const yesterday = y > 0 ? `เมื่อวานใช้ไป ${baht(y)}` : 'เมื่อวานไม่มีรายจ่ายเลย';
+    const today = p.status === 'no_spending' ? 'วันนี้เริ่มนับใหม่แล้วนะ' : `วันนี้ใช้ได้ราว ${baht(p.safeTodaySatang)}`;
+    return { mood: 'cheer', text: `วันใหม่แล้ว! ${yesterday} ${today}` };
   }
   switch (p.status) {
     case 'below_floor':

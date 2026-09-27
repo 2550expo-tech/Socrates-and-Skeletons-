@@ -3,7 +3,7 @@
  * tone (FR-5), privacy notes, the account (email, change password) and sign out.
  */
 import Constants from 'expo-constants';
-import { router } from 'expo-router';
+import { goBack } from '../ui/nav';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -66,7 +66,7 @@ export default function Settings() {
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
       <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
-        <IconButton icon="chevron-back" label="กลับ" onPress={() => router.back()} />
+        <IconButton icon="chevron-back" label="กลับ" onPress={() => goBack()} />
         <T v="h3">ตั้งค่า</T>
         <View style={{ width: 42 }} />
       </Row>

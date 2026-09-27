@@ -4,16 +4,16 @@
  */
 import { DAY_MS } from './dates';
 
-/** First run looks back 7 days. */
-export const FIRST_RUN_DAYS = 7;
+/** First run looks back 30 days (like MeowJot), later runs start from the last run. */
+export const FIRST_RUN_DAYS = 30;
 /** Never look back more than 30 days automatically (older slips: use the scan screen). */
 export const MAX_LOOKBACK_DAYS = 30;
 /** Photos saved just before the last run are checked again, in case the gallery was still syncing. */
 export const OVERLAP_MS = 60 * 60 * 1000;
 /** Opening the app repeatedly within this time does not start another scan. */
 export const MIN_INTERVAL_MS = 5 * 60 * 1000;
-/** At most this many photos per run; the rest are picked up next time. */
-export const MAX_IMAGES_PER_RUN = 40;
+/** At most this many photos per run (only QR slips are sent to be read); the rest are picked up next time. */
+export const MAX_IMAGES_PER_RUN = 150;
 
 export function autoScanSince(lastAutoScanAt: number, nowMs: number): number {
   const floor = nowMs - MAX_LOOKBACK_DAYS * DAY_MS;

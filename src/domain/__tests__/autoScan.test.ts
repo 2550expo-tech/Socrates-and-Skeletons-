@@ -9,8 +9,8 @@ import { initialStatus } from '../slip';
 const NOW = Date.parse('2026-09-27T11:00:00Z');
 
 describe('FR-4 automatic scan', () => {
-  it('TC-35 looks back 7 days the first time, then from the last run (with 1 hour overlap), at most 30 days', () => {
-    expect(autoScanSince(0, NOW)).toBe(NOW - 7 * DAY_MS);
+  it('TC-35 looks back 30 days the first time, then from the last run (with 1 hour overlap), at most 30 days', () => {
+    expect(autoScanSince(0, NOW)).toBe(NOW - 30 * DAY_MS);
     const last = NOW - 2 * DAY_MS;
     expect(autoScanSince(last, NOW)).toBe(last - 60 * 60 * 1000);
     expect(autoScanSince(NOW - 90 * DAY_MS, NOW)).toBe(NOW - 30 * DAY_MS);

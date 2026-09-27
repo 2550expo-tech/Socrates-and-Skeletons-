@@ -7,8 +7,8 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 import { useApp, useMoney } from '../../data/AppProvider';
-import { buddyLine, spentToday } from '../../domain/buddy';
-import { bkkDayKey, formatThaiDay, formatThaiDayLong, RANGE_LABEL, RANGE_ORDER } from '../../domain/dates';
+import { buddyLine, spentOnDay } from '../../domain/buddy';
+import { addDays, formatRangeSpan, formatThaiDay, formatThaiDayLong, RANGE_LABEL, RANGE_ORDER } from '../../domain/dates';
 import { formatBaht } from '../../domain/money';
 import { endOfMonthDay, safeDailySpend } from '../../domain/runway';
 import { dailyTotals, monthExpense, summarizeRange } from '../../domain/summary';
@@ -46,13 +46,15 @@ const RUNWAY_BADGE = {
 
 export default function Home() {
   const theme = useTheme();
-  const { profile, txs, repo, refresh, refreshing, loadError } = useApp();
+  const { profile, txs, repo, refresh, refreshing, loadError, today, newDay } = useApp();
   const { balance, runway, average, drafts } = useMoney();
   const [range, setRange] = useState<RangeKey>('1m');
 
-  const today = bkkDayKey(new Date());
-  const summary = useMemo(() => summarizeRange(txs, range), [txs, range]);
-  const week = useMemo(() => dailyTotals(txs, 7), [txs]);
+  // `today` changes at 00:00 Bangkok time, so every "วันนี้" number starts over.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const summary = useMemo(() => summarizeRange(txs, range), [txs, range, today]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const week = useMemo(() => dailyTotals(txs, 7), [txs, today]);
   const recent = useMemo(
     () => [...txs].filter((t) => t.status === 'confirmed').sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).slice(0, 5),
     [txs],
@@ -66,9 +68,10 @@ export default function Home() {
     days: runway.days,
     capped: runway.capped,
     safeTodaySatang: safeToday,
-    spentTodaySatang: spentToday(txs),
+    spentTodaySatang: spentOnDay(txs, today),
     draftsToReview: drafts.length - readyDrafts,
     hasAnyTransaction: txs.length > 0,
+    newDay: newDay ? { yesterdaySpentSatang: spentOnDay(txs, addDays(today, -1)) } : null,
   });
 
   return (
@@ -169,18 +172,27 @@ export default function Home() {
       {/* FR-2 overview by range */}
       <SectionTitle title="ภาพรวม" />
       <Segmented<RangeKey> options={RANGE_ORDER.map((k) => ({ key: k, label: RANGE_LABEL[k] }))} value={range} onChange={setRange} />
+      <Row justify="space-between" style={{ marginTop: -space.sm }}>
+        <Row gap={4}>
+          <Ionicons name="time-outline" size={14} color={theme.inkSoft} />
+          <T v="micro">{formatRangeSpan(range)}</T>
+        </Row>
+        <T v="micro" color={summary.netSatang >= 0 ? theme.good : theme.critical}>
+          สุทธิ {formatBaht(summary.netSatang, { sign: true, decimals: false })}
+        </T>
+      </Row>
       <Row gap={space.sm} align="stretch">
         <Card style={{ flex: 1 }}>
           <Row gap={6}>
             <Ionicons name="arrow-down-circle" size={18} color={theme.income} />
-            <T v="small">รายรับ</T>
+            <T v="small">เงินเข้า</T>
           </Row>
           <Money satang={summary.incomeSatang} size="h3" color={theme.income} decimals={false} />
         </Card>
         <Card style={{ flex: 1 }}>
           <Row gap={6}>
             <Ionicons name="arrow-up-circle" size={18} color={theme.inkSoft} />
-            <T v="small">รายจ่าย</T>
+            <T v="small">เงินออก</T>
           </Row>
           <Money satang={summary.expenseSatang} size="h3" decimals={false} />
         </Card>

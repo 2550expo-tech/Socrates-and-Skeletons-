@@ -1,9 +1,9 @@
 /**
- * TC-49..TC-51: the companion ("น้องกล้า") on the home screen.
+ * TC-49..TC-51, TC-53: the companion ("น้องกล้า") and the start of a new day.
  */
 import { describe, expect, it } from 'vitest';
-import { buddyLine, isNewFromSlip, spentToday } from '../buddy';
-import { bkkToIso } from '../dates';
+import { buddyLine, isNewFromSlip, spentOnDay, spentToday } from '../buddy';
+import { bkkToIso, msUntilNextBkkMidnight } from '../dates';
 import type { Transaction } from '../types';
 
 const NOW = new Date('2026-09-28T05:00:00Z'); // 12:00 in Bangkok
@@ -63,5 +63,23 @@ describe('Companion', () => {
     expect(isNewFromSlip(tx({ day: '2026-09-25', amount: 20, source: 'slip' }), NOW)).toBe(true);
     expect(isNewFromSlip(tx({ day: '2026-09-28', amount: 20 }), NOW)).toBe(false);
     expect(isNewFromSlip(tx({ day: '2026-09-25', amount: 20, source: 'slip', createdAt: '2026-09-26T03:00:00Z' }), NOW)).toBe(false);
+  });
+});
+
+describe('A new day', () => {
+  it('TC-53 "วันนี้" starts over at 00:00 Bangkok time, and the companion greets the new day', () => {
+    // 23:59:30 on 28 Sep in Bangkok -> 30 s to midnight
+    expect(msUntilNextBkkMidnight(Date.parse('2026-09-28T16:59:30Z'))).toBe(30_000);
+    // 00:00 exactly -> a full day
+    expect(msUntilNextBkkMidnight(Date.parse('2026-09-28T17:00:00Z'))).toBe(24 * 3600 * 1000);
+    expect(buddyLine({ ...base, newDay: { yesterdaySpentSatang: 25_000 } })).toEqual({
+      mood: 'cheer',
+      text: 'วันใหม่แล้ว! เมื่อวานใช้ไป ฿250 วันนี้ใช้ได้ราว ฿1,453',
+    });
+    expect(buddyLine({ ...base, newDay: { yesterdaySpentSatang: 0 } }).text).toContain('เมื่อวานไม่มีรายจ่ายเลย');
+    // Urgent things still come first.
+    expect(buddyLine({ ...base, draftsToReview: 1, newDay: { yesterdaySpentSatang: 0 } }).mood).toBe('thinking');
+    expect(buddyLine({ ...base, status: 'critical', days: 3, newDay: { yesterdaySpentSatang: 0 } }).mood).toBe('worried');
+    expect(spentOnDay([tx({ day: '2026-09-27', amount: 70 })], '2026-09-27')).toBe(7_000);
   });
 });

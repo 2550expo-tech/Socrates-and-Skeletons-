@@ -17,6 +17,7 @@ import { chromium } from 'playwright';
 
 const DIST = process.argv[2] ?? 'dist';
 const SHOTS = process.argv[3] ?? 'e2e-shots';
+const FIXTURES = new URL('./fixtures/', import.meta.url).pathname;
 await mkdir(SHOTS, { recursive: true });
 const BASE_PATH = '/Socrates-and-Skeletons-';
 const PORT = 4173;
@@ -53,6 +54,8 @@ const state = {
   profiles: new Map(), // id -> profile row
   redirects: [],
   calls: [],
+  txRows: [], // transactions saved through the REST API
+  slipReadings: [], // queue of answers from the slip reader (parse-slip)
 };
 let seq = 0;
 function makeUser(email, password, name, confirmed) {
@@ -138,7 +141,26 @@ async function supabase(route) {
     if (req.method() === 'PATCH') Object.assign(row, body, { updated_at: new Date().toISOString() });
     return reply({ body: row });
   }
-  if (p === '/rest/v1/transactions') return reply({ body: [] });
+  if (p === '/rest/v1/transactions') {
+    const u = byToken(req.headers().authorization);
+    if (!u) return reply({ status: 401, body: {} });
+    if (req.method() === 'POST') {
+      const row = { ...body, id: `tx-${state.txRows.length + 1}`, user_id: u.id, created_at: new Date().toISOString() };
+      state.txRows.push(row);
+      return reply({ status: 201, body: row });
+    }
+    if (req.method() === 'PATCH') {
+      const ids = (url.searchParams.get('id') ?? '').replace(/^(eq\.|in\.\()/, '').replace(/\)$/, '').split(',');
+      const changed = state.txRows.filter((r) => r.user_id === u.id && ids.includes(r.id));
+      changed.forEach((r) => Object.assign(r, body));
+      return reply({ body: changed.length === 1 ? changed[0] : changed });
+    }
+    return reply({ body: state.txRows.filter((r) => r.user_id === u.id) });
+  }
+  if (p === '/functions/v1/parse-slip') {
+    const reading = state.slipReadings.shift();
+    return reading ? reply({ body: { reading } }) : reply(err(502, 'reader_error', 'x'));
+  }
   if (p.startsWith('/functions/v1/')) return reply(err(503, 'not_configured', 'x'));
   return reply({ status: 404, body: {} });
 }
@@ -371,6 +393,10 @@ try {
     check('Settings: change password opens the new-password dialog', await visible(page, 'บันทึกรหัสผ่านใหม่'));
     await button(page, 'ไว้ทีหลัง').click();
     await page.waitForTimeout(300);
+    await button(page, 'กลับ').click();
+    check('Back from settings opened directly goes home', await visible(page, 'สวัสดี', 8000));
+    await page.goto(`${APP}settings`);
+    await visible(page, 'ออกจากระบบ', 8000);
     await button(page, 'ออกจากระบบ').click();
     await page.waitForTimeout(600);
     await shot(page, '13-signout-confirm');
@@ -378,6 +404,79 @@ try {
     check('Sign out returns to the welcome screen', await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000));
     await page.reload();
     check('...and stays signed out after reload', await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000));
+    await ctx.close();
+  }
+
+  // 9. Web scan: pick photos once, everything else is automatic; results by period and by day
+  {
+    state.confirmEmail = false;
+    const bkkDay = (daysAgo) => new Date(Date.now() + 7 * 3600e3 - daysAgo * 86400e3).toISOString().slice(0, 10);
+    state.slipReadings = [
+      { isSlip: true, direction: 'expense', amount: '120.00', dateText: 'x', dateIso: bkkDay(0), time: '00:30', counterparty: 'ร้านป้าแดง', bank: 'KBank', reference: 'E2E001', confidence: { amount: 0.97, date: 0.95, counterparty: 0.93 } },
+      { isSlip: true, direction: 'income', amount: '500.00', dateText: 'x', dateIso: bkkDay(1), time: '18:05', counterparty: 'แม่', bank: 'SCB', reference: 'E2E002', confidence: { amount: 0.99, date: 0.96, counterparty: 0.9 } },
+      { isSlip: false, direction: 'unknown', amount: null, dateText: null, dateIso: null, time: null, counterparty: null, bank: null, reference: null, confidence: { amount: 0, date: 0, counterparty: 0 } },
+    ];
+    const { ctx, page } = await freshPage('scan');
+    await page.goto(APP);
+    await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
+    await introGone(page);
+    await page.getByText('สมัครสมาชิก', { exact: true }).click();
+    await page.fill('#name', 'สแกน');
+    await page.fill('#email', 'scan@example.com');
+    await page.fill('#password', 'secret123');
+    await button(page, 'สร้างบัญชี').click();
+    await visible(page, 'สมัครบัญชีสำเร็จ');
+    await button(page, 'ไปตั้งค่าเงิน').click();
+    await page.fill('#ob-balance', '1000');
+    await button(page, 'เริ่มใช้ MindPay').click();
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    await page.goto(`${APP}scan`);
+    await introGone(page);
+    check('Web scan: one button to choose photos, no range to pick first', (await visible(page, 'เลือกรูปสลิป แล้ว')) && !(await page.getByText('ย้อนหลังกี่วัน').count()));
+    await shot(page, '14-scan-start');
+    const chooser = page.waitForEvent('filechooser');
+    await button(page, 'เลือกรูปสลิป').click();
+    await (await chooser).setFiles(['photo-1.jpg', 'photo-2.jpg', 'photo-3.jpg'].map((f) => join(FIXTURES, f)));
+    check('Reading starts by itself and finishes', await visible(page, 'อ่านเสร็จแล้ว ได้ 2 รายการ', 20000));
+    await page.waitForTimeout(600);
+    await shot(page, '15-scan-done');
+    check('Clear slips count in the balance at once', await visible(page, 'รวมในยอดเงินแล้ว 2 รายการ'));
+    check('Today = 00:00–23:59 of today, with money in/out', (await visible(page, '· 00:00–23:59')) && (await visible(page, 'ออก ฿120')));
+    check('7 days include yesterday\'s income', await visible(page, 'เข้า ฿500'));
+    check('Slips are grouped by their date (today / yesterday)', (await visible(page, 'สลิปที่อ่านรอบนี้ แยกตามวันที่')) && (await visible(page, 'เมื่อวาน')));
+    const bkkDayOf = (iso) => new Date(Date.parse(iso) + 7 * 3600e3).toISOString().slice(0, 10);
+    check(
+      'Saved under the date printed on each slip (Bangkok time)',
+      state.txRows.some((r) => r.title === 'แม่' && bkkDayOf(r.occurred_at) === bkkDay(1)) &&
+        state.txRows.some((r) => r.title === 'ร้านป้าแดง' && bkkDayOf(r.occurred_at) === bkkDay(0)),
+    );
+    await button(page, 'เสร็จ').click();
+    check('"เสร็จ" returns home even when the scan page was opened directly', await visible(page, 'สวัสดี', 8000));
+    await page.getByText('วันนี้', { exact: true }).first().click();
+    check('Home: the chosen period shows its exact hours', await visible(page, '00:00–23:59'));
+    check('Home: today shows the money out from the slip', await visible(page, 'เงินออก'));
+    await shot(page, '16-home-today');
+    await ctx.close();
+    state.confirmEmail = true;
+  }
+
+  // 10. A new day: at 00:00 Bangkok time "วันนี้" starts over by itself
+  {
+    const { ctx, page } = await freshPage('midnight');
+    await page.clock.install({ time: new Date('2026-09-28T16:59:40Z') }); // 23:59:40 on 28 Sep in Bangkok
+    await page.goto(APP);
+    await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
+    await introGone(page);
+    await page.getByText('ลองใช้ด้วยข้อมูลตัวอย่าง').click();
+    const before = await visible(page, 'วันจันทร์ที่ 28 กันยายน 2569', 8000);
+    await page.clock.fastForward(30_000); // past midnight
+    await page.waitForTimeout(500);
+    const after = await visible(page, 'วันอังคารที่ 29 กันยายน 2569', 5000);
+    check('At midnight the date on the home screen moves to the new day by itself', before && after);
+    check('The companion greets the new day with yesterday\'s spending', await visible(page, 'วันใหม่แล้ว!'));
+    await page.getByText('วันนี้', { exact: true }).first().click();
+    check('"วันนี้" now means the new day, 00:00–23:59', await visible(page, '29 ก.ย. 2569 · 00:00–23:59'));
+    await shot(page, '17-new-day');
     await ctx.close();
   }
 } catch (e) {

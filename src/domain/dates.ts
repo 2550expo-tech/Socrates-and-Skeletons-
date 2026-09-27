@@ -17,6 +17,12 @@ export function bkkDayKey(at: Date | string | number): string {
 }
 
 /** "YYYY-MM-DD" (Bangkok day) -> the UTC instant of 00:00 that day in Bangkok. */
+/** Milliseconds until the next 00:00 in Bangkok (when "วันนี้" starts over). */
+export function msUntilNextBkkMidnight(nowMs: number = Date.now()): number {
+  const next = bkkDayStart(addDays(bkkDayKey(nowMs), 1)).getTime();
+  return Math.max(0, next - nowMs);
+}
+
 export function bkkDayStart(dayKey: string): Date {
   return new Date(Date.parse(`${dayKey}T00:00:00.000Z`) - BKK_OFFSET_MS);
 }
@@ -101,6 +107,20 @@ export function formatThaiDay(dayKey: string, opts: { year?: boolean } = {}): st
   const [y, m, d] = dayKey.split('-').map(Number);
   const base = `${d} ${THAI_MONTHS_SHORT[m - 1]}`;
   return opts.year === false ? base : `${base} ${y + 543}`;
+}
+
+/**
+ * Exact span of a period, so users see which hours count:
+ *   today -> "28 ก.ย. 2569 · 00:00–23:59"
+ *   7d    -> "22 – 28 ก.ย. 2569 · 7 วันเต็ม (00:00 วันแรก ถึง 23:59 วันนี้)"
+ */
+export function formatRangeSpan(range: RangeKey, now: Date = new Date()): string {
+  const { from, to } = rangeDays(range, now);
+  if (range === 'today') return `${formatThaiDay(to)} · 00:00–23:59`;
+  const sameYear = from.slice(0, 4) === to.slice(0, 4);
+  const sameMonth = sameYear && from.slice(5, 7) === to.slice(5, 7);
+  const start = sameMonth ? String(Number(from.slice(8, 10))) : formatThaiDay(from, { year: !sameYear });
+  return `${start} – ${formatThaiDay(to)} · ${RANGE_DAYS[range]} วันเต็ม`;
 }
 
 /** "2026-09-27" -> "วันอาทิตย์ที่ 27 กันยายน 2569" */

@@ -20,7 +20,7 @@ type Filter = 'all' | 'expense' | 'income';
 
 export default function Transactions() {
   const theme = useTheme();
-  const { txs, refresh, refreshing } = useApp();
+  const { txs, refresh, refreshing, today } = useApp();
   const { drafts } = useMoney();
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
@@ -77,6 +77,7 @@ export default function Transactions() {
       </View>
 
       <SectionList
+        extraData={today}
         sections={sections}
         keyExtractor={(t) => t.id}
         stickySectionHeadersEnabled

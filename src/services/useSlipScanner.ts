@@ -2,6 +2,11 @@
  * FR-4 scanner controller. Runs the pure state machine from
  * src/domain/scanQueue.ts and does the phone work for one image at a time.
  *
+ * Every slip is kept under the date printed on it (up to one year back); the
+ * user then looks at it by period (วันนี้ / 7 วัน / ...) instead of choosing a
+ * range before scanning. The range here only decides how far back in the
+ * gallery to look.
+ *
  * The state lives in a ref as well as React state so the processing loop
  * always sees the latest phase (pause takes effect before the next image).
  */
@@ -26,15 +31,22 @@ import {
 
 type Finished = Extract<ScanAction, { type: 'itemFinished' }>;
 
-export function useSlipScanner(initialRange: RangeKey = '7d') {
+/** Slips older than this (by the date printed on them) are not recorded automatically. */
+const SLIP_WINDOW: RangeKey = '1y';
+
+export function useSlipScanner(initialRange: RangeKey = '1m') {
   const { repo, userId, txs, upsertLocal } = useApp();
   const [state, setState] = useState<ScanState>(() => initialScanState(initialRange));
   const stateRef = useRef(state);
   const [access, setAccess] = useState<GalleryAccess | null>(null);
   const [finding, setFinding] = useState(false);
+  /** A gallery search has finished at least once (to tell "nothing new" from "not searched yet"). */
+  const [searched, setSearched] = useState(false);
   const [skippedKnown, setSkippedKnown] = useState(0);
   const [requireQr, setRequireQr] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
+  /** Transactions recorded by this scan, to show them grouped by date. */
+  const [runTxIds, setRunTxIds] = useState<string[]>([]);
 
   const txsRef = useRef(txs);
   useEffect(() => {
@@ -62,12 +74,13 @@ export function useSlipScanner(initialRange: RangeKey = '7d') {
 
   const setRange = (range: RangeKey) => apply({ type: 'setRange', range });
 
-  /** Queue gallery photos in the chosen range, skipping ones checked before. */
-  const loadFromGallery = useCallback(async () => {
+  /** Queue gallery photos taken in the last `range`, skipping ones checked before. Starts at once. */
+  const loadFromGallery = useCallback(async (range?: RangeKey) => {
     setNotice(null);
     const a = await requestGalleryAccess();
     setAccess(a);
     if (a === 'denied' || a === 'blocked') return;
+    if (range && range !== stateRef.current.range) apply({ type: 'setRange', range });
     setFinding(true);
     try {
       const since = rangeStartMs(stateRef.current.range);
@@ -76,15 +89,18 @@ export function useSlipScanner(initialRange: RangeKey = '7d') {
       const fresh = images.filter((i) => !scanned.has(i.assetId));
       setSkippedKnown(images.length - fresh.length);
       pickedRef.current.clear();
+      setRunTxIds([]);
       apply({ type: 'load', items: fresh.map((i) => ({ assetId: i.assetId, createdAt: i.createdAt })) });
+      apply({ type: 'start' });
     } catch {
       setNotice('เปิดแกลเลอรีไม่สำเร็จ ลองใหม่อีกครั้ง');
     } finally {
       setFinding(false);
+      setSearched(true);
     }
   }, [apply, userId]);
 
-  /** Queue photos the user picks by hand (always read, QR or not). */
+  /** Queue photos the user picks by hand (always read, QR or not). Starts at once. */
   const loadPicked = useCallback(async () => {
     setNotice(null);
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -97,8 +113,10 @@ export function useSlipScanner(initialRange: RangeKey = '7d') {
     if (res.canceled || res.assets.length === 0) return;
     pickedRef.current = new Map(res.assets.map((a) => [a.uri, { width: a.width ?? null }]));
     setSkippedKnown(0);
+    setRunTxIds([]);
     const now = Date.now();
     apply({ type: 'load', items: res.assets.map((a, i) => ({ assetId: a.uri, createdAt: now - i })) });
+    apply({ type: 'start' });
   }, [apply]);
 
   async function processOne(item: ScanItem): Promise<Omit<Finished, 'type' | 'runId' | 'assetId'>> {
@@ -108,13 +126,17 @@ export function useSlipScanner(initialRange: RangeKey = '7d') {
       uri: picked ? item.assetId : await galleryUri(item.assetId),
       width: picked?.width,
       requireQr: requireQr && !picked,
-      range: rangeDays(stateRef.current.range),
+      range: rangeDays(SLIP_WINDOW),
       index: indexRef.current,
       repo: repo!,
       autoConfirm: prefs.autoConfirm,
       fallbackTimeMs: item.createdAt,
     });
-    if (r.tx) upsertLocal(r.tx);
+    if (r.tx) {
+      upsertLocal(r.tx);
+      const id = r.tx.id;
+      if (mounted.current) setRunTxIds((ids) => [...ids, id]);
+    }
     return {
       status: r.status,
       txId: r.tx?.id,
@@ -165,10 +187,12 @@ export function useSlipScanner(initialRange: RangeKey = '7d') {
     state,
     access,
     finding,
+    searched,
     skippedKnown,
     requireQr,
     setRequireQr,
     notice,
+    runTxIds,
     setRange,
     loadFromGallery,
     loadPicked,
@@ -181,6 +205,7 @@ export function useSlipScanner(initialRange: RangeKey = '7d') {
     reset: () => {
       setNotice(null);
       setSkippedKnown(0);
+      setRunTxIds([]);
       apply({ type: 'reset' });
     },
   };

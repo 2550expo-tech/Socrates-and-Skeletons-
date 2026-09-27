@@ -2,8 +2,8 @@
  * "น้องกล้า": a money-tree sapling with a face, drawn in code so it can change
  * mood with the user's money (happy, calm, worried, sleepy, thinking, cheer).
  * Idea from MeowJot's cat and Hugging Face's Huggy: one friendly character
- * that makes the app feel alive. It bobs gently and blinks; both stop when the
- * phone's "Reduce motion" setting is on.
+ * that makes the app feel alive. It bobs a few times when it appears and
+ * blinks now and then; both are off when the phone's "Reduce motion" is on.
  */
 import { useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, Platform, View, type StyleProp, type ViewStyle } from 'react-native';
@@ -97,11 +97,13 @@ export function Buddy({
 
   useEffect(() => {
     if (!animate) return;
+    // A few bobs when it appears or changes mood, then it rests (saves battery, less distracting).
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(bob, { toValue: 1, duration: mood === 'cheer' ? 520 : 1300, easing: Easing.inOut(Easing.sin), useNativeDriver: useNative }),
         Animated.timing(bob, { toValue: 0, duration: mood === 'cheer' ? 520 : 1300, easing: Easing.inOut(Easing.sin), useNativeDriver: useNative }),
       ]),
+      { iterations: mood === 'cheer' ? 4 : 3 },
     );
     loop.start();
     return () => loop.stop();

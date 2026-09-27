@@ -5,8 +5,8 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { useMoney } from '../../data/AppProvider';
-import { addDays, bkkDayKey, formatThaiDay } from '../../domain/dates';
+import { useApp, useMoney } from '../../data/AppProvider';
+import { addDays, formatThaiDay } from '../../domain/dates';
 import { formatBaht, parseBahtToSatang } from '../../domain/money';
 import { runwayAfterPurchase, runwayWithReduction, RUNWAY_WINDOW_DAYS, type Runway } from '../../domain/runway';
 import { ContourLines, MoneyTree, treeHealth } from '../../ui/art';
@@ -23,10 +23,10 @@ function daysText(r: Runway) {
 export default function RunwayScreen() {
   const theme = useTheme();
   const { balance, runway, average } = useMoney();
+  const { today } = useApp();
   const [reduce, setReduce] = useState(0);
   const [price, setPrice] = useState('');
 
-  const today = bkkDayKey(new Date());
   const reduced = useMemo(() => runwayWithReduction(runway, reduce), [runway, reduce]);
   const priceSatang = parseBahtToSatang(price);
   const afterBuy = priceSatang ? runwayAfterPurchase(runway, priceSatang) : null;

@@ -51,7 +51,7 @@ export async function processSlipImage(opts: {
   const outcome = classifyCandidate(c, { range: opts.range, index: opts.index });
   const label = c.counterparty ?? 'รายการจากสลิป';
   if (outcome === 'duplicate') return { status: 'duplicate', amountSatang: c.amountSatang, label, message: 'มีรายการนี้แล้ว' };
-  if (outcome === 'out_of_range') return { status: 'out_of_range', amountSatang: c.amountSatang, label, message: 'อยู่นอกช่วงเวลาที่เลือก' };
+  if (outcome === 'out_of_range') return { status: 'out_of_range', amountSatang: c.amountSatang, label, message: 'วันที่บนสลิปเก่ากว่า 1 ปี จึงไม่บันทึกอัตโนมัติ' };
   if (c.amountSatang === null) return { status: 'failed', label, message: 'อ่านยอดเงินไม่ได้ ลองจดรายการนี้เอง' };
 
   const status = initialStatus(outcome, opts.autoConfirm);
