@@ -1,5 +1,5 @@
 /**
- * First run: the three numbers Mind pay needs to be useful from day one.
+ * First run: the three numbers MindPay needs to be useful from day one.
  * Balance = money now; the low line drives FR-6; the budget is optional.
  */
 import { useState } from 'react';
@@ -85,7 +85,7 @@ export default function Onboarding() {
             error={errors.budget}
           />
         </Card>
-        <Button label="เริ่มใช้ Mind pay" kind="gold" onPress={finish} loading={busy} />
+        <Button label="เริ่มใช้ MindPay" kind="gold" onPress={finish} loading={busy} />
         <T v="micro" center color={theme.inkFaint}>แก้ไขทุกค่าได้ภายหลังในหน้าตั้งค่า</T>
       </Screen>
     </KeyboardAvoidingView>

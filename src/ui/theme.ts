@@ -1,5 +1,5 @@
 /**
- * Mind pay design system tokens.
+ * MindPay design system tokens.
  *
  * Brand: Green (money, growth, stability) + Gold (accent for what matters most).
  * Rule from the brand direction: green is for structure, gold is used sparingly

@@ -66,7 +66,7 @@ export default function Settings() {
             <Field id="st-name" label="ชื่อเล่น" value={name} onChangeText={setName} error={errors.name} maxLength={30} />
             <Field
               id="st-opening"
-              label="ยอดเงินตอนเริ่มใช้ Mind pay (บาท)"
+              label="ยอดเงินตอนเริ่มใช้ MindPay (บาท)"
               value={opening}
               onChangeText={setOpening}
               keyboardType="decimal-pad"
@@ -120,7 +120,7 @@ export default function Settings() {
 
           <Card>
             <T v="small">
-              {repo?.mode === 'demo' ? 'โหมดทดลอง (ข้อมูลในเครื่อง)' : 'เข้าสู่ระบบด้วยบัญชี Mind pay'} · เวอร์ชัน {Constants.expoConfig?.version ?? '1.0.0'}
+              {repo?.mode === 'demo' ? 'โหมดทดลอง (ข้อมูลในเครื่อง)' : 'เข้าสู่ระบบด้วยบัญชี MindPay'} · เวอร์ชัน {Constants.expoConfig?.version ?? '1.0.0'}
             </T>
             <Button label={repo?.mode === 'demo' ? 'ออกจากโหมดทดลอง' : 'ออกจากระบบ'} kind="danger" icon="log-out-outline" onPress={() => setAskOut(true)} />
           </Card>

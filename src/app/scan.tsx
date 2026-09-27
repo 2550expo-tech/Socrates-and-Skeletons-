@@ -111,13 +111,13 @@ export default function Scan() {
           <Card tone="alt">
             <T v="h3">ยังไม่ได้อนุญาตให้เข้าถึงรูปภาพ</T>
             <T v="small">
-              Mind pay ต้องเห็นรูปในแกลเลอรีเพื่อหาสลิป ถ้าไม่อยากให้สิทธิ์ ยังใช้ “เลือกรูปเอง” ได้
+              MindPay ต้องเห็นรูปในแกลเลอรีเพื่อหาสลิป ถ้าไม่อยากให้สิทธิ์ ยังใช้ “เลือกรูปเอง” ได้
             </T>
             {s.access === 'blocked' ? <Button label="เปิดการตั้งค่า" kind="soft" small onPress={() => Linking.openSettings()} /> : <Button label="ขอสิทธิ์อีกครั้ง" kind="soft" small onPress={s.loadFromGallery} />}
           </Card>
         ) : null}
         {s.access === 'limited' ? (
-          <T v="small">คุณอนุญาตเฉพาะบางรูป Mind pay จะตรวจได้เฉพาะรูปที่เลือกไว้</T>
+          <T v="small">คุณอนุญาตเฉพาะบางรูป MindPay จะตรวจได้เฉพาะรูปที่เลือกไว้</T>
         ) : null}
 
         {s.notice ? (

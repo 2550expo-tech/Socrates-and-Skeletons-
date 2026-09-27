@@ -1,4 +1,4 @@
-"""Mind pay app icon: a minimal gold money tree on forest green (matches the in-app MoneyTree)."""
+"""MindPay app icon: a minimal gold money tree on forest green (matches the in-app MoneyTree)."""
 import math
 from PIL import Image, ImageDraw
 

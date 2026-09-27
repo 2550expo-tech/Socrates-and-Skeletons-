@@ -1,4 +1,4 @@
--- Mind pay database schema (Supabase / PostgreSQL)
+-- MindPay database schema (Supabase / PostgreSQL)
 -- Run once: Supabase Dashboard -> SQL Editor -> paste -> Run
 -- or with the CLI: supabase db push
 --

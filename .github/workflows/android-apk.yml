@@ -1,7 +1,7 @@
-# Builds an installable Android APK of Mind pay on GitHub's servers.
+# Builds an installable Android APK of MindPay on GitHub's servers.
 #
 # Runs on every push to main (and can be started by hand from the Actions tab).
-# The finished APK is attached to the release "Mind pay (latest APK)":
+# The finished APK is attached to the release "MindPay (latest APK)":
 #   https://github.com/2550expo-tech/Socrates-and-Skeletons-/releases/tag/latest-apk
 # Open that page on an Android phone, tap mind-pay.apk, and install.
 #
@@ -72,6 +72,6 @@ jobs:
         run: |
           gh release delete latest-apk --yes --cleanup-tag || true
           gh release create latest-apk mind-pay.apk \
-            --title "Mind pay (latest APK)" \
+            --title "MindPay (latest APK)" \
             --notes "Built from ${GITHUB_SHA::7} on $(date -u +'%Y-%m-%d %H:%M UTC'). Open this page on an Android phone, tap mind-pay.apk, and install. Debug-signed build for testing." \
             --prerelease
