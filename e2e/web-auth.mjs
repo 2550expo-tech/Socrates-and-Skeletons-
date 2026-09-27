@@ -419,6 +419,7 @@ try {
     await visible(page, 'ยอดคงเหลือ', 8000);
     await page.goto(`${APP}settings`);
     const onSettings = await visible(page, 'ออกจากระบบ', 8000);
+    await introGone(page);
     await shot(page, '12-settings');
     check('Settings shows the signed-in email', await visible(page, 'mint@example.com'));
     await button(page, 'เปลี่ยนรหัสผ่าน').click();
