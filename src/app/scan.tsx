@@ -17,6 +17,7 @@ import type { RangeKey } from '../domain/types';
 import { galleryAvailable } from '../services/slips';
 import { useSlipScanner } from '../services/useSlipScanner';
 import { Badge, Button, Card, Divider, IconButton, Ionicons, ProgressBar, Row, Segmented, T, type IconName } from '../ui/components';
+import { BuddySays } from '../ui/Buddy';
 import { useToast } from '../ui/feedback';
 import { fonts, radius, space, useTheme } from '../ui/theme';
 
@@ -63,9 +64,7 @@ export default function Scan() {
 
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxxl }}>
         {demo ? (
-          <Card tone="alt">
-            <T v="body">โหมดทดลองอ่านสลิปไม่ได้ เพราะการอ่านสลิปต้องใช้เซิร์ฟเวอร์ เข้าสู่ระบบด้วยบัญชีจริงเพื่อใช้งาน</T>
-          </Card>
+          <BuddySays mood="calm">โหมดทดลองยังอ่านสลิปไม่ได้นะ เพราะต้องใช้เซิร์ฟเวอร์ เข้าสู่ระบบด้วยบัญชีจริง แล้วกล้าจะอ่านให้เลย</BuddySays>
         ) : null}
 
         <View style={{ gap: space.sm }}>

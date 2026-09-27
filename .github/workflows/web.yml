@@ -48,6 +48,25 @@ jobs:
       - name: Single-page app fallback for deep links
         run: cp dist/index.html dist/404.html
 
+      - name: Unit tests
+        run: npm test
+
+      # Browser test of every sign-in path (sign up, email code, links, reset
+      # password, sign out) against a local stand-in for Supabase. If anything
+      # fails, the website is NOT published and the screenshots are attached.
+      - name: Install the test browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser tests (sign-in flows)
+        run: node e2e/web-auth.mjs dist e2e-shots
+
+      - name: Keep screenshots when the browser tests fail
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: e2e-shots
+
       - name: Publish to the gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:

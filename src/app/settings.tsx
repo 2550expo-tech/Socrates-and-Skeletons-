@@ -1,18 +1,19 @@
 /**
  * Settings: the numbers behind FR-6 (balance start, low line, budget), coach
- * tone (FR-5), privacy notes, and sign out.
+ * tone (FR-5), privacy notes, the account (email, change password) and sign out.
  */
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../data/AppProvider';
+import { supabase } from '../data/supabase';
 import { useAutoScan } from '../services/AutoScanProvider';
 import { forgetScanned } from '../services/slips';
 import { PERSONAS } from '../domain/insights';
 import { formatSatang, parseBahtToSatang } from '../domain/money';
-import { Button, Card, Chip, IconButton, Row, T } from '../ui/components';
+import { Button, Card, Chip, IconButton, Ionicons, Row, T } from '../ui/components';
 import { ConfirmSheet, useToast } from '../ui/feedback';
 import { Field } from '../ui/inputs';
 import { space, useTheme } from '../ui/theme';
@@ -20,7 +21,15 @@ import { space, useTheme } from '../ui/theme';
 export default function Settings() {
   const theme = useTheme();
   const toast = useToast();
-  const { profile, repo, userId, saveProfile, signOut } = useApp();
+  const { profile, repo, userId, saveProfile, signOut, showAuthNotice } = useApp();
+  const [email, setEmail] = useState<string | null>(null);
+  useEffect(() => {
+    if (repo?.mode !== 'cloud' || !supabase) return;
+    supabase.auth
+      .getSession()
+      .then(({ data }) => setEmail(data.session?.user.email ?? null))
+      .catch(() => {});
+  }, [repo]);
   const auto = useAutoScan();
   const [name, setName] = useState(profile?.displayName ?? '');
   const [opening, setOpening] = useState(formatSatang(profile?.openingBalanceSatang ?? 0, { decimals: false }).replace(/,/g, ''));
@@ -151,9 +160,17 @@ export default function Settings() {
           </Card>
 
           <Card>
-            <T v="small">
-              {repo?.mode === 'demo' ? 'โหมดทดลอง (ข้อมูลในเครื่อง)' : 'เข้าสู่ระบบด้วยบัญชี MindPay'} · เวอร์ชัน {Constants.expoConfig?.version ?? '1.0.0'}
-            </T>
+            <T v="h3">บัญชี</T>
+            <Row gap={space.sm}>
+              <Ionicons name={repo?.mode === 'demo' ? 'flask-outline' : 'person-circle-outline'} size={22} color={theme.inkSoft} />
+              <T v="body" style={{ flex: 1 }} numberOfLines={1}>
+                {repo?.mode === 'demo' ? 'โหมดทดลอง (ข้อมูลในเครื่อง)' : (email ?? 'บัญชี MindPay')}
+              </T>
+            </Row>
+            {repo?.mode === 'cloud' ? (
+              <Button label="เปลี่ยนรหัสผ่าน" kind="soft" icon="key-outline" onPress={() => showAuthNotice({ kind: 'recovery' })} />
+            ) : null}
+            <T v="micro">MindPay เวอร์ชัน {Constants.expoConfig?.version ?? '1.0.0'}</T>
             <Button label={repo?.mode === 'demo' ? 'ออกจากโหมดทดลอง' : 'ออกจากระบบ'} kind="danger" icon="log-out-outline" onPress={() => setAskOut(true)} />
           </Card>
         </ScrollView>

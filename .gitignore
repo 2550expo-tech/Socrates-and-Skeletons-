@@ -43,3 +43,4 @@ yarn-error.*
 # secrets
 .env
 node_modules
+/e2e-shots
