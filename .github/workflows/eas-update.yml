@@ -1,0 +1,71 @@
+# Sends code changes straight to MindPay apps that are already installed
+# (EAS Update). Installed apps download the update in the background and
+# use it the next time they are opened: no new APK needed.
+#
+# Needs the repository secret EXPO_TOKEN (expo.dev -> Account settings ->
+# Access tokens). Without it this workflow does nothing.
+#
+# Only JavaScript/asset changes can be delivered this way. After adding a
+# native module (npx expo install of a package with native code) or changing
+# native settings in app.json, bump "version" in app.json so a new APK is built
+# with a matching runtime version.
+name: Update installed apps (EAS Update)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: eas-update
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Check for EXPO_TOKEN
+        id: token
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "EXPO_TOKEN secret is not set; skipping EAS Update."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.token.outputs.ok == 'true'
+        uses: actions/checkout@v4
+
+      - if: steps.token.outputs.ok == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - if: steps.token.outputs.ok == 'true'
+        run: npm ci
+
+      - if: steps.token.outputs.ok == 'true'
+        name: Tests must pass before anything reaches users
+        run: npm test
+
+      - if: steps.token.outputs.ok == 'true'
+        name: App settings (public Supabase URL and publishable key)
+        run: cp .env.example .env
+
+      - if: steps.token.outputs.ok == 'true'
+        name: Make sure the production channel exists
+        run: npx eas-cli@latest channel:create production --non-interactive || true
+
+      - if: steps.token.outputs.ok == 'true'
+        name: Publish update to the production channel
+        run: |
+          npx eas-cli@latest update \
+            --channel production \
+            --platform android \
+            --message "$(git log -1 --pretty=%s)" \
+            --non-interactive
