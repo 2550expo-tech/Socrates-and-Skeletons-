@@ -30,6 +30,7 @@ import { useToast } from '../ui/feedback';
 import { PeriodSummary } from '../ui/PeriodSummary';
 import { TxRow } from '../ui/TxRow';
 import { radius, space, useTheme } from '../ui/theme';
+import { WaitNotice } from '../ui/WaitNotice';
 
 export default function Scan() {
   const theme = useTheme();
@@ -178,9 +179,7 @@ export default function Scan() {
               </View>
             </Row>
             {!done ? <ProgressBar value={counts.total ? counts.finished / counts.total : 0} color={theme.accent} /> : null}
-            {running && s.waiting ? (
-              <T v="small">{s.waiting}</T>
-            ) : null}
+            {running && s.waiting ? <WaitNotice until={s.waiting} /> : null}
             {running ? <Button label="หยุดชั่วคราว" kind="soft" small icon="pause" onPress={s.pause} /> : null}
             {paused && !s.notice ? <Button label="อ่านต่อ" small icon="play" onPress={s.resume} /> : null}
             {done && readyIds.length > 0 ? (

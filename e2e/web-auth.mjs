@@ -471,9 +471,15 @@ try {
     await button(page, 'เลือกรูปสลิป').click();
     state.slipBusy = 1;
     await (await chooser).setFiles(['photo-1.jpg', 'photo-2.jpg', 'photo-3.jpg'].map((f) => join(FIXTURES, f)));
-    check('AI busy (free-tier limit): the scan says it will wait instead of failing', await visible(page, 'AI มีคิวเยอะ รออีก 20 วินาที', 10000));
+    check('AI busy (free-tier limit): the scan says it will wait instead of failing', await visible(page, 'AI มีคิวเยอะ รออีก', 10000));
     await shot(page, '14b-scan-ai-busy');
-    await page.clock.fastForward(21_000);
+    const secondsShown = async () => Number((await page.getByText(/AI มีคิวเยอะ รออีก \d+/).first().textContent().catch(() => '')).match(/\d+/)?.[0] ?? NaN);
+    const s1 = await secondsShown();
+    await page.clock.fastForward(5_000);
+    await page.waitForTimeout(300);
+    const s2 = await secondsShown();
+    check('...with a live countdown', s1 <= 20 && s2 <= s1 - 4, `${s1} → ${s2}`);
+    await page.clock.fastForward(17_000);
     check('Reading starts by itself and finishes', await visible(page, 'อ่านเสร็จแล้ว ได้ 2 รายการ', 20000));
     await page.waitForTimeout(600);
     await shot(page, '15-scan-done');

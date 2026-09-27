@@ -27,7 +27,6 @@ import {
   rememberScanned,
   requestGalleryAccess,
   SlipReaderError,
-  waitMessage,
 } from './slips';
 
 export type AutoScanPhase = 'idle' | 'needs_permission' | 'scanning' | 'done' | 'error';
@@ -41,6 +40,8 @@ export interface AutoScanState {
   /** Slips saved as drafts (need a check) by this run. */
   drafts: number;
   message: string | null;
+  /** While the AI is rate-limited: when the reader tries again (ms). */
+  waitUntil: number | null;
 }
 
 interface AutoScanContextValue {
@@ -55,7 +56,7 @@ interface AutoScanContextValue {
   dismiss(): void;
 }
 
-const IDLE: AutoScanState ={ phase: 'idle', total: 0, processed: 0, confirmed: [], drafts: 0, message: null };
+const IDLE: AutoScanState = { phase: 'idle', total: 0, processed: 0, confirmed: [], drafts: 0, message: null, waitUntil: null };
 const AutoScanContext = createContext<AutoScanContextValue | null>(null);
 
 export function useAutoScan() {
@@ -108,7 +109,7 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
               repo,
               autoConfirm: p.autoConfirm,
               fallbackTimeMs: img.createdAt,
-              onWait: (seconds) => setState((s) => ({ ...s, message: waitMessage(seconds) })),
+              onWait: (seconds) => setState((s) => ({ ...s, waitUntil: Date.now() + seconds * 1000 })),
             });
             if (r.tx) {
               upsertLocal(r.tx);
@@ -124,7 +125,7 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
             // One unreadable image: skip it this time, try again next run.
           }
           processed += 1;
-          setState((s) => ({ ...s, processed, confirmed: [...confirmed], drafts, message: null }));
+          setState((s) => ({ ...s, processed, confirmed: [...confirmed], drafts, waitUntil: null }));
         }
 
         await rememberScanned(userId, scanned);
@@ -133,7 +134,7 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
           setPrefsState(await saveScanPrefs({ lastAutoScanAt: startedAt }));
         }
         if (stoppedBy) setState({ ...IDLE, phase: 'error', message: stoppedBy });
-        else if (confirmed.length + drafts > 0) setState({ phase: 'done', total: batch.length, processed, confirmed, drafts, message: null });
+        else if (confirmed.length + drafts > 0) setState({ ...IDLE, phase: 'done', total: batch.length, processed, confirmed, drafts });
         else setState(IDLE); // nothing new: stay quiet
       } catch {
         setState({ ...IDLE, phase: 'error', message: 'ตรวจแกลเลอรีอัตโนมัติไม่สำเร็จ ลองใหม่ได้ที่ปุ่มสแกนสลิป' });

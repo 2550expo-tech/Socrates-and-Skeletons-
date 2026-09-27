@@ -11,6 +11,7 @@ import { Buddy } from './Buddy';
 import { Button, Card, IconButton, ProgressBar, Row, T } from './components';
 import { useToast } from './feedback';
 import { space, useTheme } from './theme';
+import { WaitNotice } from './WaitNotice';
 
 export function AutoScanBanner() {
   const theme = useTheme();
@@ -28,7 +29,7 @@ export function AutoScanBanner() {
               {state.total === 0 ? `${BUDDY_NAME}กำลังหาสลิปใหม่ในแกลเลอรี…` : `${BUDDY_NAME}กำลังอ่านสลิปใหม่ ${state.processed}/${state.total}`}
             </T>
             {state.total > 0 ? <ProgressBar value={state.processed / state.total} color={theme.accent} /> : null}
-            {state.message ? <T v="micro">{state.message}</T> : null}
+            {state.waitUntil ? <WaitNotice until={state.waitUntil} micro /> : null}
           </View>
         </Row>
       </Card>

@@ -26,7 +26,6 @@ import {
   rememberScanned,
   requestGalleryAccess,
   SlipReaderError,
-  waitMessage,
   type GalleryAccess,
 } from './slips';
 
@@ -46,8 +45,8 @@ export function useSlipScanner(initialRange: RangeKey = '1m') {
   const [skippedKnown, setSkippedKnown] = useState(0);
   const [requireQr, setRequireQr] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
-  /** Set while the reader waits for the AI's rate limit (free tier) before trying again. */
-  const [waiting, setWaiting] = useState<string | null>(null);
+  /** Set while the reader waits for the AI's rate limit (free tier): when it tries again (ms). */
+  const [waiting, setWaiting] = useState<number | null>(null);
   /** Transactions recorded by this scan, to show them grouped by date. */
   const [runTxIds, setRunTxIds] = useState<string[]>([]);
 
@@ -135,7 +134,7 @@ export function useSlipScanner(initialRange: RangeKey = '1m') {
       autoConfirm: prefs.autoConfirm,
       fallbackTimeMs: item.createdAt,
       onWait: (seconds) => {
-        if (mounted.current) setWaiting(waitMessage(seconds));
+        if (mounted.current) setWaiting(Date.now() + seconds * 1000);
       },
     });
     if (mounted.current) setWaiting(null);
