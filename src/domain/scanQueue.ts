@@ -36,6 +36,8 @@ export interface ScanItem {
   amountSatang?: number | null;
   label?: string | null;
   message?: string;
+  /** true when the slip was counted in the balance straight away (auto-confirm). */
+  confirmed?: boolean;
 }
 
 export interface ScanState {
@@ -61,6 +63,7 @@ export type ScanAction =
       amountSatang?: number | null;
       label?: string | null;
       message?: string;
+      confirmed?: boolean;
     }
   | { type: 'reset' };
 
@@ -123,6 +126,7 @@ export function scanReducer(state: ScanState, action: ScanAction): ScanState {
           amountSatang: action.amountSatang,
           label: action.label,
           message: action.message,
+          confirmed: action.confirmed,
         };
       });
       if (!found) return state;

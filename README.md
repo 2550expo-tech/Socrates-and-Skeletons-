@@ -21,7 +21,7 @@
 |---|---|---|
 | FR-1 | Transaction Management: เพิ่ม แก้ จัดหมวด ลบ | แท็บ **รายการ**, หน้าจดรายการ |
 | FR-2 | Overview Dashboard: รายรับ รายจ่าย ยอดคงเหลือ ยอดตามหมวด | แท็บ **หน้าหลัก** |
-| FR-4 | Automatic Gallery Slip Detection: ตรวจสลิปในแกลเลอรี, เกณฑ์ความมั่นใจ 80%, กันรายการซ้ำ | ปุ่มทอง **สแกนสลิป** |
+| FR-4 | Automatic Gallery Slip Detection: ตรวจสลิปในแกลเลอรี, เกณฑ์ความมั่นใจ 80%, กันรายการซ้ำ | **อัตโนมัติทุกครั้งที่เปิดแอป** + ปุ่มทอง **สแกนสลิป** |
 | FR-5 | AI Persona Coach: อธิบายข้อมูลที่ยืนยันแล้วด้วยโทนที่ผู้ใช้เลือก | แท็บ **โค้ช** |
 | FR-6 | Money Runway: ประมาณวันที่เงินจะแตะเส้นสำรองจากค่าเฉลี่ย 7 วัน | แท็บ **เงินพอถึง** |
 
@@ -140,7 +140,7 @@ Supabase Dashboard → **Edge Functions → Secrets** → เพิ่ม
 ## คำสั่งสำหรับนักพัฒนา
 
 ```bash
-npm test            # unit test ของกฎทั้งหมด (41 เคส)
+npm test            # unit test ของกฎทั้งหมด (44 เคส)
 npm run typecheck   # ตรวจ TypeScript
 npx expo lint       # ESLint
 npx expo start      # เปิด dev server

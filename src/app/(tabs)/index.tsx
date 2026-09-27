@@ -30,6 +30,7 @@ import {
   Segmented,
   T,
 } from '../../ui/components';
+import { AutoScanBanner } from '../../ui/AutoScanBanner';
 import { TxRow } from '../../ui/TxRow';
 import { palette, radius, space, useTheme } from '../../ui/theme';
 
@@ -84,6 +85,8 @@ export default function Home() {
           <Button label="ลองอีกครั้ง" kind="soft" small onPress={refresh} icon="refresh" />
         </Card>
       ) : null}
+
+      <AutoScanBanner />
 
       {/* Hero: balance + runway (the one place gold is used for the number that matters) */}
       <View

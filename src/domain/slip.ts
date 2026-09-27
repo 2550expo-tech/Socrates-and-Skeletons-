@@ -16,7 +16,7 @@
 import { suggestCategory } from './categories';
 import { addDays, bkkDayKey, isDayInRange, parseSlipDate, parseSlipTime } from './dates';
 import { parseBahtToSatang } from './money';
-import type { Transaction, TxKind } from './types';
+import type { Transaction, TxKind, TxStatus } from './types';
 
 export const CONFIDENCE_THRESHOLD = 0.8;
 
@@ -242,4 +242,14 @@ export function classifyCandidate(
   if (isDuplicate(c, opts.index)) return 'duplicate';
   if (c.dayKey && !isDayInRange(c.dayKey, opts.range)) return 'out_of_range';
   return c.flags.length === 0 ? 'ready' : 'needs_review';
+}
+
+/**
+ * How a newly read slip is saved.
+ * Team decision (27 ก.ย. 2569): when "auto-confirm" is on, a slip whose every key
+ * field was read with at least 80% confidence counts in the balance right away
+ * (the user can undo). Anything unsure stays a draft until the user checks it.
+ */
+export function initialStatus(outcome: 'ready' | 'needs_review', autoConfirm: boolean): TxStatus {
+  return outcome === 'ready' && autoConfirm ? 'confirmed' : 'draft';
 }

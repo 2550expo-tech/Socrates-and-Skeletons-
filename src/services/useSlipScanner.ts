@@ -7,25 +7,17 @@
  */
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { bkkToIso, rangeDays, rangeStartMs } from '../domain/dates';
-import {
-  addToIndex,
-  buildDuplicateIndex,
-  classifyCandidate,
-  normalizeReading,
-  type DuplicateIndex,
-} from '../domain/slip';
+import { rangeDays, rangeStartMs } from '../domain/dates';
+import { buildDuplicateIndex, type DuplicateIndex } from '../domain/slip';
 import { initialScanState, nextQueued, scanReducer, type ScanAction, type ScanItem, type ScanState } from '../domain/scanQueue';
 import type { RangeKey } from '../domain/types';
 import { useApp } from '../data/AppProvider';
-import { DuplicateSlipError } from '../data/repo';
+import { loadScanPrefs } from '../data/prefs';
+import { processSlipImage } from './processSlip';
 import {
-  detectSlipQr,
   findGalleryImages,
   galleryUri,
   loadScannedIds,
-  prepareImage,
-  readSlip,
   rememberScanned,
   requestGalleryAccess,
   SlipReaderError,
@@ -111,48 +103,26 @@ export function useSlipScanner(initialRange: RangeKey = '7d') {
 
   async function processOne(item: ScanItem): Promise<Omit<Finished, 'type' | 'runId' | 'assetId'>> {
     const picked = pickedRef.current.get(item.assetId);
-    const uri = picked ? item.assetId : await galleryUri(item.assetId);
-
-    const qr = await detectSlipQr(uri);
-    if (!qr && requireQr && !picked) return { status: 'not_slip', message: 'ไม่พบ QR ของสลิป' };
-
-    const prepared = await prepareImage(uri, picked?.width);
-    if (indexRef.current.hashes.has(prepared.hash)) return { status: 'duplicate', message: 'รูปนี้เคยบันทึกแล้ว' };
-
-    const reading = await readSlip(prepared.base64);
-    if (!reading.isSlip) return { status: 'not_slip', message: 'ไม่ใช่สลิปโอนเงิน' };
-
-    const c = normalizeReading(reading, { qr, imageHash: prepared.hash });
-    const outcome = classifyCandidate(c, { range: rangeDays(stateRef.current.range), index: indexRef.current });
-    const label = c.counterparty ?? 'รายการจากสลิป';
-    if (outcome === 'duplicate') return { status: 'duplicate', amountSatang: c.amountSatang, label, message: 'มีรายการนี้แล้ว' };
-    if (outcome === 'out_of_range') return { status: 'out_of_range', amountSatang: c.amountSatang, label, message: 'อยู่นอกช่วงเวลาที่เลือก' };
-    if (c.amountSatang === null) {
-      return { status: 'failed', label, message: 'อ่านยอดเงินไม่ได้ ลองจดรายการนี้เอง' };
-    }
-
-    try {
-      const tx = await repo!.insert({
-        kind: c.kind,
-        amountSatang: c.amountSatang,
-        categoryKey: c.categoryKey,
-        title: label,
-        note: c.bank ? `สลิปจาก ${c.bank}` : null,
-        occurredAt: c.dayKey ? bkkToIso(c.dayKey, c.time) : new Date(item.createdAt).toISOString(),
-        source: 'slip',
-        status: 'draft',
-        slipRef: c.ref,
-        slipImageHash: c.imageHash,
-        ocrConfidence: Math.round(c.confidence * 100) / 100,
-        reviewFlags: c.flags,
-      });
-      addToIndex(indexRef.current, tx);
-      upsertLocal(tx);
-      return { status: outcome, txId: tx.id, amountSatang: c.amountSatang, label };
-    } catch (e) {
-      if (e instanceof DuplicateSlipError) return { status: 'duplicate', amountSatang: c.amountSatang, label, message: 'มีรายการนี้แล้ว' };
-      throw e;
-    }
+    const prefs = await loadScanPrefs();
+    const r = await processSlipImage({
+      uri: picked ? item.assetId : await galleryUri(item.assetId),
+      width: picked?.width,
+      requireQr: requireQr && !picked,
+      range: rangeDays(stateRef.current.range),
+      index: indexRef.current,
+      repo: repo!,
+      autoConfirm: prefs.autoConfirm,
+      fallbackTimeMs: item.createdAt,
+    });
+    if (r.tx) upsertLocal(r.tx);
+    return {
+      status: r.status,
+      txId: r.tx?.id,
+      amountSatang: r.amountSatang,
+      label: r.label,
+      message: r.message,
+      confirmed: r.confirmed,
+    };
   }
 
   const runLoop = useCallback(async () => {

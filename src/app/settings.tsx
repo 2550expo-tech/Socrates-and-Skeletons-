@@ -5,9 +5,10 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../data/AppProvider';
+import { useAutoScan } from '../services/AutoScanProvider';
 import { forgetScanned } from '../services/slips';
 import { PERSONAS } from '../domain/insights';
 import { formatSatang, parseBahtToSatang } from '../domain/money';
@@ -20,6 +21,7 @@ export default function Settings() {
   const theme = useTheme();
   const toast = useToast();
   const { profile, repo, userId, saveProfile, signOut } = useApp();
+  const auto = useAutoScan();
   const [name, setName] = useState(profile?.displayName ?? '');
   const [opening, setOpening] = useState(formatSatang(profile?.openingBalanceSatang ?? 0, { decimals: false }).replace(/,/g, ''));
   const [floor, setFloor] = useState(formatSatang(profile?.runwayFloorSatang ?? 50_000, { decimals: false }).replace(/,/g, ''));
@@ -85,6 +87,36 @@ export default function Settings() {
             <Field id="st-budget" label="งบใช้จ่ายต่อเดือน (บาท)" value={budget} onChangeText={setBudget} keyboardType="decimal-pad" hint="เว้นว่างถ้าไม่ต้องการตั้งงบ" error={errors.budget} />
             <Button label="บันทึก" onPress={save} loading={busy} />
           </Card>
+
+          {auto.available ? (
+            <Card>
+              <T v="h3">อ่านสลิปอัตโนมัติ</T>
+              <Row justify="space-between" gap={space.md}>
+                <View style={{ flex: 1 }}>
+                  <T v="body">หาสลิปใหม่ทุกครั้งที่เปิดแอป</T>
+                  <T v="micro">ตรวจเฉพาะรูปที่มี QR ของสลิปธนาคาร ย้อนหลังตั้งแต่ครั้งล่าสุดที่เปิดแอป</T>
+                </View>
+                <Switch
+                  value={auto.prefs.autoScan}
+                  onValueChange={(v) => auto.setPrefs({ autoScan: v })}
+                  trackColor={{ true: theme.primary, false: theme.line }}
+                  accessibilityLabel="หาสลิปใหม่ทุกครั้งที่เปิดแอป"
+                />
+              </Row>
+              <Row justify="space-between" gap={space.md}>
+                <View style={{ flex: 1 }}>
+                  <T v="body">รวมยอดทันทีเมื่ออ่านชัด</T>
+                  <T v="micro">สลิปที่อ่านได้มั่นใจ 80% ขึ้นไปทุกช่องจะเข้ายอดเงินเลย ส่วนที่ไม่ชัดรอให้ตรวจก่อน</T>
+                </View>
+                <Switch
+                  value={auto.prefs.autoConfirm}
+                  onValueChange={(v) => auto.setPrefs({ autoConfirm: v })}
+                  trackColor={{ true: theme.primary, false: theme.line }}
+                  accessibilityLabel="รวมยอดทันทีเมื่ออ่านชัด"
+                />
+              </Row>
+            </Card>
+          ) : null}
 
           <Card>
             <T v="h3">โทนของโค้ช</T>

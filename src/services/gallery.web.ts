@@ -13,6 +13,10 @@ export interface GalleryImage {
 
 export const galleryAvailable = false;
 
+export async function getGalleryAccess(): Promise<GalleryAccess> {
+  return 'denied';
+}
+
 export async function requestGalleryAccess(): Promise<GalleryAccess> {
   return 'denied';
 }

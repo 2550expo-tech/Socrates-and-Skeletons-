@@ -13,6 +13,7 @@ import {
 } from '@expo-google-fonts/anuphan';
 import { NotoSerifThai_600SemiBold, NotoSerifThai_700Bold } from '@expo-google-fonts/noto-serif-thai';
 import { AppProvider, useApp } from '../data/AppProvider';
+import { AutoScanProvider } from '../services/AutoScanProvider';
 import { ToastProvider } from '../ui/feedback';
 import { useTheme } from '../ui/theme';
 
@@ -32,7 +33,9 @@ export default function RootLayout() {
       <WebFrame>
         <AppProvider>
           <ToastProvider>
-            <Navigator ready={fontsLoaded || !!fontError} />
+            <AutoScanProvider>
+              <Navigator ready={fontsLoaded || !!fontError} />
+            </AutoScanProvider>
           </ToastProvider>
         </AppProvider>
       </WebFrame>

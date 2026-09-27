@@ -2,12 +2,19 @@
  * FR-4 gallery access on the phone (Android / iOS).
  * The web build uses gallery.web.ts instead, where only hand-picked photos are possible.
  */
-import { Asset, AssetField, MediaType, Query, requestPermissionsAsync } from 'expo-media-library';
+import { Asset, AssetField, getPermissionsAsync, MediaType, Query, requestPermissionsAsync } from 'expo-media-library';
 
 /** Whether this platform can search the whole photo library. */
 export const galleryAvailable = true;
 
 export type GalleryAccess = 'all' | 'limited' | 'denied' | 'blocked';
+
+/** Current access without showing a prompt (used by the automatic scan on app open). */
+export async function getGalleryAccess(): Promise<GalleryAccess> {
+  const res = await getPermissionsAsync(false, ['photo']);
+  if (res.granted) return res.accessPrivileges === 'limited' ? 'limited' : 'all';
+  return res.canAskAgain ? 'denied' : 'blocked';
+}
 
 export async function requestGalleryAccess(): Promise<GalleryAccess> {
   const res = await requestPermissionsAsync(false, ['photo']);

@@ -40,7 +40,8 @@ export default function Scan() {
   const counts = scanCounts(state);
   const locked = state.phase === 'running' || state.phase === 'paused';
   const demo = repo?.mode === 'demo';
-  const readyIds = state.items.filter((i) => i.status === 'ready' && i.txId).map((i) => i.txId!);
+  const readyIds = state.items.filter((i) => i.status === 'ready' && i.txId && !i.confirmed).map((i) => i.txId!);
+  const autoCounted = state.items.filter((i) => i.confirmed).length;
   const shown = state.items.filter((i) => i.status !== 'queued' && i.status !== 'not_slip').slice(0, 60);
 
   async function confirmReady() {
@@ -190,6 +191,9 @@ export default function Scan() {
             ) : null}
             {state.phase === 'running' ? <Button label="หยุดชั่วคราว" kind="soft" icon="pause" onPress={s.pause} /> : null}
             {state.phase === 'paused' ? <Button label="ตรวจต่อ" icon="play" onPress={s.resume} /> : null}
+            {autoCounted > 0 ? (
+              <T v="small" color={theme.good}>รวมในยอดเงินแล้ว {autoCounted} รายการ (อ่านชัดทุกช่อง)</T>
+            ) : null}
             {state.phase === 'done' && readyIds.length > 0 ? (
               <Button label={`ยืนยัน ${readyIds.length} รายการที่พร้อม`} kind="gold" icon="checkmark-done" onPress={confirmReady} />
             ) : null}
