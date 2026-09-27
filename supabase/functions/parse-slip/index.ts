@@ -2,10 +2,11 @@
 //
 // Privacy: the image is used only for this request. It is not written to the
 // database or to storage, and only images that already looked like slips on
-// the phone are sent here.
-import { callClaude, corsHeaders, fail, json, NotConfiguredError, requireUser, takeQuota } from '../_shared/common.ts';
+// the phone are sent here. The AI service (Claude or Gemini, see
+// _shared/common.ts) receives the image to read it.
+import { aiProvider, BusyError, callAI, corsHeaders, fail, json, NotConfiguredError, requireUser, takeQuota } from '../_shared/common.ts';
+import { normalizeReading, parseJsonText } from '../_shared/helpers.ts';
 
-const MODEL = Deno.env.get('SLIP_MODEL') ?? 'claude-haiku-4-5-20251001';
 const DAILY_LIMIT = Number(Deno.env.get('SLIP_DAILY_LIMIT') ?? '300');
 const MAX_BASE64_CHARS = 6_000_000; // about 4.5 MB of image
 
@@ -76,25 +77,32 @@ Deno.serve(async (req) => {
     return fail('bad_request', 'Unsupported image type', 400);
   }
 
-  if (!Deno.env.get('ANTHROPIC_API_KEY')) return fail('not_configured', 'AI key is not set on the server', 503);
+  if (!aiProvider()) return fail('not_configured', 'AI key is not set on the server', 503);
 
   try {
     if (!(await takeQuota(userId, 'slip', DAILY_LIMIT))) {
       return fail('quota', 'Daily slip limit reached, try again tomorrow', 429);
     }
-    const text = await callClaude({
-      model: MODEL,
+    const text = await callAI({
+      task: 'slip',
       system: SYSTEM,
       maxTokens: 600,
       schema: SCHEMA,
       content: [
-        { type: 'image', source: { type: 'base64', media_type: mediaType, data: image } },
+        { type: 'image', mediaType, data: image },
         { type: 'text', text: 'Extract the slip fields from this image.' },
       ],
     });
-    return json({ reading: JSON.parse(text) });
+    return json({ reading: normalizeReading(parseJsonText(text)) });
   } catch (e) {
-    if (e instanceof NotConfiguredError) return fail('not_configured', 'AI key is not set on the server', 503);
+    if (e instanceof NotConfiguredError) {
+      console.error('parse-slip: AI key missing or refused', e.message);
+      return fail('not_configured', 'AI key is not set on the server or was refused', 503);
+    }
+    if (e instanceof BusyError) {
+      console.warn('parse-slip: AI busy', e.message);
+      return fail('busy', 'The AI service is busy, try again shortly', 503);
+    }
     console.error('parse-slip failed', e);
     return fail('reader_error', 'Could not read this image', 502);
   }

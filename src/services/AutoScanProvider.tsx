@@ -116,7 +116,7 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
             scanned.add(img.assetId);
           } catch (e) {
             if (e instanceof SlipReaderError && e.code !== 'reader_error' && e.code !== 'network') {
-              stoppedBy = e.message; // affects every image (not configured, quota, signed out)
+              stoppedBy = e.message; // affects every image (not configured, AI busy, quota, signed out): next run continues
               break;
             }
             // One unreadable image: skip it this time, try again next run.

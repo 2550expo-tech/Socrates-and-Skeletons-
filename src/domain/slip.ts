@@ -4,7 +4,7 @@
  *
  * Pipeline for one image:
  *   1. read the QR code on the slip (on the phone, free)          -> parseSlipQr
- *   2. send the image to the slip reader (server + Claude vision)  -> SlipReading
+ *   2. send the image to the slip reader (server + AI vision: Claude or Gemini)  -> SlipReading
  *   3. clean the reading and flag unsure fields                    -> normalizeReading
  *   4. decide what to do with it                                   -> classifyCandidate
  *

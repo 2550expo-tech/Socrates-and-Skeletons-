@@ -55,6 +55,7 @@
 | เปลี่ยนช่วงเวลาระหว่างสแกนไม่ได้ (แก้บั๊กของ prototype เดิม) | `scanReducer` `setRange` | TC-27, TC-28 |
 | พักและสแกนต่อได้ | `scanReducer` pause/resume | TC-29 |
 | เว็บ/แอปเข้าถึงเฉพาะรูปที่ได้รับอนุญาต ถ้าไม่ให้สิทธิ์ยังเลือกรูปเองได้ | `src/services/slips.ts`, `scan.tsx` | MT-05 |
+| ผลอ่านสลิปจาก AI (Claude หรือ Gemini) ถูกทำความสะอาดบนเซิร์ฟเวอร์ก่อนส่งให้แอป: ปี พ.ศ. ที่ลืมแปลง, จำนวนเงินมีคอมมา/"บาท", ช่องที่อ่านไม่ได้ต้องมีความมั่นใจ 0 | `supabase/functions/_shared/helpers.ts` `normalizeReading`, `pickProvider` | TC-38 ถึง TC-42 |
 
 ## FR-5 AI Persona Coach
 
@@ -92,7 +93,7 @@
 
 ## Automated tests
 
-รัน `npm test` · ไฟล์ `src/domain/__tests__/domain.test.ts` · ผลล่าสุด **44/44 ผ่าน** (รวม TC-33: ข้อมูลตัวอย่างต้องมียอดเงินเป็นบวกและ Runway ≥ 10 วัน ไม่ว่าจะเปิดแอปวันไหน)
+รัน `npm test` · ไฟล์ `src/domain/__tests__/*.test.ts` และ `supabase/functions/_shared/__tests__/helpers.test.ts` · ผลล่าสุด **49/49 ผ่าน** (รวม TC-33: ข้อมูลตัวอย่างต้องมียอดเงินเป็นบวกและ Runway ≥ 10 วัน ไม่ว่าจะเปิดแอปวันไหน)
 
 ## Manual test plan (ทีมทดสอบบนมือถือจริง แล้วกรอกผล)
 

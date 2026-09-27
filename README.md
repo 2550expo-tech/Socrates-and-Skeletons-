@@ -39,14 +39,14 @@ flowchart LR
   Data -->|"publishable key + RLS"| DB[("Supabase<br/>PostgreSQL")]
   Scan -->|"เฉพาะรูปที่เป็นสลิป"| F1["Edge Function<br/>parse-slip"]
   UI -->|"ยอดรวมตามหมวดเท่านั้น"| F2["Edge Function<br/>coach"]
-  F1 --> Claude["Claude API<br/>(key อยู่บนเซิร์ฟเวอร์)"]
-  F2 --> Claude
+  F1 --> AI["AI: Claude หรือ Gemini<br/>(key อยู่บนเซิร์ฟเวอร์)"]
+  F2 --> AI
 ```
 
 - **เงินเก็บเป็นสตางค์ (จำนวนเต็ม)** ไม่มีปัญหาทศนิยมเพี้ยน
 - **เวลาอิงเวลาไทย (UTC+7)** ทุกจุด ทั้งการจัดกลุ่มรายวันและการอ่านวันที่บนสลิป
 - **สลิปที่อ่านได้เป็น "แบบร่าง"** จนกว่าผู้ใช้จะยืนยัน ไม่เข้ายอดเงินก่อน
-- **API key ของ Claude อยู่บนเซิร์ฟเวอร์เท่านั้น** แอปไม่มีคีย์ลับ
+- **API key ของ AI (Claude หรือ Gemini) อยู่บนเซิร์ฟเวอร์เท่านั้น** แอปไม่มีคีย์ลับ
 
 ## โครงสร้างโฟลเดอร์
 
@@ -125,22 +125,30 @@ npx eas-cli@latest build --profile preview --platform android
 
 ### 4. ตั้งค่า AI (อ่านสลิป + โค้ช)
 
-Supabase Dashboard → **Edge Functions → Secrets** → เพิ่ม
+Supabase Dashboard → **Edge Functions → Secrets** → เพิ่ม **อย่างใดอย่างหนึ่ง** (ใส่ทั้งสองได้ ระบบจะใช้ Claude ก่อน):
 
-| Name | Value |
-|---|---|
-| `ANTHROPIC_API_KEY` | คีย์จาก console.anthropic.com (`sk-ant-...`) |
+| Name | Value | หมายเหตุ |
+|---|---|---|
+| `GEMINI_API_KEY` | คีย์จาก https://aistudio.google.com/apikey | **ฟรี ไม่ต้องใช้บัตร** แต่แบบฟรี Google อาจนำข้อมูลที่ส่งไป (รูปสลิป) ไปปรับปรุงโมเดล และมีเพดานจำนวนครั้งต่อนาที/ต่อวัน เหมาะกับการทดสอบและพรีเซนต์ |
+| `ANTHROPIC_API_KEY` | คีย์จาก console.anthropic.com (`sk-ant-...`) | ต้องเติมเครดิตและยืนยันตัวตน ข้อมูลไม่ถูกนำไปฝึกโมเดล |
 
-ตัวเลือกเสริม: `SLIP_MODEL`, `COACH_MODEL` (ค่าเริ่มต้น `claude-haiku-4-5-20251001`), `SLIP_DAILY_LIMIT` (300 ใบ/วัน/คน), `COACH_DAILY_LIMIT` (60 ครั้ง/วัน/คน)
+ไม่ต้อง deploy ใหม่หลังใส่ key
 
-ค่าใช้จ่ายโดยประมาณ: อ่านสลิป 1 ใบ ≈ 0.003 ดอลลาร์ (ราว 10 สตางค์)
+ตัวเลือกเสริม:
+- `AI_PROVIDER` = `claude` หรือ `gemini` บังคับใช้ตัวใดตัวหนึ่ง
+- `GEMINI_MODEL` (ค่าเริ่มต้น `gemini-3.5-flash-lite` ถ้ารุ่นนี้ใช้ไม่ได้ ระบบลองรุ่นถัดไปเอง)
+- `SLIP_MODEL`, `COACH_MODEL` สำหรับ Claude (ค่าเริ่มต้น `claude-haiku-4-5-20251001`)
+- `SLIP_DAILY_LIMIT` (300 ใบ/วัน/คน), `COACH_DAILY_LIMIT` (60 ครั้ง/วัน/คน)
+
+ค่าใช้จ่ายโดยประมาณ: Gemini แบบฟรี 0 บาท (ภายในเพดาน) · Claude อ่านสลิป 1 ใบ ≈ 0.003 ดอลลาร์ (ราว 10 สตางค์)
+ถ้า AI ตอบไม่ทัน (เกินเพดานแบบฟรี) แอปจะแจ้งให้ลองใหม่ และสลิปที่เหลือจะอ่านต่อตอนเปิดแอปครั้งหน้า
 
 ---
 
 ## คำสั่งสำหรับนักพัฒนา
 
 ```bash
-npm test            # unit test ของกฎทั้งหมด (44 เคส)
+npm test            # unit test ของกฎทั้งหมด (49 เคส)
 npm run typecheck   # ตรวจ TypeScript
 npx expo lint       # ESLint
 npx expo start      # เปิด dev server
@@ -151,7 +159,7 @@ npx expo start      # เปิด dev server
 1. สร้างโปรเจคใหม่ (Region: Singapore)
 2. SQL Editor → รันไฟล์ใน `supabase/migrations/` ตามลำดับชื่อไฟล์
 3. Deploy ฟังก์ชัน: `npx supabase functions deploy parse-slip` และ `coach`
-4. ใส่ Secret `ANTHROPIC_API_KEY`
+4. ใส่ Secret `GEMINI_API_KEY` หรือ `ANTHROPIC_API_KEY`
 5. แก้ URL และ publishable key ใน `.env` และ `eas.json`
 
 ---
@@ -159,7 +167,7 @@ npx expo start      # เปิด dev server
 ## ความปลอดภัยและความเป็นส่วนตัว
 
 - ทุกตารางเปิด **Row Level Security** ผู้ใช้เห็นและแก้ได้เฉพาะแถวของตัวเอง ตรวจด้วย Supabase Security Advisor แล้ว ผล 0 ปัญหา
-- รูปในแกลเลอรีตรวจ **บนมือถือก่อน** เฉพาะรูปที่มี QR ของสลิปธนาคารจึงถูกส่งไปอ่าน และไม่ถูกเก็บไว้บนเซิร์ฟเวอร์
+- รูปในแกลเลอรีตรวจ **บนมือถือก่อน** เฉพาะรูปที่มี QR ของสลิปธนาคารจึงถูกส่งไปอ่าน และไม่ถูกเก็บไว้บนเซิร์ฟเวอร์ของเรา (ผู้ให้บริการ AI ได้รับรูปเพื่ออ่าน: ถ้าใช้ Gemini แบบฟรี Google อาจเก็บไปปรับปรุงโมเดล ควรใช้แบบเสียเงินหรือ Claude เมื่อมีผู้ใช้จริง)
 - โค้ช AI ได้รับเฉพาะยอดรวมตามหมวด ไม่มีรูป เลขบัญชี หรือชื่อคน
 - จำกัดจำนวนการเรียก AI ต่อวันต่อบัญชี กันค่าใช้จ่ายบานปลาย
 - Android ขอเฉพาะสิทธิ์รูปภาพ บล็อกสิทธิ์กล้องและไมโครโฟน

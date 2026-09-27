@@ -1,9 +1,9 @@
 // FR-5: AI Persona Coach. Explains the user's CONFIRMED numbers in the tone
 // they picked. The app sends only totals by category (no slip images, no
 // names of people, no account numbers).
-import { callClaude, corsHeaders, fail, json, NotConfiguredError, requireUser, takeQuota } from '../_shared/common.ts';
+import { aiProvider, BusyError, callAI, corsHeaders, fail, json, NotConfiguredError, requireUser, takeQuota } from '../_shared/common.ts';
+import { plainText } from '../_shared/helpers.ts';
 
-const MODEL = Deno.env.get('COACH_MODEL') ?? 'claude-haiku-4-5-20251001';
 const DAILY_LIMIT = Number(Deno.env.get('COACH_DAILY_LIMIT') ?? '60');
 
 const PERSONAS: Record<string, string> = {
@@ -41,14 +41,14 @@ Deno.serve(async (req) => {
   const question = (body.question ?? '').toString().slice(0, 400).trim();
   const data = JSON.stringify(body.context ?? {}).slice(0, 6000);
 
-  if (!Deno.env.get('ANTHROPIC_API_KEY')) return fail('not_configured', 'AI key is not set on the server', 503);
+  if (!aiProvider()) return fail('not_configured', 'AI key is not set on the server', 503);
 
   try {
     if (!(await takeQuota(userId, 'coach', DAILY_LIMIT))) {
       return fail('quota', 'Daily coach limit reached, try again tomorrow', 429);
     }
-    const text = await callClaude({
-      model: MODEL,
+    const text = await callAI({
+      task: 'coach',
       system: systemPrompt(body.tone ?? 'friend'),
       maxTokens: 500,
       content: [
@@ -58,9 +58,16 @@ Deno.serve(async (req) => {
         },
       ],
     });
-    return json({ text: text.trim() });
+    return json({ text: plainText(text) });
   } catch (e) {
-    if (e instanceof NotConfiguredError) return fail('not_configured', 'AI key is not set on the server', 503);
+    if (e instanceof NotConfiguredError) {
+      console.error('coach: AI key missing or refused', e.message);
+      return fail('not_configured', 'AI key is not set on the server or was refused', 503);
+    }
+    if (e instanceof BusyError) {
+      console.warn('coach: AI busy', e.message);
+      return fail('busy', 'The AI service is busy, try again shortly', 503);
+    }
     console.error('coach failed', e);
     return fail('coach_error', 'The coach is unavailable right now', 502);
   }

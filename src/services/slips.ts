@@ -69,7 +69,10 @@ export async function prepareImage(uri: string, width?: number | null) {
 }
 
 export class SlipReaderError extends Error {
-  constructor(public code: 'cloud_required' | 'unauthorized' | 'quota' | 'too_large' | 'not_configured' | 'network' | 'reader_error', message: string) {
+  constructor(
+    public code: 'cloud_required' | 'unauthorized' | 'quota' | 'too_large' | 'not_configured' | 'busy' | 'network' | 'reader_error',
+    message: string,
+  ) {
     super(message);
   }
 }
@@ -79,7 +82,8 @@ const READER_MESSAGES: Record<SlipReaderError['code'], string> = {
   unauthorized: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง',
   quota: 'วันนี้อ่านสลิปครบโควตาแล้ว ลองใหม่พรุ่งนี้',
   too_large: 'รูปใหญ่เกินไป',
-  not_configured: 'เซิร์ฟเวอร์ยังไม่ได้ใส่ API key สำหรับอ่านสลิป (ดู README ขั้นตอน Secrets)',
+  not_configured: 'ระบบอ่านสลิปยังไม่พร้อม: API key ของ AI บนเซิร์ฟเวอร์ยังไม่ได้ใส่หรือใช้ไม่ได้ (ดู README ขั้นตอน Secrets)',
+  busy: 'ตอนนี้ AI อ่านสลิปมีคนใช้เยอะ ลองใหม่อีกสักครู่ สลิปที่เหลือจะอ่านต่อตอนเปิดแอปครั้งหน้า',
   network: 'เชื่อมต่ออินเทอร์เน็ตไม่ได้ ลองใหม่อีกครั้ง',
   reader_error: 'อ่านรูปนี้ไม่สำเร็จ',
 };
@@ -95,7 +99,7 @@ export async function readSlip(base64: string): Promise<SlipReading> {
     if (error instanceof FunctionsHttpError) {
       const body = await (error.context as Response).json().catch(() => null);
       const c = body?.error?.code;
-      code = c === 'unauthorized' || c === 'quota' || c === 'too_large' || c === 'not_configured' ? c : 'reader_error';
+      code = c === 'unauthorized' || c === 'quota' || c === 'too_large' || c === 'not_configured' || c === 'busy' ? c : 'reader_error';
     }
     throw new SlipReaderError(code, READER_MESSAGES[code]);
   }
