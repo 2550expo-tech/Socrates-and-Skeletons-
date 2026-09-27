@@ -267,7 +267,8 @@ export function Button({
       }}
       disabled={off}
       accessibilityRole="button"
-      accessibilityState={{ disabled: !!off, busy: !!loading }}
+      aria-disabled={!!off}
+      aria-busy={!!loading}
       style={({ pressed }) => [
         {
           backgroundColor: colors.bg,
@@ -363,7 +364,9 @@ export function Segmented<K extends string>({
               onChange(o.key);
             }}
             accessibilityRole="tab"
-            accessibilityState={{ selected: active, disabled: !!disabled }}
+            // aria-* (not accessibilityState) so screen readers on the web also hear which one is chosen
+            aria-selected={active}
+            aria-disabled={!!disabled}
             style={{
               flex: 1,
               paddingVertical: 8,
@@ -410,7 +413,7 @@ export function Chip({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityState={{ selected: !!selected }}
+      aria-selected={!!selected}
       style={{
         flexDirection: 'row',
         alignItems: 'center',

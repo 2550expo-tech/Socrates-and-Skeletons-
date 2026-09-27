@@ -130,7 +130,7 @@ export default function Coach() {
                   key={p.tone}
                   onPress={() => setTone(p.tone)}
                   accessibilityRole="radio"
-                  accessibilityState={{ selected: active }}
+                  aria-selected={active}
                   style={{
                     width: 150,
                     padding: space.md,

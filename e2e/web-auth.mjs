@@ -203,6 +203,18 @@ const visible = (page, text, timeout = 6000) => page.getByText(text, { exact: fa
 const gone = (page, text, timeout = 6000) => page.getByText(text, { exact: false }).first().waitFor({ state: 'hidden', timeout }).then(() => true, () => false);
 const introGone = (page) => page.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
 const button = (page, name) => page.getByRole('button', { name, exact: false }).first();
+/** Choose a period (วันนี้ / 7 วัน / ...) on the segmented control; clicks again if a layout shift ate the first click. */
+async function pickPeriod(page, label) {
+  const tab = page.getByRole('tab', { name: label, exact: true }).first();
+  for (let i = 0; i < 3; i++) {
+    await tab.click();
+    const selected = await tab.evaluate((el) => el.getAttribute('aria-selected')).catch(() => null);
+    if (selected === 'true') return true;
+    await page.waitForTimeout(700);
+    if ((await tab.getAttribute('aria-selected').catch(() => null)) === 'true') return true;
+  }
+  return false;
+}
 
 // ---------------------------------------------------------------- scenarios
 try {
@@ -477,7 +489,7 @@ try {
     );
     await button(page, 'เสร็จ').click();
     check('"เสร็จ" returns home even when the scan page was opened directly', await visible(page, 'สวัสดี', 8000));
-    await page.getByText('วันนี้', { exact: true }).first().click();
+    await pickPeriod(page, 'วันนี้');
     check('Home: the chosen period shows its exact hours', await visible(page, '00:00–23:59'));
     check('Home: today shows the money out from the slip', await visible(page, 'เงินออก'));
     await shot(page, '16-home-today');
@@ -499,8 +511,8 @@ try {
     const after = await visible(page, 'วันอังคารที่ 29 กันยายน 2569', 5000);
     check('At midnight the date on the home screen moves to the new day by itself', before && after);
     check('The companion greets the new day with yesterday\'s spending', await visible(page, 'วันใหม่แล้ว!'));
-    await page.getByText('วันนี้', { exact: true }).first().click();
-    check('"วันนี้" now means the new day, 00:00–23:59', await visible(page, '29 ก.ย. 2569 · 00:00–23:59'));
+    const picked = await pickPeriod(page, 'วันนี้');
+    check('"วันนี้" now means the new day, 00:00–23:59', picked && (await visible(page, '29 ก.ย. 2569 · 00:00–23:59', 8000)), picked ? '' : 'tab not selected');
     await shot(page, '17-new-day');
     await ctx.close();
   }

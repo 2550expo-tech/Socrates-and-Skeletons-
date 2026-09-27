@@ -32,7 +32,7 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
       <Pressable
         key={route.key}
         accessibilityRole="tab"
-        accessibilityState={{ selected: focused }}
+        aria-selected={focused}
         accessibilityLabel={meta.label}
         onPress={() => {
           Haptics.selectionAsync().catch(() => {});
