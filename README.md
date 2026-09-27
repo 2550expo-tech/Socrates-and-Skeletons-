@@ -116,6 +116,13 @@ npx eas-cli@latest build --profile preview --platform android
 
 ไอคอนสร้างจาก `scripts/make_icons.py` ถ้ามีไฟล์โลโก้ทางการของทีม แทนที่ไฟล์ใน `assets/` ได้เลย (icon.png 1024×1024 ไม่มีพื้นใส)
 
+### อัปเดตแอปที่ติดตั้งแล้ว (EAS Update)
+
+แอป Android ที่ติดตั้งแล้วจะดาวน์โหลดโค้ดใหม่เองตอนเปิดแอป และใช้เวอร์ชันใหม่ในการเปิดครั้งถัดไป ไม่ต้องติดตั้ง APK ใหม่
+- ทำงานผ่าน `.github/workflows/eas-update.yml` ทุกครั้งที่ push ขึ้น `main` (ต้องมี secret `EXPO_TOKEN` ใน GitHub)
+- โปรเจค Expo: `@expokler/mindpay` · channel: `production`
+- ถ้าเพิ่มแพ็กเกจที่มีโค้ด native หรือแก้ค่า native ใน `app.json` ให้เพิ่ม `version` ใน `app.json` (เช่น 1.0.0 → 1.1.0) แล้วติดตั้ง APK ใหม่หนึ่งครั้ง
+
 ### 4. ตั้งค่า AI (อ่านสลิป + โค้ช)
 
 Supabase Dashboard → **Edge Functions → Secrets** → เพิ่ม

@@ -74,6 +74,23 @@
     "experiments": {
       "typedRoutes": true,
       "baseUrl": "/Socrates-and-Skeletons-"
-    }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/eb06a5c2-48ad-4602-bbaa-f4af2bcce7f0",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      },
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "extra": {
+      "eas": {
+        "projectId": "eb06a5c2-48ad-4602-bbaa-f4af2bcce7f0"
+      }
+    },
+    "owner": "expokler"
   }
 }
