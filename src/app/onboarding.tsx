@@ -1,0 +1,93 @@
+/**
+ * First run: the three numbers MindPay needs to be useful from day one.
+ * Balance = money now; the low line drives FR-6; the budget is optional.
+ */
+import { useState } from 'react';
+import { KeyboardAvoidingView, Platform } from 'react-native';
+import { useApp } from '../data/AppProvider';
+import { formatSatang, parseBahtToSatang } from '../domain/money';
+import { Button, Card, Screen, T } from '../ui/components';
+import { useToast } from '../ui/feedback';
+import { Field } from '../ui/inputs';
+import { space, useTheme } from '../ui/theme';
+
+export default function Onboarding() {
+  const theme = useTheme();
+  const toast = useToast();
+  const { profile, saveProfile } = useApp();
+  const [name, setName] = useState(profile?.displayName ?? '');
+  const [balance, setBalance] = useState('');
+  const [floor, setFloor] = useState(formatSatang(profile?.runwayFloorSatang ?? 50_000, { decimals: false }));
+  const [budget, setBudget] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  async function finish() {
+    const e: Record<string, string> = {};
+    const balanceSatang = balance.trim() === '0' ? 0 : parseBahtToSatang(balance);
+    const floorSatang = floor.trim() === '0' ? 0 : parseBahtToSatang(floor);
+    const budgetSatang = budget.trim() ? parseBahtToSatang(budget) : null;
+    if (!name.trim()) e.name = 'ใส่ชื่อเล่นสั้น ๆ ให้โค้ชเรียกคุณ';
+    if (balanceSatang === null) e.balance = 'ใส่ยอดเงินที่มีตอนนี้ เช่น 3500';
+    if (floorSatang === null) e.floor = 'ใส่เป็นตัวเลข เช่น 500 หรือ 0';
+    if (budget.trim() && budgetSatang === null) e.budget = 'ใส่เป็นตัวเลข หรือเว้นว่างไว้';
+    setErrors(e);
+    if (Object.keys(e).length) return;
+    setBusy(true);
+    try {
+      await saveProfile({
+        displayName: name.trim(),
+        openingBalanceSatang: balanceSatang!,
+        runwayFloorSatang: floorSatang!,
+        monthlyBudgetSatang: budgetSatang,
+        onboarded: true,
+      });
+    } catch {
+      toast({ message: 'บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง', tone: 'error' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Screen edges={['top', 'bottom']} contentStyle={{ paddingTop: space.xl }}>
+        <T v="label">เริ่มต้นใช้งาน</T>
+        <T v="h1">ตั้งค่า 1 นาที แล้วเริ่มเห็นภาพเงินของคุณ</T>
+        <Card style={{ gap: space.lg }}>
+          <Field id="ob-name" label="ชื่อเล่น" value={name} onChangeText={setName} placeholder="เช่น มิ้นท์" error={errors.name} maxLength={30} />
+          <Field
+            id="ob-balance"
+            label="ตอนนี้มีเงินอยู่เท่าไหร่ (บาท)"
+            value={balance}
+            onChangeText={setBalance}
+            keyboardType="decimal-pad"
+            placeholder="เช่น 3500"
+            hint="รวมเงินในบัญชีที่ใช้จ่ายประจำ ใช้เป็นจุดเริ่มต้นของยอดคงเหลือ"
+            error={errors.balance}
+          />
+          <Field
+            id="ob-floor"
+            label="เงินสำรองที่ไม่อยากให้ต่ำกว่า (บาท)"
+            value={floor}
+            onChangeText={setFloor}
+            keyboardType="decimal-pad"
+            hint="Money Runway จะนับวันจนเงินเหลือเท่านี้ ค่าเริ่มต้น ฿500"
+            error={errors.floor}
+          />
+          <Field
+            id="ob-budget"
+            label="งบใช้จ่ายต่อเดือน (ไม่บังคับ)"
+            value={budget}
+            onChangeText={setBudget}
+            keyboardType="decimal-pad"
+            placeholder="เช่น 9000"
+            error={errors.budget}
+          />
+        </Card>
+        <Button label="เริ่มใช้ MindPay" kind="gold" onPress={finish} loading={busy} />
+        <T v="micro" center color={theme.inkFaint}>แก้ไขทุกค่าได้ภายหลังในหน้าตั้งค่า</T>
+      </Screen>
+    </KeyboardAvoidingView>
+  );
+}
