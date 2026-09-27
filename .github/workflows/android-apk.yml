@@ -61,7 +61,9 @@ jobs:
         # The default Metaspace ran out during Android lint and the build hung until the job timeout.
         run: |
           sed -i '/^org.gradle.jvmargs=/d' android/gradle.properties
-          echo 'org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8' >> android/gradle.properties
+          # The generated file has no trailing newline: start with one so the setting is not glued onto the last line.
+          printf '\norg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8\n' >> android/gradle.properties
+          tail -n 3 android/gradle.properties
 
       - name: Build release APK
         working-directory: android
