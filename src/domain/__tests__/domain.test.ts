@@ -377,3 +377,16 @@ describe('FR-5 coach insights', () => {
     for (const i of [...friend, ...senior]) expect(i.message).not.toMatch(/เกินไป!/);
   });
 });
+
+describe('FR-5 budget wording', () => {
+  it('TC-34 says "over budget" plainly when spending passed the budget, without shaming', () => {
+    const txs = [tx({ day: '2026-09-10', amount: 9500 }), tx({ day: '2026-09-27', amount: 100 })];
+    const runway = computeRunway({ balanceSatang: 900_000, floorSatang: 50_000, averageSatang: 10_000, now: NOW });
+    for (const tone of ['friend', 'coach', 'senior'] as const) {
+      const budget = buildInsights({ txs, profile: { ...profile, coachTone: tone }, runway, now: NOW }).find((i) => i.kind === 'budget_pace')!;
+      expect(budget.message).toContain('เกินงบ');
+      expect(budget.message).toContain('฿600');
+      expect(budget.message).not.toMatch(/นิดนึง|นิดหน่อย/);
+    }
+  });
+});

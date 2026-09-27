@@ -417,7 +417,15 @@ export function Chip({
   );
 }
 
-export function Badge({ label, tone = 'neutral' }: { label: string; tone?: 'neutral' | 'good' | 'watch' | 'critical' | 'gold' }) {
+export function Badge({
+  label,
+  tone = 'neutral',
+  center,
+}: {
+  label: string;
+  tone?: 'neutral' | 'good' | 'watch' | 'critical' | 'gold';
+  center?: boolean;
+}) {
   const theme = useTheme();
   const map = {
     neutral: { bg: theme.surfaceAlt, fg: theme.inkSoft },
@@ -427,7 +435,7 @@ export function Badge({ label, tone = 'neutral' }: { label: string; tone?: 'neut
     gold: { bg: theme.accentSoft, fg: theme.dark ? theme.accent : '#7A5A0E' },
   }[tone];
   return (
-    <View style={{ backgroundColor: map.bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start' }}>
+    <View style={{ backgroundColor: map.bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3, alignSelf: center ? 'center' : 'flex-start' }}>
       <Text style={{ fontFamily: fonts.sansSemi, fontSize: 11, color: map.fg }}>{label}</Text>
     </View>
   );

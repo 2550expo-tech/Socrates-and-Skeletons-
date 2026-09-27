@@ -65,6 +65,7 @@ export default function RunwayScreen() {
           </>
         )}
         <Badge
+          center
           label={{ healthy: 'สบาย ๆ', watch: 'เริ่มต้องระวัง', critical: 'ใกล้เส้นสำรอง', below_floor: 'ต่ำกว่าเงินสำรอง', no_spending: 'รอข้อมูลรายจ่าย' }[runway.status]}
           tone={{ healthy: 'good', watch: 'watch', critical: 'critical', below_floor: 'critical', no_spending: 'neutral' }[runway.status] as 'good'}
         />
@@ -93,7 +94,7 @@ export default function RunwayScreen() {
           <Divider />
           <Row justify="space-between">
             <T v="h3">เงินพอใช้อีก</T>
-            <T v="h3" color={theme.primary}>{daysText(runway)}</T>
+            <T v="h3" color={runway.status === 'below_floor' || runway.status === 'critical' ? theme.critical : theme.primary}>{daysText(runway)}</T>
           </Row>
         </View>
         <T v="micro">

@@ -138,9 +138,17 @@ export function buildInsights(params: {
     const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
     const expected = Math.round((profile.monthlyBudgetSatang * d) / daysInMonth);
     const pct = Math.round((spent / profile.monthlyBudgetSatang) * 100);
+    const over = spent > profile.monthlyBudgetSatang;
     const ahead = spent > expected * 1.1;
     const fact = `เดือนนี้ใช้ไป ${formatBaht(spent, { decimals: false })} จากงบ ${formatBaht(profile.monthlyBudgetSatang, { decimals: false })} (${pct}%) ผ่านเดือนมาแล้ว ${Math.round((d / daysInMonth) * 100)}%`;
-    out.push({ kind: 'budget_pace', severity: ahead ? 'watch' : 'good', fact, message: ahead
+    const overBy = formatBaht(spent - profile.monthlyBudgetSatang, { decimals: false });
+    out.push({ kind: 'budget_pace', severity: ahead ? 'watch' : 'good', fact, message: over
+      ? voice(tone, {
+          friend: `เดือนนี้ใช้เกินงบไปแล้ว ${overBy} ไม่เป็นไรนะ ลองดูว่าเดือนหน้าจะตั้งงบเท่าเดิมหรือปรับให้ตรงกับชีวิตจริงขึ้น`,
+          coach: `${fact} เกินงบ ${overBy} ช่วงที่เหลือของเดือนใช้เฉพาะที่จำเป็น และทบทวนงบเดือนหน้า`,
+          senior: `เดือนนี้ใช้เกินงบไป ${overBy} แล้ว ไม่ต้องโทษตัวเองนะ ลองดูด้วยกันว่าหมวดไหนเกินเพราะอะไร`,
+        })
+      : ahead
       ? voice(tone, {
           friend: `งบเดือนนี้ไปเร็วกว่าเวลานิดนึง (${pct}%) ช่วงที่เหลือค่อย ๆ ผ่อนลงก็ทันนะ`,
           coach: `${fact} ใช้เร็วกว่าแผน ลดรายจ่ายรายวันลงให้กลับมาตามแผน`,
