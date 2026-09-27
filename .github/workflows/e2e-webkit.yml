@@ -1,0 +1,58 @@
+# Runs the browser tests on Safari's engine (WebKit), set up like an iPhone,
+# because many users open MindPay in Safari on iPhone. This does not block the
+# website deploy (web.yml runs the same tests on Chromium as the gate).
+# Failed checks show as annotations on the run; screenshots are attached.
+name: Browser tests on Safari engine (iPhone)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-webkit
+  cancel-in-progress: true
+
+jobs:
+  webkit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: App settings (public Supabase URL and publishable key)
+        run: cp .env.example .env
+
+      - name: Export web build
+        env:
+          EXPO_WEB_BASE_URL: /Socrates-and-Skeletons-
+        run: |
+          npx expo export --platform web --output-dir dist
+          node scripts/web-home-screen.mjs dist
+          cp dist/index.html dist/404.html
+
+      - name: Install Safari engine
+        run: npx playwright install --with-deps webkit
+
+      - name: Browser tests (WebKit, iPhone-like)
+        env:
+          E2E_BROWSER: webkit
+        run: node e2e/web-auth.mjs dist e2e-shots
+
+      - name: Keep screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webkit-screenshots
+          path: e2e-shots

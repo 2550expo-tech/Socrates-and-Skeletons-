@@ -13,8 +13,11 @@
 import { createServer } from 'node:http';
 import { readFile, stat, mkdir } from 'node:fs/promises';
 import { extname, join } from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, webkit } from 'playwright';
 
+// E2E_BROWSER=webkit runs the same checks on Safari's engine, set up like an iPhone.
+const ENGINE = process.env.E2E_BROWSER === 'webkit' ? 'webkit' : 'chromium';
+const IN_CI = !!process.env.GITHUB_ACTIONS;
 const DIST = process.argv[2] ?? 'dist';
 const SHOTS = process.argv[3] ?? 'e2e-shots';
 const FIXTURES = new URL('./fixtures/', import.meta.url).pathname;
@@ -172,10 +175,13 @@ const results = [];
 function check(name, ok, detail = '') {
   results.push({ name, ok, detail });
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
+  // In GitHub Actions a failed check also becomes an annotation on the run.
+  if (!ok && IN_CI) console.log(`::error title=${ENGINE} browser test::${name}${detail ? ` (${detail.replace(/\n/g, ' ').slice(0, 300)})` : ''}`);
 }
-const browser = await chromium.launch();
+const browser = await (ENGINE === 'webkit' ? webkit : chromium).launch();
+const phone = ENGINE === 'webkit' ? { isMobile: true, hasTouch: true } : {};
 async function freshPage(tag) {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'th-TH' });
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'th-TH', ...phone });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log(`[${tag}] pageerror`, e.message));
   page.on('console', (m) => { if (m.type() === 'error') console.log(`[${tag}] console.error`, m.text().slice(0, 200)); });
@@ -485,7 +491,7 @@ try {
 
   // 11. Motion: respects "Reduce motion", and nothing keeps animating when the screen is idle
   {
-    const reduced = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+    const reduced = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce', ...phone });
     const page = await reduced.newPage();
     await page.route(`${SUPA}/**`, supabase);
     await page.goto(APP);
@@ -668,5 +674,6 @@ try {
 await browser.close();
 server.close();
 const failed = results.filter((r) => !r.ok);
-console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
+console.log(`\n${results.length - failed.length}/${results.length} checks passed (${ENGINE})`);
+if (IN_CI) console.log(`::notice title=${ENGINE} browser test::${results.length - failed.length}/${results.length} checks passed`);
 process.exit(failed.length ? 1 : 0);
