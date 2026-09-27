@@ -16,6 +16,7 @@ import { formatBaht, parseBahtToSatang } from '../../domain/money';
 import { runwayAfterPurchase } from '../../domain/runway';
 import type { CoachTone } from '../../domain/types';
 import { askCoach, CoachError } from '../../services/coach';
+import { Buddy, BuddySays } from '../../ui/Buddy';
 import { Card, Chip, Ionicons, Row, T } from '../../ui/components';
 import { useToast } from '../../ui/feedback';
 import { fonts, radius, space, useTheme } from '../../ui/theme';
@@ -26,6 +27,12 @@ interface Msg {
   text: string;
   error?: boolean;
 }
+
+const GREETING: Record<CoachTone, string> = {
+  friend: 'หวัดดี! ถามเรื่องเงินได้ทุกเรื่องเลยนะ เช่น สัปดาห์นี้ใช้ไปกับอะไรเยอะสุด',
+  coach: 'พร้อมแล้ว ถามมาได้เลย จะตอบสั้น ๆ พร้อมตัวเลขและสิ่งที่ควรทำต่อ',
+  senior: 'สวัสดีจ้ะน้อง อยากรู้อะไรเรื่องเงิน ถามพี่ได้เลยนะ ค่อย ๆ ดูไปด้วยกัน',
+};
 
 const QUICK = ['สรุปสัปดาห์นี้ให้หน่อย', 'หมวดไหนควรลดก่อน', 'ซื้อของ 500 บาทวันนี้ได้ไหม', 'ทำยังไงให้เงินพอถึงสิ้นเดือน'];
 
@@ -164,14 +171,17 @@ export default function Coach() {
           <View style={{ gap: space.sm }}>
             <T v="h3">ถาม{persona.name}</T>
             {msgs.length === 0 ? (
-              <T v="small">โค้ชตอบจากตัวเลขที่คุณยืนยันแล้วเท่านั้น ไม่เห็นรูปสลิปหรือชื่อคนที่คุณโอนให้</T>
+              <>
+                <BuddySays mood="happy">{GREETING[persona.tone]}</BuddySays>
+                <T v="micro">โค้ชตอบจากตัวเลขที่คุณยืนยันแล้วเท่านั้น ไม่เห็นรูปสลิปหรือชื่อคนที่คุณโอนให้</T>
+              </>
             ) : null}
             {msgs.map((m) => (
+              <Row key={m.id} gap={6} align="flex-end" style={{ alignSelf: m.from === 'me' ? 'flex-end' : 'flex-start', maxWidth: '92%' }}>
+              {m.from === 'coach' ? <Buddy mood={m.error ? 'worried' : 'happy'} size={34} still /> : null}
               <View
-                key={m.id}
                 style={{
-                  alignSelf: m.from === 'me' ? 'flex-end' : 'flex-start',
-                  maxWidth: '88%',
+                  flexShrink: 1,
                   backgroundColor: m.from === 'me' ? theme.primary : m.error ? theme.surfaceAlt : theme.surface,
                   borderRadius: radius.lg,
                   borderBottomRightRadius: m.from === 'me' ? 6 : radius.lg,
@@ -187,9 +197,11 @@ export default function Coach() {
                   {m.text}
                 </T>
               </View>
+              </Row>
             ))}
             {busy ? (
               <Row gap={space.sm}>
+                <Buddy mood="thinking" size={34} />
                 <ActivityIndicator color={theme.primary} />
                 <T v="small">{persona.name}กำลังดูตัวเลขของคุณ…</T>
               </Row>

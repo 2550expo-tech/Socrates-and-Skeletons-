@@ -3,10 +3,12 @@
  * then what changed, with a way to review or undo.
  */
 import { router } from 'expo-router';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
+import { BUDDY_NAME } from '../domain/buddy';
 import { formatBaht } from '../domain/money';
 import { useAutoScan } from '../services/AutoScanProvider';
-import { Button, Card, IconButton, Ionicons, ProgressBar, Row, T } from './components';
+import { Buddy } from './Buddy';
+import { Button, Card, IconButton, ProgressBar, Row, T } from './components';
 import { useToast } from './feedback';
 import { space, useTheme } from './theme';
 
@@ -20,10 +22,10 @@ export function AutoScanBanner() {
     return (
       <Card tone="alt" style={{ paddingVertical: space.md }}>
         <Row gap={space.md}>
-          <ActivityIndicator color={theme.primary} />
+          <Buddy mood="thinking" size={48} />
           <View style={{ flex: 1, gap: 6 }}>
             <T v="body">
-              {state.total === 0 ? 'กำลังหาสลิปใหม่ในแกลเลอรี…' : `กำลังอ่านสลิปใหม่ ${state.processed}/${state.total}`}
+              {state.total === 0 ? `${BUDDY_NAME}กำลังหาสลิปใหม่ในแกลเลอรี…` : `${BUDDY_NAME}กำลังอ่านสลิปใหม่ ${state.processed}/${state.total}`}
             </T>
             {state.total > 0 ? <ProgressBar value={state.processed / state.total} color={theme.accent} /> : null}
           </View>
@@ -36,11 +38,11 @@ export function AutoScanBanner() {
     return (
       <Card style={{ borderColor: theme.accent, borderWidth: 1.5 }}>
         <Row gap={space.md} align="flex-start">
-          <Ionicons name="images-outline" size={22} color={theme.accent} />
+          <Buddy mood="happy" size={52} />
           <View style={{ flex: 1, gap: 4 }}>
-            <T v="h3">ให้ MindPay อ่านสลิปให้อัตโนมัติ</T>
+            <T v="h3">ให้{BUDDY_NAME}จดจากสลิปให้อัตโนมัติไหม</T>
             <T v="small">
-              {state.message ?? 'ทุกครั้งที่เปิดแอป MindPay จะหาสลิปใหม่ในแกลเลอรี อ่านยอด แล้วคำนวณเงินให้ทันที รูปอื่นไม่ออกจากมือถือ'}
+              {state.message ?? 'แค่เปิดแอป กล้าจะหาสลิปใหม่ในแกลเลอรี อ่านยอด แล้วคำนวณเงินให้ทันที รูปอื่นไม่ออกจากมือถือ'}
             </T>
           </View>
           <IconButton icon="close" label="ปิด" onPress={dismiss} />
@@ -54,7 +56,7 @@ export function AutoScanBanner() {
     return (
       <Card tone="alt" style={{ paddingVertical: space.md }}>
         <Row gap={space.md}>
-          <Ionicons name="alert-circle-outline" size={20} color={theme.watch} />
+          <Buddy mood="worried" size={44} still />
           <T v="small" style={{ flex: 1 }}>{state.message}</T>
           <IconButton icon="close" label="ปิด" onPress={dismiss} />
         </Row>
@@ -67,14 +69,14 @@ export function AutoScanBanner() {
   return (
     <Card style={{ borderColor: theme.primary, borderWidth: 1.5 }}>
       <Row gap={space.md} align="flex-start">
-        <Ionicons name="sparkles" size={22} color={theme.accent} />
+        <Buddy mood={state.confirmed.length > 0 ? 'cheer' : 'thinking'} size={52} />
         <View style={{ flex: 1, gap: 4 }}>
           {state.confirmed.length > 0 ? (
             <T v="h3">
-              เพิ่ม {state.confirmed.length} รายการจากสลิปใหม่ ({formatBaht(total, { sign: true, decimals: false })})
+              {BUDDY_NAME}จดให้แล้ว {state.confirmed.length} รายการ ({formatBaht(total, { sign: true, decimals: false })})
             </T>
           ) : (
-            <T v="h3">พบสลิปใหม่ {state.drafts} ใบ</T>
+            <T v="h3">{BUDDY_NAME}เจอสลิปใหม่ {state.drafts} ใบ</T>
           )}
           <T v="small">
             {state.confirmed.length > 0 ? 'ยอดเงินและ Money Runway คำนวณใหม่แล้ว' : ''}

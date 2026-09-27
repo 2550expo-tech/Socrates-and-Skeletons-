@@ -12,6 +12,7 @@ import { relativeDayLabel } from '../../domain/dates';
 import { formatBaht } from '../../domain/money';
 import { groupByDay } from '../../domain/summary';
 import { Button, Card, Divider, EmptyState, IconButton, Ionicons, Row, Segmented, T } from '../../ui/components';
+import { Buddy } from '../../ui/Buddy';
 import { TxRow } from '../../ui/TxRow';
 import { fonts, radius, space, useTheme } from '../../ui/theme';
 
@@ -95,10 +96,11 @@ export default function Transactions() {
         )}
         ListEmptyComponent={
           query || filter !== 'all' ? (
-            <EmptyState icon="search" title="ไม่พบรายการ" body="ลองเปลี่ยนคำค้นหรือตัวกรอง" />
+            <EmptyState icon="search" art={<Buddy mood="thinking" size={84} />} title="ไม่พบรายการ" body="ลองเปลี่ยนคำค้นหรือตัวกรองดูนะ" />
           ) : (
             <EmptyState
               icon="wallet-outline"
+              art={<Buddy mood="sleepy" size={84} />}
               title="ยังไม่มีรายการที่ยืนยัน"
               body="สแกนสลิปจากแกลเลอรี หรือจดรายจ่ายเงินสดด้วยตัวเอง"
               action="จดรายการแรก"

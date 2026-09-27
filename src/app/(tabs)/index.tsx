@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 import { useApp, useMoney } from '../../data/AppProvider';
+import { buddyLine, spentToday } from '../../domain/buddy';
 import { bkkDayKey, formatThaiDay, formatThaiDayLong, RANGE_LABEL, RANGE_ORDER } from '../../domain/dates';
 import { formatBaht } from '../../domain/money';
 import { endOfMonthDay, safeDailySpend } from '../../domain/runway';
@@ -31,6 +32,7 @@ import {
   T,
 } from '../../ui/components';
 import { AutoScanBanner } from '../../ui/AutoScanBanner';
+import { Buddy, BuddySays } from '../../ui/Buddy';
 import { TxRow } from '../../ui/TxRow';
 import { palette, radius, space, useTheme } from '../../ui/theme';
 
@@ -59,6 +61,15 @@ export default function Home() {
   const spentMonth = monthExpense(txs);
   const readyDrafts = drafts.filter((d) => d.reviewFlags.length === 0).length;
   const badge = RUNWAY_BADGE[runway.status];
+  const buddy = buddyLine({
+    status: runway.status,
+    days: runway.days,
+    capped: runway.capped,
+    safeTodaySatang: safeToday,
+    spentTodaySatang: spentToday(txs),
+    draftsToReview: drafts.length - readyDrafts,
+    hasAnyTransaction: txs.length > 0,
+  });
 
   return (
     <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.primary} />}>
@@ -70,11 +81,13 @@ export default function Home() {
         <IconButton icon="settings-outline" label="ตั้งค่า" onPress={() => router.push('/settings')} />
       </Row>
 
+      <BuddySays mood={buddy.mood}>{buddy.text}</BuddySays>
+
       {repo?.mode === 'demo' ? (
         <Card tone="alt" style={{ paddingVertical: space.md }}>
           <Row gap={space.sm}>
             <Ionicons name="flask-outline" size={18} color={theme.inkSoft} />
-            <T v="small" style={{ flex: 1 }}>โหมดทดลอง: ข้อมูลตัวอย่างเก็บในเครื่องนี้ แก้ไขหรือลบได้ตามสบาย</T>
+            <T v="small" style={{ flex: 1 }}>โหมดทดลอง ข้อมูลตัวอย่างอยู่ในเครื่องนี้ ลองแก้หรือลบได้ตามสบายเลย</T>
           </Row>
         </Card>
       ) : null}
@@ -98,7 +111,7 @@ export default function Home() {
         <Row align="flex-start" justify="space-between">
           <View style={{ flex: 1, gap: 2 }}>
             <T v="label" color="#B9CEC2">ยอดคงเหลือ</T>
-            <Money satang={balance} size="display" color="#F4F1E6" />
+            <Money satang={balance} size="display" color="#F4F1E6" countUp />
             <View style={{ marginTop: space.sm }}>
               <Badge label={badge.label} tone={badge.tone} onDark />
             </View>
@@ -120,7 +133,7 @@ export default function Home() {
               <T v="h3" color="#F4F1E6">ยังคำนวณไม่ได้</T>
             )}
           </View>
-          <Button label="ดูรายละเอียด" small kind="ghost" onPress={() => router.navigate('/runway')} style={{ borderColor: 'rgba(244,241,230,0.35)' }} />
+          <Button label="ดูรายละเอียด" small kind="onDark" icon="chevron-forward" onPress={() => router.navigate('/runway')} />
         </Row>
       </View>
 
@@ -182,7 +195,12 @@ export default function Home() {
         {summary.byCategory.expense.length > 0 ? (
           <CategoryBars items={summary.byCategory.expense} />
         ) : (
-          <EmptyState icon="pie-chart-outline" title="ยังไม่มีรายจ่ายในช่วงนี้" body="ลองเลือกช่วงที่ยาวขึ้น หรือสแกนสลิปเพื่อเพิ่มรายการ" />
+          <EmptyState
+            icon="pie-chart-outline"
+            art={<Buddy mood="calm" size={84} />}
+            title="ยังไม่มีรายจ่ายในช่วงนี้"
+            body="ลองเลือกช่วงที่ยาวขึ้น หรือสแกนสลิปเพื่อเพิ่มรายการ"
+          />
         )}
         {summary.byCategory.income.length > 0 ? (
           <>
@@ -220,7 +238,14 @@ export default function Home() {
       <SectionTitle title="รายการล่าสุด" action="ดูทั้งหมด" onAction={() => router.navigate('/transactions')} />
       <Card style={{ paddingVertical: space.xs, gap: 0 }}>
         {recent.length === 0 ? (
-          <EmptyState icon="wallet-outline" title="ยังไม่มีรายการ" body="เริ่มจากสแกนสลิปในแกลเลอรี หรือจดรายการแรกด้วยตัวเอง" action="สแกนสลิป" onAction={() => router.push('/scan')} />
+          <EmptyState
+            icon="wallet-outline"
+            art={<Buddy mood="sleepy" size={84} />}
+            title="ยังไม่มีรายการ"
+            body="เริ่มจากสแกนสลิปในแกลเลอรี หรือจดรายการแรกด้วยตัวเอง"
+            action="สแกนสลิป"
+            onAction={() => router.push('/scan')}
+          />
         ) : (
           recent.map((t, i) => (
             <View key={t.id}>

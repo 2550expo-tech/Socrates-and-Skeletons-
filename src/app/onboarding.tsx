@@ -9,6 +9,7 @@ import { formatSatang, parseBahtToSatang } from '../domain/money';
 import { Button, Card, Screen, T } from '../ui/components';
 import { useToast } from '../ui/feedback';
 import { Field } from '../ui/inputs';
+import { BuddySays } from '../ui/Buddy';
 import { StepDots } from '../ui/StepDots';
 import { space, useTheme } from '../ui/theme';
 
@@ -55,6 +56,9 @@ export default function Onboarding() {
       <Screen edges={['top', 'bottom']} contentStyle={{ paddingTop: space.xl }}>
         <StepDots step={3} />
         <T v="h1">ตั้งค่า 1 นาที แล้วเริ่มเห็นภาพเงินของคุณ</T>
+        <BuddySays mood="happy">
+          {`ยินดีที่ได้รู้จัก${name.trim() ? ` ${name.trim()}` : ''}! บอกกล้าหน่อยว่าตอนนี้มีเงินเท่าไหร่ แล้วกล้าจะนับให้ว่าเงินพอใช้ถึงวันไหน`}
+        </BuddySays>
         <Card style={{ gap: space.lg }}>
           <Field id="ob-name" label="ชื่อเล่น" value={name} onChangeText={setName} placeholder="เช่น มิ้นท์" error={errors.name} maxLength={30} />
           <Field

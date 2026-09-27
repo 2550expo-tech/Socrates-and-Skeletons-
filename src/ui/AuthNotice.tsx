@@ -8,13 +8,15 @@
  */
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, Animated, Easing, KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { Animated, Easing, KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { useApp } from '../data/AppProvider';
 import { supabase } from '../data/supabase';
 import { authErrorMessage, MIN_PASSWORD_LENGTH } from '../domain/auth';
+import { Buddy } from './Buddy';
 import { Button, Ionicons, T } from './components';
 import { useToast } from './feedback';
 import { PasswordField } from './inputs';
+import { useReduceMotion } from './motion';
 import { palette, radius, space, useTheme } from './theme';
 
 const useNative = Platform.OS !== 'web';
@@ -27,16 +29,6 @@ export function AuthNoticeHost() {
     return <LinkErrorDialog message={authNotice.message} onClose={dismissAuthNotice} />;
   }
   return <SignedUpDialog name={authNotice.name ?? null} viaEmail={authNotice.kind === 'email_confirmed'} onClose={dismissAuthNotice} />;
-}
-
-function useReduceMotion() {
-  const [reduce, setReduce] = useState(false);
-  useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then(setReduce)
-      .catch(() => {});
-  }, []);
-  return reduce;
 }
 
 /** Dimmed background that fades in, with a solid card that springs up into place. */
@@ -142,17 +134,29 @@ function Celebration() {
       ))}
       <Animated.View
         style={{
-          width: 84,
-          height: 84,
-          borderRadius: 42,
-          backgroundColor: palette.gold,
-          alignItems: 'center',
-          justifyContent: 'center',
           transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }],
           opacity: pop.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 1, 1] }),
         }}
       >
-        <Ionicons name="checkmark" size={48} color="#1D1405" />
+        <Buddy mood="cheer" size={112} />
+      </Animated.View>
+      <Animated.View
+        style={{
+          position: 'absolute',
+          right: '30%',
+          bottom: 14,
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          backgroundColor: palette.leaf,
+          borderWidth: 3,
+          borderColor: '#FFFFFF',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transform: [{ scale: pop.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0, 1] }) }],
+        }}
+      >
+        <Ionicons name="checkmark" size={20} color="#FFFFFF" />
       </Animated.View>
     </View>
   );

@@ -17,6 +17,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCountUp, useReduceMotion } from './motion';
 import { fonts, radius, space, type, useTheme } from './theme';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -88,6 +89,7 @@ export function Money({
   sign,
   decimals = true,
   style,
+  countUp,
 }: {
   satang: number;
   size?: 'display' | 'h1' | 'h2' | 'h3' | 'body' | 'small';
@@ -95,12 +97,16 @@ export function Money({
   sign?: boolean;
   decimals?: boolean;
   style?: StyleProp<TextStyle>;
+  /** Count up to the amount when it first shows or changes (the balance on the home screen). */
+  countUp?: boolean;
 }) {
   const theme = useTheme();
-  const abs = Math.abs(satang);
+  const reduce = useReduceMotion();
+  const value = useCountUp(satang, !!countUp && !reduce);
+  const abs = Math.abs(value);
   const whole = String(Math.floor(abs / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const frac = String(abs % 100).padStart(2, '0');
-  const prefix = sign ? (satang < 0 ? '−' : '+') : satang < 0 ? '−' : '';
+  const prefix = sign ? (value < 0 ? '−' : '+') : value < 0 ? '−' : '';
   const big = type[size];
   return (
     <Text
@@ -235,7 +241,8 @@ export function Button({
 }: {
   label: string;
   onPress: () => void;
-  kind?: 'primary' | 'gold' | 'ghost' | 'danger' | 'soft';
+  /** onDark: outline button on the dark green hero surfaces */
+  kind?: 'primary' | 'gold' | 'ghost' | 'danger' | 'soft' | 'onDark';
   icon?: IconName;
   loading?: boolean;
   disabled?: boolean;
@@ -249,6 +256,7 @@ export function Button({
     ghost: { bg: 'transparent', fg: theme.ink, border: theme.line },
     danger: { bg: 'transparent', fg: theme.critical, border: theme.critical },
     soft: { bg: theme.surfaceAlt, fg: theme.ink, border: theme.surfaceAlt },
+    onDark: { bg: 'rgba(244,241,230,0.10)', fg: '#F4F1E6', border: 'rgba(244,241,230,0.45)' },
   }[kind];
   const off = disabled || loading;
   return (
@@ -272,7 +280,8 @@ export function Button({
           alignItems: 'center',
           justifyContent: 'center',
           gap: 8,
-          opacity: off ? 0.5 : pressed ? 0.85 : 1,
+          opacity: off ? 0.5 : pressed ? 0.88 : 1,
+          transform: [{ scale: pressed && !off ? 0.97 : 1 }],
         },
         style,
       ]}
@@ -449,8 +458,8 @@ export function Badge({
   }[tone];
   const c = onDark ? dark : map;
   return (
-    <View style={{ backgroundColor: c.bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3, alignSelf: center ? 'center' : 'flex-start' }}>
-      <Text style={{ fontFamily: fonts.sansSemi, fontSize: 11, color: c.fg }}>{label}</Text>
+    <View style={{ backgroundColor: c.bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4, alignSelf: center ? 'center' : 'flex-start' }}>
+      <Text style={{ fontFamily: fonts.sansSemi, fontSize: 12, lineHeight: 17, color: c.fg }}>{label}</Text>
     </View>
   );
 }
@@ -471,19 +480,24 @@ export function EmptyState({
   body,
   action,
   onAction,
+  art,
 }: {
   icon: IconName;
   title: string;
   body: string;
   action?: string;
   onAction?: () => void;
+  /** A picture instead of the icon, e.g. <Buddy mood="sleepy" /> */
+  art?: ReactNode;
 }) {
   const theme = useTheme();
   return (
     <View style={{ alignItems: 'center', paddingVertical: space.xxl, gap: space.sm }}>
-      <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: theme.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-        <Ionicons name={icon} size={28} color={theme.primary} />
-      </View>
+      {art ?? (
+        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: theme.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name={icon} size={28} color={theme.primary} />
+        </View>
+      )}
       <T v="h3" center>{title}</T>
       <T v="small" center style={{ maxWidth: 300 }}>{body}</T>
       {action && onAction ? <Button label={action} onPress={onAction} small kind="soft" style={{ marginTop: space.sm }} /> : null}

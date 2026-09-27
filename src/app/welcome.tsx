@@ -37,6 +37,13 @@ type Sent = { kind: 'confirm' | 'reset'; email: string; name?: string };
 
 const RESEND_WAIT_S = 60;
 
+/** What MindPay does for you, in one glance (MeowJot-style problem -> solution). */
+const VALUE_POINTS = [
+  { icon: 'receipt-outline', label: 'จดจากสลิปให้เอง' },
+  { icon: 'leaf-outline', label: 'รู้ว่าเงินพอถึงวันไหน' },
+  { icon: 'chatbubble-ellipses-outline', label: 'โค้ช AI ช่วยคิด' },
+] as const;
+
 export default function Welcome() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -218,6 +225,29 @@ export default function Welcome() {
           <MoneyTree health={0.85} size={120} trunk="#E8E1CC" leaf={palette.goldBright} bare="#7FA491" />
           <T v="display" color="#F4F1E6" style={{ marginTop: space.sm }}>MindPay</T>
           <T v="body" color="#B9CEC2" center>รู้ก่อนจ่าย เห็นว่าเงินจะอยู่ได้อีกกี่วัน</T>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: space.sm }}>
+            {VALUE_POINTS.map((v) => (
+              <View
+                key={v.label}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 5,
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: radius.pill,
+                  backgroundColor: 'rgba(244,241,230,0.10)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(244,241,230,0.18)',
+                }}
+              >
+                <Ionicons name={v.icon} size={14} color={palette.goldBright} />
+                <T v="micro" color="#E8E1CC">
+                  {v.label}
+                </T>
+              </View>
+            ))}
+          </View>
         </View>
 
         <View style={{ padding: space.lg, gap: space.lg, marginTop: -space.xxl }}>

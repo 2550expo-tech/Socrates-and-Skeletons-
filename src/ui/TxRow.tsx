@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
+import { isNewFromSlip } from '../domain/buddy';
 import { getCategory } from '../domain/categories';
 import { bkkTime } from '../domain/dates';
 import { FLAG_LABEL, type ReviewFlag } from '../domain/slip';
@@ -12,11 +13,12 @@ export function TxRow({ tx, showTime = true }: { tx: Transaction; showTime?: boo
   const theme = useTheme();
   const cat = getCategory(tx.categoryKey);
   const draft = tx.status === 'draft';
+  const fresh = isNewFromSlip(tx);
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/transaction', params: { id: tx.id } })}
       accessibilityRole="button"
-      accessibilityLabel={`${tx.title} ${tx.kind === 'income' ? 'รายรับ' : 'รายจ่าย'} ${tx.amountSatang / 100} บาท${draft ? ' รอยืนยัน' : ''}`}
+      accessibilityLabel={`${tx.title} ${tx.kind === 'income' ? 'รายรับ' : 'รายจ่าย'} ${tx.amountSatang / 100} บาท${draft ? ' รอยืนยัน' : ''}${fresh ? ' ใหม่วันนี้' : ''}`}
       style={({ pressed }) => ({ paddingVertical: space.md, opacity: pressed ? 0.6 : 1 })}
     >
       <Row gap={space.md}>
@@ -31,6 +33,22 @@ export function TxRow({ tx, showTime = true }: { tx: Transaction; showTime?: boo
           }}
         >
           <T v="h3">{cat.glyph}</T>
+          {fresh ? (
+            <View
+              accessibilityLabel="ใหม่วันนี้"
+              style={{
+                position: 'absolute',
+                top: -3,
+                right: -3,
+                width: 12,
+                height: 12,
+                borderRadius: 6,
+                backgroundColor: theme.accent,
+                borderWidth: 2,
+                borderColor: theme.surface,
+              }}
+            />
+          ) : null}
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <T v="body" numberOfLines={1} style={{ fontFamily: undefined }}>
@@ -40,7 +58,7 @@ export function TxRow({ tx, showTime = true }: { tx: Transaction; showTime?: boo
             <T v="micro" numberOfLines={1}>
               {cat.label}
               {showTime ? ` · ${bkkTime(tx.occurredAt)}` : ''}
-              {tx.source === 'slip' ? ' · จากสลิป' : ''}
+              {tx.source === 'slip' ? (fresh ? ' · จดจากสลิปวันนี้' : ' · จากสลิป') : ''}
             </T>
           </Row>
           {draft ? (

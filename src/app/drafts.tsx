@@ -8,6 +8,7 @@ import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp, useMoney } from '../data/AppProvider';
 import { formatBaht } from '../domain/money';
+import { Buddy } from '../ui/Buddy';
 import { Button, Card, Divider, EmptyState, IconButton, Row, T } from '../ui/components';
 import { useToast } from '../ui/feedback';
 import { TxRow } from '../ui/TxRow';
@@ -45,7 +46,14 @@ export default function Drafts() {
       </Row>
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxxl }}>
         {sorted.length === 0 ? (
-          <EmptyState icon="checkmark-done-circle-outline" title="ไม่มีสลิปค้างยืนยัน" body="ทุกรายการจากสลิปถูกยืนยันแล้ว" action="สแกนสลิปเพิ่ม" onAction={() => router.push('/scan')} />
+          <EmptyState
+            icon="checkmark-done-circle-outline"
+            art={<Buddy mood="cheer" size={96} />}
+            title="เคลียร์หมดแล้ว"
+            body="ทุกรายการจากสลิปยืนยันเรียบร้อย เก่งมาก"
+            action="สแกนสลิปเพิ่ม"
+            onAction={() => router.push('/scan')}
+          />
         ) : null}
 
         {ready.length > 0 ? (
