@@ -2,7 +2,8 @@
 #   https://2550expo-tech.github.io/Socrates-and-Skeletons-/
 # The web version shows the app at phone width, works with real accounts and
 # demo data, and reads slips from photos the user uploads. Scanning the whole
-# gallery is only in the phone app.
+# gallery is only in the phone app. On iPhone: open in Safari -> Share ->
+# Add to Home Screen, and it opens full screen with the MindPay icon.
 name: Deploy web app
 
 on:
@@ -38,6 +39,11 @@ jobs:
         env:
           EXPO_WEB_BASE_URL: /Socrates-and-Skeletons-
         run: npx expo export --platform web --output-dir dist
+
+      - name: Home-screen icon and full-screen mode (iPhone "Add to Home Screen")
+        env:
+          EXPO_WEB_BASE_URL: /Socrates-and-Skeletons-
+        run: node scripts/web-home-screen.mjs dist
 
       - name: Single-page app fallback for deep links
         run: cp dist/index.html dist/404.html

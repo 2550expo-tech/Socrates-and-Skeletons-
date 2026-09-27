@@ -58,4 +58,8 @@ mono.save(out + 'android-icon-monochrome.png')
 # splash (shown on forest background from app.json) and web favicon
 mark(1024, 0.8, CREAM, GOLD).save(out + 'splash-icon.png')
 mark(48, 0.7, CREAM, GOLD, bg=FOREST).save(out + 'favicon.png')
+# web app on a phone home screen (iPhone "Add to Home Screen", Android "Install app")
+os.makedirs(out + 'web', exist_ok=True)
+for name, size in [('apple-touch-icon.png', 180), ('icon-192.png', 192), ('icon-512.png', 512)]:
+    mark(size, 0.74, CREAM, GOLD, bg=FOREST).convert('RGB').save(out + 'web/' + name)
 print('done')
