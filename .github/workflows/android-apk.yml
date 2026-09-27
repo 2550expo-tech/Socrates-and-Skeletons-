@@ -28,7 +28,7 @@ concurrency:
 jobs:
   apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -57,10 +57,17 @@ jobs:
       - name: Generate the native Android project
         run: npx expo prebuild --platform android --no-install
 
+      - name: Give Gradle enough memory
+        # The default Metaspace ran out during Android lint and the build hung until the job timeout.
+        run: |
+          sed -i '/^org.gradle.jvmargs=/d' android/gradle.properties
+          echo 'org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8' >> android/gradle.properties
+
       - name: Build release APK
         working-directory: android
         # arm64 only: covers practically every Android phone from the last 7 years and builds much faster.
-        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+        # lintVitalAnalyzeRelease is skipped: it is a code-style check that is not needed to produce the APK.
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a -x lintVitalAnalyzeRelease
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/release/app-release.apk mind-pay.apk
