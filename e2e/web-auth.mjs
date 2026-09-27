@@ -56,6 +56,7 @@ const state = {
   calls: [],
   txRows: [], // transactions saved through the REST API
   slipReadings: [], // queue of answers from the slip reader (parse-slip)
+  coach: { status: 200, body: { text: 'สัปดาห์นี้ใช้ไป ฿0 ยังไม่มีรายจ่ายเลยนะ' } }, // answer of the coach function
 };
 let seq = 0;
 function makeUser(email, password, name, confirmed) {
@@ -157,6 +158,7 @@ async function supabase(route) {
     }
     return reply({ body: state.txRows.filter((r) => r.user_id === u.id) });
   }
+  if (p === '/functions/v1/coach') return reply(state.coach);
   if (p === '/functions/v1/parse-slip') {
     const reading = state.slipReadings.shift();
     return reading ? reply({ body: { reading } }) : reply(err(502, 'reader_error', 'x'));
@@ -520,6 +522,86 @@ try {
     );
     check('Idle home screen: no animation keeps running (battery)', frames < 5, `${frames} frames in 2 s`);
     await ctx.close();
+  }
+
+  // 12. Money: add, edit, delete and undo; the balance follows every change
+  {
+    const { ctx, page } = await freshPage('money');
+    await page.goto(APP);
+    await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
+    await introGone(page);
+    await page.getByText('ลองใช้ด้วยข้อมูลตัวอย่าง').click();
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    const balance = async () => {
+      await page.waitForTimeout(900); // let the count-up finish
+      const label = await page.locator('[aria-label^="ยอดคงเหลือ"]').first().getAttribute('aria-label');
+      return Math.round(Number(label.match(/฿([\d,]+\.\d{2})/)[1].replace(/,/g, '')) * 100);
+    };
+    const start = await balance();
+    await button(page, 'จดรายการ').click();
+    await visible(page, 'จ่ายให้ / ซื้ออะไร');
+    await button(page, 'บันทึกรายการ').click();
+    check('Add: an empty amount is not saved', await visible(page, 'จ่ายให้ / ซื้ออะไร'));
+    await page.fill('#tx-amount', '123');
+    await page.fill('#tx-title', 'ทดสอบกาแฟ');
+    await button(page, 'บันทึกรายการ').click();
+    check('Add: saved with a confirmation', await visible(page, 'บันทึกรายการแล้ว'));
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    check('Add: the balance goes down by ฿123', (await balance()) === start - 12_300);
+    await page.goto(`${APP}transactions`);
+    await introGone(page);
+    await page.getByText('ทดสอบกาแฟ').first().click();
+    await page.fill('#tx-amount', '150');
+    await button(page, 'บันทึกการแก้ไข').click();
+    check('Edit: saved', await visible(page, 'บันทึกการแก้ไขแล้ว'));
+    await page.goto(APP);
+    await introGone(page);
+    check('Edit: the balance follows (฿150 instead of ฿123)', (await balance()) === start - 15_000);
+    await page.goto(`${APP}transactions`);
+    await introGone(page);
+    await page.getByText('ทดสอบกาแฟ').first().click();
+    await button(page, 'ลบรายการ').first().click();
+    await page.getByRole('dialog').getByRole('button', { name: 'ลบรายการ' }).click();
+    check('Delete: toast with undo', await visible(page, 'เลิกทำ'));
+    await button(page, 'เลิกทำ').click();
+    await page.waitForTimeout(500);
+    check('Undo: the item is back', await visible(page, 'ทดสอบกาแฟ'));
+    await ctx.close();
+  }
+
+  // 13. Coach: an answer from the AI, and a clear message when the key is missing
+  {
+    state.confirmEmail = false;
+    const { ctx, page } = await freshPage('coach');
+    await page.goto(APP);
+    await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
+    await introGone(page);
+    await page.getByText('สมัครสมาชิก', { exact: true }).click();
+    await page.fill('#name', 'โค้ช');
+    await page.fill('#email', 'coach@example.com');
+    await page.fill('#password', 'secret123');
+    await button(page, 'สร้างบัญชี').click();
+    await visible(page, 'สมัครบัญชีสำเร็จ');
+    await button(page, 'ไปตั้งค่าเงิน').click();
+    await page.fill('#ob-balance', '2000');
+    await button(page, 'เริ่มใช้ MindPay').click();
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    await page.goto(`${APP}coach`);
+    await introGone(page);
+    check('Coach: the companion greets before the first question', await visible(page, 'ถามเรื่องเงินได้ทุกเรื่อง'));
+    await page.getByText('สรุปสัปดาห์นี้ให้หน่อย').first().click();
+    check('Coach: the AI answer appears', await visible(page, 'สัปดาห์นี้ใช้ไป ฿0'));
+    state.coach = { status: 503, body: { error: { code: 'not_configured', message: 'x' } } };
+    await page.fill('#coach-input', 'หมวดไหนควรลดก่อน');
+    await button(page, 'ส่งคำถาม').click();
+    check('Coach: a missing key says exactly what to set', await visible(page, 'GEMINI_API_KEY'));
+    state.coach = { status: 503, body: { error: { code: 'busy', message: 'x' } } };
+    await page.fill('#coach-input', 'อีกข้อ');
+    await button(page, 'ส่งคำถาม').click();
+    check('Coach: a busy AI asks to try again shortly', await visible(page, 'รอสักครู่'));
+    await shot(page, '18-coach');
+    await ctx.close();
+    state.confirmEmail = true;
   }
 } catch (e) {
   check('Test run crashed', false, e.stack?.slice(0, 500));

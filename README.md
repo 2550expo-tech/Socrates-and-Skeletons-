@@ -157,7 +157,7 @@ Supabase Dashboard → **Edge Functions → Secrets** → เพิ่ม **อ�
 
 ```bash
 npm test            # unit test ของกฎทั้งหมด (60 เคส)
-npm run e2e:web     # ทดสอบในเบราว์เซอร์ 57 ข้อ: สมัคร/เข้าสู่ระบบ, สแกนสลิป, ข้ามเที่ยงคืน, แอนิเมชัน (ครั้งแรก: npx playwright install chromium)
+npm run e2e:web     # ทดสอบในเบราว์เซอร์ 68 ข้อ: สมัคร/เข้าสู่ระบบ, สแกนสลิป, จด/แก้/ลบรายการ, โค้ช, ข้ามเที่ยงคืน, แอนิเมชัน (ครั้งแรก: npx playwright install chromium)
 npm run typecheck   # ตรวจ TypeScript
 npx expo lint       # ESLint
 npx expo start      # เปิด dev server
