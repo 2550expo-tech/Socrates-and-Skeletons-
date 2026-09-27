@@ -97,7 +97,7 @@ export default function Home() {
             <T v="label" color="#B9CEC2">ยอดคงเหลือ</T>
             <Money satang={balance} size="display" color="#F4F1E6" />
             <View style={{ marginTop: space.sm }}>
-              <Badge label={badge.label} tone={badge.tone} />
+              <Badge label={badge.label} tone={badge.tone} onDark />
             </View>
           </View>
           <MoneyTree health={treeHealth(runway.status, runway.days)} size={104} trunk="#E8E1CC" leaf={palette.goldBright} bare="#6F9483" />

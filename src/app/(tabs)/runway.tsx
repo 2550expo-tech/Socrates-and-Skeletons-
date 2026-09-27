@@ -66,6 +66,7 @@ export default function RunwayScreen() {
         )}
         <Badge
           center
+          onDark
           label={{ healthy: 'สบาย ๆ', watch: 'เริ่มต้องระวัง', critical: 'ใกล้เส้นสำรอง', below_floor: 'ต่ำกว่าเงินสำรอง', no_spending: 'รอข้อมูลรายจ่าย' }[runway.status]}
           tone={{ healthy: 'good', watch: 'watch', critical: 'critical', below_floor: 'critical', no_spending: 'neutral' }[runway.status] as 'good'}
         />

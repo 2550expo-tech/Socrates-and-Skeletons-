@@ -421,10 +421,13 @@ export function Badge({
   label,
   tone = 'neutral',
   center,
+  onDark,
 }: {
   label: string;
   tone?: 'neutral' | 'good' | 'watch' | 'critical' | 'gold';
   center?: boolean;
+  /** Badge sits on the dark green hero: use light, high-contrast colors. */
+  onDark?: boolean;
 }) {
   const theme = useTheme();
   const map = {
@@ -434,9 +437,17 @@ export function Badge({
     critical: { bg: theme.dark ? '#3D1C15' : '#F8E1DB', fg: theme.critical },
     gold: { bg: theme.accentSoft, fg: theme.dark ? theme.accent : '#7A5A0E' },
   }[tone];
+  const dark = {
+    neutral: { bg: 'rgba(244,241,230,0.14)', fg: '#F4F1E6' },
+    good: { bg: 'rgba(92,192,142,0.22)', fg: '#B8F0CF' },
+    watch: { bg: 'rgba(224,165,72,0.25)', fg: '#FFD89A' },
+    critical: { bg: 'rgba(224,122,99,0.28)', fg: '#FFC2B3' },
+    gold: { bg: 'rgba(226,182,74,0.25)', fg: '#FFE3A1' },
+  }[tone];
+  const c = onDark ? dark : map;
   return (
-    <View style={{ backgroundColor: map.bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3, alignSelf: center ? 'center' : 'flex-start' }}>
-      <Text style={{ fontFamily: fonts.sansSemi, fontSize: 11, color: map.fg }}>{label}</Text>
+    <View style={{ backgroundColor: c.bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3, alignSelf: center ? 'center' : 'flex-start' }}>
+      <Text style={{ fontFamily: fonts.sansSemi, fontSize: 11, color: c.fg }}>{label}</Text>
     </View>
   );
 }
