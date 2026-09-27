@@ -177,6 +177,7 @@ async function freshPage(tag) {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log(`[${tag}] pageerror`, e.message));
   page.on('console', (m) => { if (m.type() === 'error') console.log(`[${tag}] console.error`, m.text().slice(0, 200)); });
+  page.on('requestfailed', (r) => { if (!r.url().startsWith(SUPA)) console.log(`[${tag}] request failed`, r.url().slice(0, 160)); });
   await page.route(`${SUPA}/**`, supabase);
   return { ctx, page };
 }
@@ -477,6 +478,47 @@ try {
     await page.getByText('วันนี้', { exact: true }).first().click();
     check('"วันนี้" now means the new day, 00:00–23:59', await visible(page, '29 ก.ย. 2569 · 00:00–23:59'));
     await shot(page, '17-new-day');
+    await ctx.close();
+  }
+
+  // 11. Motion: respects "Reduce motion", and nothing keeps animating when the screen is idle
+  {
+    const reduced = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+    const page = await reduced.newPage();
+    await page.route(`${SUPA}/**`, supabase);
+    await page.goto(APP);
+    const shown = await page.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'attached', timeout: 8000 }).then(() => true, () => false);
+    const t0 = Date.now();
+    await page.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
+    const introMs = Date.now() - t0;
+    check('Reduce motion: the opening screen still shows, then leaves quickly', shown && introMs < 1500, `${introMs} ms on screen`);
+    await page.getByText('ลองใช้ด้วยข้อมูลตัวอย่าง').click();
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    const balanceNow = await page.getByText(/฿[\d,]+/).first().textContent();
+    await page.waitForTimeout(150);
+    check('Reduce motion: the balance appears at once (no count-up)', balanceNow === (await page.getByText(/฿[\d,]+/).first().textContent()));
+    await reduced.close();
+
+    const { ctx, page: p2 } = await freshPage('idle');
+    await p2.goto(APP);
+    await p2.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
+    const t1 = Date.now();
+    await introGone(p2);
+    const fullMs = Date.now() - t1;
+    check('Normal motion: the opening animation lasts about a second, not longer', fullMs > 700 && fullMs < 4000, `${fullMs} ms on screen`);
+    await p2.getByText('ลองใช้ด้วยข้อมูลตัวอย่าง').click();
+    await visible(p2, 'ยอดคงเหลือ', 8000);
+    await p2.waitForTimeout(9000); // the companion bobs a few times, then rests
+    const frames = await p2.evaluate(
+      () =>
+        new Promise((resolve) => {
+          let n = 0;
+          const orig = window.requestAnimationFrame.bind(window);
+          window.requestAnimationFrame = (cb) => orig((t) => { n += 1; cb(t); });
+          setTimeout(() => { window.requestAnimationFrame = orig; resolve(n); }, 2000);
+        }),
+    );
+    check('Idle home screen: no animation keeps running (battery)', frames < 5, `${frames} frames in 2 s`);
     await ctx.close();
   }
 } catch (e) {
