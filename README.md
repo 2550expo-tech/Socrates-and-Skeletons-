@@ -129,7 +129,7 @@ Supabase Dashboard → **Edge Functions → Secrets** → เพิ่ม **อ�
 
 | Name | Value | หมายเหตุ |
 |---|---|---|
-| `GEMINI_API_KEY` | คีย์จาก https://aistudio.google.com/apikey | **ฟรี ไม่ต้องใช้บัตร** แต่แบบฟรี Google อาจนำข้อมูลที่ส่งไป (รูปสลิป) ไปปรับปรุงโมเดล และมีเพดานจำนวนครั้งต่อนาที/ต่อวัน เหมาะกับการทดสอบและพรีเซนต์ |
+| `GEMINI_API_KEY` (หรือ `GOOGLE_API_KEY`) | คีย์จาก https://aistudio.google.com/apikey · ชื่อต้องตรงเป๊ะ ตัวพิมพ์ใหญ่ ใส่ใน **Edge Functions → Secrets** (ไม่ใช่ Vault หรือหน้า API keys ของ Supabase) | **ฟรี ไม่ต้องใช้บัตร** แต่แบบฟรี Google อาจนำข้อมูลที่ส่งไป (รูปสลิป) ไปปรับปรุงโมเดล และมีเพดานจำนวนครั้งต่อนาที/ต่อวัน เหมาะกับการทดสอบและพรีเซนต์ |
 | `ANTHROPIC_API_KEY` | คีย์จาก console.anthropic.com (`sk-ant-...`) | ต้องเติมเครดิตและยืนยันตัวตน ข้อมูลไม่ถูกนำไปฝึกโมเดล |
 
 ไม่ต้อง deploy ใหม่หลังใส่ key

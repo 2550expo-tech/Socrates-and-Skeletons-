@@ -3,6 +3,23 @@
 
 export type AiProvider = 'claude' | 'gemini';
 
+/** Secret names accepted for each service (Google's own tools also read GOOGLE_API_KEY). */
+export const GEMINI_KEY_NAMES = ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY'];
+export const CLAUDE_KEY_NAMES = ['ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'];
+
+/**
+ * The first secret that is set, with spaces, line breaks or quotes from
+ * copy-paste removed. Returns null when none is set.
+ */
+export function readKey(get: (name: string) => string | undefined | null, names: string[]): string | null {
+  for (const name of names) {
+    const raw = get(name);
+    const clean = raw?.trim().replace(/^["']|["']$/g, '').trim();
+    if (clean) return clean;
+  }
+  return null;
+}
+
 /**
  * Which AI service answers: Claude when its key is set, otherwise Gemini.
  * AI_PROVIDER=claude|gemini forces one. Returns null when no usable key is set.

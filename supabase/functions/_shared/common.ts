@@ -2,13 +2,20 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import {
   type AiProvider,
+  CLAUDE_KEY_NAMES,
+  GEMINI_KEY_NAMES,
   geminiModels,
   geminiText,
   isInvalidKey,
   isZeroQuota,
   pickProvider,
+  readKey,
   retryDelayMs,
 } from './helpers.ts';
+
+const env = (name: string) => Deno.env.get(name);
+const geminiKey = () => readKey(env, GEMINI_KEY_NAMES);
+const claudeKey = () => readKey(env, CLAUDE_KEY_NAMES);
 
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -69,8 +76,9 @@ export async function takeQuota(userId: string, kind: 'slip' | 'coach', dailyLim
 }
 
 // ---------------------------------------------------------------------------
-// AI: Claude (ANTHROPIC_API_KEY) or Gemini (GEMINI_API_KEY). Keys never leave
-// the server. Claude is used when both are set, unless AI_PROVIDER says otherwise.
+// AI: Claude (ANTHROPIC_API_KEY) or Gemini (GEMINI_API_KEY, or GOOGLE_API_KEY).
+// Keys never leave the server. Claude is used when both are set, unless
+// AI_PROVIDER says otherwise.
 // ---------------------------------------------------------------------------
 
 export type Content = { type: 'text'; text: string } | { type: 'image'; mediaType: string; data: string };
@@ -89,8 +97,8 @@ const CLAUDE_DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
 export function aiProvider(): AiProvider | null {
   return pickProvider({
     forced: Deno.env.get('AI_PROVIDER'),
-    hasClaude: !!Deno.env.get('ANTHROPIC_API_KEY'),
-    hasGemini: !!Deno.env.get('GEMINI_API_KEY'),
+    hasClaude: !!claudeKey(),
+    hasGemini: !!geminiKey(),
   });
 }
 
@@ -108,7 +116,7 @@ export async function callAI(req: AiRequest): Promise<string> {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function callClaude(req: AiRequest): Promise<{ text: string; model: string }> {
-  const key = Deno.env.get('ANTHROPIC_API_KEY')!;
+  const key = claudeKey()!;
   const model = Deno.env.get(req.task === 'slip' ? 'SLIP_MODEL' : 'COACH_MODEL') ?? CLAUDE_DEFAULT_MODEL;
   const body: Record<string, unknown> = {
     model,
@@ -152,7 +160,7 @@ async function callClaude(req: AiRequest): Promise<{ text: string; model: string
 }
 
 async function callGemini(req: AiRequest): Promise<{ text: string; model: string }> {
-  const key = Deno.env.get('GEMINI_API_KEY')!;
+  const key = geminiKey()!;
   const parts = req.content.map((c) =>
     c.type === 'text' ? { text: c.text } : { inlineData: { mimeType: c.mediaType, data: c.data } },
   );

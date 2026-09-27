@@ -11,7 +11,9 @@ import {
   parseJsonText,
   pickProvider,
   plainText,
+  readKey,
   retryDelayMs,
+  GEMINI_KEY_NAMES,
 } from '../helpers';
 
 describe('AI provider', () => {
@@ -44,6 +46,17 @@ describe('AI provider', () => {
     expect(parseJsonText('Here it is: {"a":2} done')).toEqual({ a: 2 });
     expect(() => parseJsonText('no json')).toThrow();
     expect(plainText('## หัวข้อ\n**สรุป** ใช้ไป ฿1,200')).toBe('หัวข้อ\nสรุป ใช้ไป ฿1,200');
+  });
+});
+
+describe('Reading the AI key', () => {
+  it('TC-54 tolerates copy-paste mistakes and Google\'s other standard name', () => {
+    const env = (vars: Record<string, string>) => (n: string) => vars[n];
+    expect(readKey(env({ GEMINI_API_KEY: '  abc123\n' }), GEMINI_KEY_NAMES)).toBe('abc123');
+    expect(readKey(env({ GEMINI_API_KEY: '"abc123"' }), GEMINI_KEY_NAMES)).toBe('abc123');
+    expect(readKey(env({ GOOGLE_API_KEY: 'xyz' }), GEMINI_KEY_NAMES)).toBe('xyz');
+    expect(readKey(env({ GEMINI_API_KEY: '   ' }), GEMINI_KEY_NAMES)).toBeNull();
+    expect(readKey(env({}), GEMINI_KEY_NAMES)).toBeNull();
   });
 });
 
