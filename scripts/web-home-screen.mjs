@@ -39,6 +39,8 @@ const tags = [
   '<meta name="mobile-web-app-capable" content="yes">',
   '<meta name="apple-mobile-web-app-title" content="MindPay">',
   '<meta name="apple-mobile-web-app-status-bar-style" content="default">',
+  // Brand green while the app loads, so the page does not flash white before the opening animation.
+  `<style>html, body { background-color: ${FOREST}; }</style>`,
 ].join('\n    ');
 
 const indexPath = join(dist, 'index.html');

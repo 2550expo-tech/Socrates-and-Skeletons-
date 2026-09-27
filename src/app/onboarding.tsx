@@ -9,6 +9,7 @@ import { formatSatang, parseBahtToSatang } from '../domain/money';
 import { Button, Card, Screen, T } from '../ui/components';
 import { useToast } from '../ui/feedback';
 import { Field } from '../ui/inputs';
+import { StepDots } from '../ui/StepDots';
 import { space, useTheme } from '../ui/theme';
 
 export default function Onboarding() {
@@ -52,7 +53,7 @@ export default function Onboarding() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen edges={['top', 'bottom']} contentStyle={{ paddingTop: space.xl }}>
-        <T v="label">เริ่มต้นใช้งาน</T>
+        <StepDots step={3} />
         <T v="h1">ตั้งค่า 1 นาที แล้วเริ่มเห็นภาพเงินของคุณ</T>
         <Card style={{ gap: space.lg }}>
           <Field id="ob-name" label="ชื่อเล่น" value={name} onChangeText={setName} placeholder="เช่น มิ้นท์" error={errors.name} maxLength={30} />

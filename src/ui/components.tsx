@@ -46,6 +46,7 @@ export function T({
   numberOfLines,
   center,
   selectable,
+  accessibilityRole,
 }: {
   v?: Variant;
   color?: string;
@@ -54,11 +55,13 @@ export function T({
   numberOfLines?: number;
   center?: boolean;
   selectable?: boolean;
+  accessibilityRole?: 'header' | 'text' | 'alert';
 }) {
   const theme = useTheme();
   const size = v === 'label' ? type.micro : type[v];
   return (
     <Text
+      accessibilityRole={accessibilityRole}
       numberOfLines={numberOfLines}
       selectable={selectable}
       style={[

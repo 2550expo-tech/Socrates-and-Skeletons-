@@ -2,7 +2,7 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
@@ -14,9 +14,12 @@ import {
 import { NotoSerifThai_600SemiBold, NotoSerifThai_700Bold } from '@expo-google-fonts/noto-serif-thai';
 import { AppProvider, useApp } from '../data/AppProvider';
 import { AutoScanProvider } from '../services/AutoScanProvider';
+import { AuthNoticeHost } from '../ui/AuthNotice';
 import { ToastProvider } from '../ui/feedback';
+import { LaunchIntro } from '../ui/LaunchIntro';
 import { useTheme } from '../ui/theme';
 
+// The native splash stays until the opening animation (LaunchIntro) takes over.
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
@@ -69,12 +72,8 @@ function Navigator({ ready }: { ready: boolean }) {
   const theme = useTheme();
   const { status, repo, profile } = useApp();
   const loading = !ready || status === 'loading';
-
-  useEffect(() => {
-    if (!loading) SplashScreen.hideAsync().catch(() => {});
-  }, [loading]);
-
-  if (loading) return null;
+  const [introDone, setIntroDone] = useState(false);
+  const finishIntro = useCallback(() => setIntroDone(true), []);
 
   const signedIn = status === 'ready' && !!repo;
   const needsOnboarding = signedIn && !!profile && !profile.onboarded;
@@ -82,7 +81,18 @@ function Navigator({ ready }: { ready: boolean }) {
 
   return (
     <>
-      <StatusBar style={theme.dark ? 'light' : 'dark'} />
+      <StatusBar style={!introDone || theme.dark ? 'light' : 'dark'} />
+      {loading ? null : <Screens signedIn={signedIn} needsOnboarding={needsOnboarding} inApp={inApp} />}
+      {loading || !introDone ? null : <AuthNoticeHost />}
+      <LaunchIntro ready={!loading} fontsReady={ready} onDone={finishIntro} />
+    </>
+  );
+}
+
+function Screens({ signedIn, needsOnboarding, inApp }: { signedIn: boolean; needsOnboarding: boolean; inApp: boolean }) {
+  const theme = useTheme();
+  return (
+    <>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.bg } }}>
         <Stack.Protected guard={!signedIn}>
           <Stack.Screen name="welcome" />

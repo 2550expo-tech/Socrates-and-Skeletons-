@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
-import { TextInput, View, type KeyboardTypeOptions } from 'react-native';
-import { T } from './components';
+import { useState, type ReactNode } from 'react';
+import { TextInput, View, type KeyboardTypeOptions, type TextInputProps } from 'react-native';
+import { IconButton, T } from './components';
 import { fonts, radius, space, useTheme } from './theme';
 
 export function Field({
@@ -15,6 +15,7 @@ export function Field({
   error,
   maxLength,
   right,
+  inputProps,
 }: {
   id: string;
   label: string;
@@ -27,6 +28,8 @@ export function Field({
   error?: string | null;
   maxLength?: number;
   right?: ReactNode;
+  /** Extra TextInput settings: autoComplete, secureTextEntry, onSubmitEditing, ... */
+  inputProps?: Omit<TextInputProps, 'value' | 'onChangeText' | 'style'>;
 }) {
   const theme = useTheme();
   return (
@@ -46,6 +49,7 @@ export function Field({
         }}
       >
         <TextInput
+          {...inputProps}
           nativeID={id}
           accessibilityLabel={label}
           value={value}
@@ -73,6 +77,64 @@ export function Field({
         <T v="micro">{hint}</T>
       ) : null}
     </View>
+  );
+}
+
+/** Password with a show / hide button, so people can check what they typed. */
+export function PasswordField({
+  id,
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  hint,
+  error,
+  isNew,
+  onSubmit,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChangeText: (s: string) => void;
+  placeholder?: string;
+  hint?: string;
+  error?: string | null;
+  /** true when creating a password (sign up, reset) so password managers offer to save it */
+  isNew?: boolean;
+  onSubmit?: () => void;
+}) {
+  const theme = useTheme();
+  const [visible, setVisible] = useState(false);
+  return (
+    <Field
+      id={id}
+      label={label}
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      hint={hint}
+      error={error}
+      maxLength={72}
+      inputProps={{
+        secureTextEntry: !visible,
+        autoCapitalize: 'none',
+        autoCorrect: false,
+        autoComplete: isNew ? 'new-password' : 'current-password',
+        textContentType: isNew ? 'newPassword' : 'password',
+        returnKeyType: 'go',
+        onSubmitEditing: onSubmit,
+      }}
+      right={
+        <View style={{ marginRight: -8 }}>
+          <IconButton
+            icon={visible ? 'eye-off-outline' : 'eye-outline'}
+            label={visible ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+            color={theme.inkSoft}
+            onPress={() => setVisible((v) => !v)}
+          />
+        </View>
+      }
+    />
   );
 }
 

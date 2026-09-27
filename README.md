@@ -145,10 +145,18 @@ Supabase Dashboard → **Edge Functions → Secrets** → เพิ่ม **อ�
 
 ---
 
+### 5. ตั้งค่าการสมัคร / เข้าสู่ระบบ
+
+ตั้ง Site URL, Redirect URLs และเลือกว่าจะให้ยืนยันอีเมลไหม ดูขั้นตอนและเทมเพลตอีเมล (รหัส 6 หลัก) ใน [docs/SUPABASE_AUTH_SETUP.md](docs/SUPABASE_AUTH_SETUP.md)
+
+> อีเมลฟรีของ Supabase ส่งได้เฉพาะอีเมลของสมาชิกทีมในโปรเจค และชั่วโมงละ 2 ฉบับ ช่วงเรียน/พรีเซนต์แนะนำให้ปิด Confirm email
+
+---
+
 ## คำสั่งสำหรับนักพัฒนา
 
 ```bash
-npm test            # unit test ของกฎทั้งหมด (49 เคส)
+npm test            # unit test ของกฎทั้งหมด (55 เคส)
 npm run typecheck   # ตรวจ TypeScript
 npx expo lint       # ESLint
 npx expo start      # เปิด dev server

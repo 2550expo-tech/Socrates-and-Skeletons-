@@ -16,6 +16,20 @@
 
 ---
 
+## บัญชีผู้ใช้ (รองรับทุก FR, NFR ด้านความปลอดภัย)
+
+| Acceptance criteria | Code | Test |
+|---|---|---|
+| สมัครทีละขั้น: ข้อมูลบัญชี → ยืนยันอีเมล (รหัส 6 หลักหรือลิงก์) → ตั้งค่าเงิน; ชื่อเล่น อีเมล และรหัสผ่าน ≥ 8 ตัวเป็นช่องบังคับ | `src/app/welcome.tsx`, `src/ui/StepDots.tsx` | E2E sign-up, TC-47, TC-48 |
+| สมัครเสร็จ: ล้างฟอร์ม, หน้าต่าง "สมัครบัญชีสำเร็จ", ไปตั้งค่าเงิน, ย้อนกลับไม่เจอหน้าสมัคร | `src/ui/AuthNotice.tsx`, `src/app/_layout.tsx` | E2E sign-up |
+| อีเมลที่สมัครแล้วไม่แสดง "สมัครสำเร็จ" หลอก ๆ แต่บอกให้เข้าสู่ระบบ/ลืมรหัสผ่าน | `isExistingAccountSignUp` | TC-47, E2E |
+| ลิงก์ในอีเมลเปิดแอปและเข้าสู่ระบบได้ทั้งเว็บและแอป; ลิงก์หมดอายุ/ใช้ซ้ำมีคำอธิบาย; ลบ token ออกจากแถบที่อยู่ | `src/domain/auth.ts` `parseAuthLink`, `src/data/authLinks.ts`, `AppProvider` | TC-43, TC-44, TC-45, E2E |
+| ลืมรหัสผ่าน: รหัสหรือลิงก์จากอีเมล → ตั้งรหัสใหม่ (ห้ามซ้ำรหัสเดิม) | `welcome.tsx`, `AuthNotice.tsx` | E2E forgot password |
+| ข้อความผิดพลาดทุกแบบเป็นภาษาไทยที่บอกวิธีแก้ | `authErrorMessage`, `otpErrorMessage` | TC-46, TC-48 |
+| เปิดแอปมีแอนิเมชัน (ต่อจาก splash, ลดเหลือ fade เมื่อเปิด "ลดการเคลื่อนไหว") | `src/ui/LaunchIntro.tsx` | E2E launch |
+
+E2E = ทดสอบอัตโนมัติในเบราว์เซอร์บนเว็บเวอร์ชัน โดยจำลองเซิร์ฟเวอร์ Supabase ในเครื่อง: 37/37 ผ่าน (28 ก.ย. 2569)
+
 ## FR-1 Transaction Management
 
 **Requirement:** ผู้ใช้เพิ่ม แก้ไข จัดหมวด และลบธุรกรรมของตนได้
@@ -93,7 +107,7 @@
 
 ## Automated tests
 
-รัน `npm test` · ไฟล์ `src/domain/__tests__/*.test.ts` และ `supabase/functions/_shared/__tests__/helpers.test.ts` · ผลล่าสุด **49/49 ผ่าน** (รวม TC-33: ข้อมูลตัวอย่างต้องมียอดเงินเป็นบวกและ Runway ≥ 10 วัน ไม่ว่าจะเปิดแอปวันไหน)
+รัน `npm test` · ไฟล์ `src/domain/__tests__/*.test.ts` และ `supabase/functions/_shared/__tests__/helpers.test.ts` · ผลล่าสุด **55/55 ผ่าน** (รวม TC-33: ข้อมูลตัวอย่างต้องมียอดเงินเป็นบวกและ Runway ≥ 10 วัน ไม่ว่าจะเปิดแอปวันไหน)
 
 ## Manual test plan (ทีมทดสอบบนมือถือจริง แล้วกรอกผล)
 

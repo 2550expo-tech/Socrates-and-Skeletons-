@@ -5,15 +5,24 @@
  */
 import { Storage } from './storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { authErrorMessage, authLinkErrorMessage, parseAuthLink } from '../domain/auth';
 import { averageDailyExpense, computeRunway } from '../domain/runway';
 import { computeBalance } from '../domain/summary';
 import type { Profile, Transaction, TransactionInput } from '../domain/types';
 import { createCloudRepo, createDemoRepo, resetDemoData, type Repo } from './repo';
+import { clearLinkFromAddressBar, onIncomingLink, openingLink } from './authLinks';
 import { supabase } from './supabase';
 
 const MODE_KEY = 'mindpay.mode';
 
 type AuthStatus = 'loading' | 'signedOut' | 'ready';
+
+/** One-time message shown over any screen after an account event. */
+export type AuthNotice =
+  | { kind: 'signed_up'; name?: string | null }
+  | { kind: 'email_confirmed'; name?: string | null }
+  | { kind: 'recovery' }
+  | { kind: 'link_error'; message: string };
 
 interface AppContextValue {
   status: AuthStatus;
@@ -33,6 +42,9 @@ interface AppContextValue {
   confirmTxs(ids: string[]): Promise<void>;
   /** Used by the slip scanner, which inserts through the repo itself. */
   upsertLocal(tx: Transaction): void;
+  authNotice: AuthNotice | null;
+  showAuthNotice(notice: AuthNotice): void;
+  dismissAuthNotice(): void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -51,7 +63,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [txs, setTxs] = useState<Transaction[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [authNotice, setAuthNotice] = useState<AuthNotice | null>(null);
   const repoRef = useRef<Repo | null>(null);
+  /** The account whose data is loaded (or being loaded): prevents loading the same account twice. */
+  const activeUserRef = useRef<string | null>(null);
+  const handledLinks = useRef(new Set<string>());
 
   const loadAll = useCallback(async (r: Repo) => {
     setLoadError(null);
@@ -68,6 +84,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const activateRepo = useCallback(
     async (r: Repo, id: string) => {
+      activeUserRef.current = id;
       repoRef.current = r;
       setRepo(r);
       setUserId(id);
@@ -77,6 +94,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const clear = useCallback(() => {
+    activeUserRef.current = null;
     repoRef.current = null;
     setRepo(null);
     setUserId(null);
@@ -85,10 +103,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setStatus('signedOut');
   }, []);
 
+  /**
+   * A link from a Supabase email (confirm sign-up / reset password). Returns true
+   * when it signed the user in; the SIGNED_IN event then loads their data.
+   */
+  const handleAuthLink = useCallback(async (url: string | null) => {
+    const result = parseAuthLink(url);
+    if (!url || !result || !supabase || handledLinks.current.has(url)) return false;
+    handledLinks.current.add(url);
+    clearLinkFromAddressBar();
+    if (result.kind === 'error') {
+      setAuthNotice({ kind: 'link_error', message: authLinkErrorMessage(result) });
+      return false;
+    }
+    try {
+      const { data, error } =
+        result.kind === 'session'
+          ? await supabase.auth.setSession({ access_token: result.accessToken!, refresh_token: result.refreshToken! })
+          : await supabase.auth.exchangeCodeForSession(result.code!);
+      if (error || !data.session) {
+        setAuthNotice({ kind: 'link_error', message: authErrorMessage(error) });
+        return false;
+      }
+      const name = (data.session.user.user_metadata?.display_name as string | undefined) ?? null;
+      if (result.type === 'recovery') setAuthNotice({ kind: 'recovery' });
+      else if (result.type === 'signup' || result.type === 'email' || result.type === 'invite') {
+        setAuthNotice({ kind: 'email_confirmed', name });
+      }
+      return true;
+    } catch (e) {
+      setAuthNotice({ kind: 'link_error', message: authErrorMessage(e as Error) });
+      return false;
+    }
+  }, []);
+
   // Decide the starting mode once, then follow Supabase auth changes.
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // An email link that opened the app wins over the saved mode.
+      if (await handleAuthLink(await openingLink())) return;
       const mode = await Storage.getItem(MODE_KEY).catch(() => null);
       if (mode === 'demo') {
         if (!cancelled) await activateRepo(createDemoRepo(), 'demo');
@@ -100,26 +154,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       const { data } = await supabase.auth.getSession();
       if (cancelled) return;
-      if (data.session) await activateRepo(createCloudRepo(data.session.user.id), data.session.user.id);
-      else setStatus('signedOut');
+      const id = data.session?.user.id;
+      if (id) {
+        if (activeUserRef.current !== id) await activateRepo(createCloudRepo(id), id);
+      } else if (!activeUserRef.current) setStatus('signedOut');
     })();
 
     const sub = supabase?.auth.onAuthStateChange((event, session) => {
       // Supabase warns against calling other supabase methods inside this callback
       // (it can deadlock the auth lock), so the actual work is deferred.
       setTimeout(() => {
-        if (event === 'SIGNED_IN' && session && repoRef.current?.mode !== 'cloud') {
+        // A password-reset code signs in with the PASSWORD_RECOVERY event instead of SIGNED_IN.
+        const signedIn = event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY';
+        if (signedIn && session && activeUserRef.current !== session.user.id) {
           Storage.setItem(MODE_KEY, 'cloud').catch(() => {});
           activateRepo(createCloudRepo(session.user.id), session.user.id);
         }
         if (event === 'SIGNED_OUT' && repoRef.current?.mode === 'cloud') clear();
       }, 0);
     });
+    const stopLinks = onIncomingLink((url) => {
+      handleAuthLink(url);
+    });
     return () => {
       cancelled = true;
       sub?.data.subscription.unsubscribe();
+      stopLinks();
     };
-  }, [activateRepo, clear]);
+  }, [activateRepo, clear, handleAuthLink]);
 
   const need = () => {
     if (!repoRef.current) throw new Error('ยังไม่ได้เข้าสู่ระบบ');
@@ -180,8 +242,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       upsertLocal(tx) {
         setTxs((list) => [tx, ...list.filter((t) => t.id !== tx.id)]);
       },
+      authNotice,
+      showAuthNotice: setAuthNotice,
+      dismissAuthNotice() {
+        setAuthNotice(null);
+      },
     }),
-    [status, repo, userId, profile, txs, loadError, refreshing, loadAll, activateRepo, clear],
+    [status, repo, userId, profile, txs, loadError, refreshing, authNotice, loadAll, activateRepo, clear],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
