@@ -14,6 +14,7 @@ name: Update installed apps (EAS Update)
 on:
   push:
     branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
   workflow_dispatch:
 
 concurrency:

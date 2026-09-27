@@ -12,14 +12,18 @@ name: Build Android APK
 on:
   push:
     branches: [main]
+    # Editing documents only does not need a new APK.
+    paths-ignore: ['**.md', 'docs/**']
   workflow_dispatch:
 
 permissions:
   contents: write
 
+# A build that already started runs to the end; newer pushes wait in line
+# (only the newest waiting push is kept).
 concurrency:
   group: android-apk
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   apk:
