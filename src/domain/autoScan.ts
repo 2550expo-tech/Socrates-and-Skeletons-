@@ -15,6 +15,19 @@ export const MIN_INTERVAL_MS = 5 * 60 * 1000;
 /** At most this many photos per run (only QR slips are sent to be read); the rest are picked up next time. */
 export const MAX_IMAGES_PER_RUN = 150;
 
+/** A photo the automatic scan could not read is tried this many times in all, then left for the scan screen. */
+export const MAX_AUTO_ATTEMPTS = 2;
+
+/**
+ * The time to save as "last automatic scan": normally when this run started,
+ * but early enough that the oldest photo to try again stays inside the next
+ * run's window (see autoScanSince).
+ */
+export function nextAutoScanMark(startedAt: number, retryFromCreatedAt: number | null): number {
+  if (retryFromCreatedAt === null) return startedAt;
+  return Math.min(startedAt, retryFromCreatedAt + OVERLAP_MS - 1);
+}
+
 export function autoScanSince(lastAutoScanAt: number, nowMs: number): number {
   const floor = nowMs - MAX_LOOKBACK_DAYS * DAY_MS;
   if (!lastAutoScanAt) return nowMs - FIRST_RUN_DAYS * DAY_MS;

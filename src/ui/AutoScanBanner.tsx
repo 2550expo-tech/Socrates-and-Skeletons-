@@ -55,11 +55,20 @@ export function AutoScanBanner() {
   }
 
   if (state.phase === 'error') {
+    const recorded = state.confirmed.length + state.drafts;
     return (
       <Card tone="alt" style={{ paddingVertical: space.md }}>
         <Row gap={space.md}>
           <Buddy mood="worried" size={44} still />
-          <T v="small" style={{ flex: 1 }}>{state.message}</T>
+          <View style={{ flex: 1, gap: 2 }}>
+            <T v="small">{state.message}</T>
+            {recorded > 0 ? (
+              <T v="micro">
+                ก่อนหยุด{BUDDY_NAME}จดให้แล้ว {recorded} รายการ
+                {state.drafts > 0 ? ` (รอตรวจ ${state.drafts})` : ''}
+              </T>
+            ) : null}
+          </View>
           <IconButton icon="close" label="ปิด" onPress={dismiss} />
         </Row>
       </Card>

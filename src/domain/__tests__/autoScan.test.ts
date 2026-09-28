@@ -1,8 +1,9 @@
 /**
- * TC-35..TC-37: automatic scan on app open, and the auto-confirm rule.
+ * TC-35..TC-37, TC-56: automatic scan on app open, the auto-confirm rule, and
+ * photos that could not be read.
  */
 import { describe, expect, it } from 'vitest';
-import { autoScanSince, MIN_INTERVAL_MS, shouldAutoScan } from '../autoScan';
+import { autoScanSince, MIN_INTERVAL_MS, nextAutoScanMark, shouldAutoScan } from '../autoScan';
 import { DAY_MS } from '../dates';
 import { initialStatus } from '../slip';
 
@@ -27,5 +28,16 @@ describe('FR-4 automatic scan', () => {
     expect(initialStatus('ready', true)).toBe('confirmed');
     expect(initialStatus('needs_review', true)).toBe('draft');
     expect(initialStatus('ready', false)).toBe('draft');
+  });
+
+  it('TC-56 a photo that could not be read stays in the next run\'s window (it is not skipped for good)', () => {
+    expect(nextAutoScanMark(NOW, null)).toBe(NOW);
+    const photo = NOW - 3 * DAY_MS;
+    const mark = nextAutoScanMark(NOW, photo);
+    expect(autoScanSince(mark, NOW + 10 * 60_000)).toBeLessThanOrEqual(photo);
+    // ...and the next opening of the app scans again instead of waiting 5 minutes from this run.
+    expect(shouldAutoScan({ enabled: true, lastAutoScanAt: mark, nowMs: NOW + 1000, alreadyRunning: false })).toBe(true);
+    // A photo taken after the run started never pushes the mark forward.
+    expect(nextAutoScanMark(NOW, NOW + 5000)).toBe(NOW);
   });
 });

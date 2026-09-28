@@ -33,6 +33,8 @@ type Finished = Extract<ScanAction, { type: 'itemFinished' }>;
 
 /** Slips older than this (by the date printed on them) are not recorded automatically. */
 const SLIP_WINDOW: RangeKey = '1y';
+/** Wait before trying an image again after a network error. */
+const NETWORK_RETRY_MS = 3000;
 
 export function useSlipScanner(initialRange: RangeKey = '1m') {
   const { repo, userId, txs, upsertLocal } = useApp();
@@ -164,13 +166,22 @@ export function useSlipScanner(initialRange: RangeKey = '1m') {
         const runId = stateRef.current.runId;
         apply({ type: 'itemStarted', runId, assetId: item.assetId });
         try {
-          const result = await processOne(item);
+          let result: Awaited<ReturnType<typeof processOne>>;
+          try {
+            result = await processOne(item);
+          } catch (e) {
+            if (!(e instanceof SlipReaderError && e.code === 'network')) throw e;
+            // A short drop in the connection: try this image once more before stopping.
+            await new Promise((resolve) => setTimeout(resolve, NETWORK_RETRY_MS));
+            result = await processOne(item);
+          }
           apply({ type: 'itemFinished', runId, assetId: item.assetId, ...result });
           if (!pickedRef.current.has(item.assetId) && userId) scannedRef.current.add(item.assetId);
         } catch (e) {
           if (mounted.current) setWaiting(null);
-          if (e instanceof SlipReaderError && e.code !== 'reader_error' && e.code !== 'network') {
-            // Problems that affect every image: stop and tell the user. This image is retried on resume.
+          if (e instanceof SlipReaderError && e.code !== 'reader_error' && e.code !== 'too_large') {
+            // Problems that affect every image (offline, not configured, AI busy, quota, signed out):
+            // stop and tell the user. This image is retried on resume.
             setNotice(e.message);
             apply({ type: 'pause' });
             break;

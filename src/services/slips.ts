@@ -17,6 +17,8 @@ export * from './gallery';
 
 // Remember which photos were already checked, so a second scan skips them.
 const scannedKey = (userId: string) => `mindpay.scanned.${userId}`;
+// How many times the automatic scan failed to read each photo (see MAX_AUTO_ATTEMPTS).
+const failuresKey = (userId: string) => `mindpay.scanFailures.${userId}`;
 
 export async function loadScannedIds(userId: string): Promise<Set<string>> {
   try {
@@ -37,6 +39,27 @@ export async function rememberScanned(userId: string, ids: Set<string>) {
 
 export async function forgetScanned(userId: string) {
   await Storage.removeItem(scannedKey(userId)).catch(() => {});
+  await Storage.removeItem(failuresKey(userId)).catch(() => {});
+}
+
+export async function loadScanFailures(userId: string): Promise<Record<string, number>> {
+  try {
+    const raw = await Storage.getItem(failuresKey(userId));
+    const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, number>) : {};
+  } catch {
+    return {};
+  }
+}
+
+export async function saveScanFailures(userId: string, failures: Record<string, number>) {
+  const entries = Object.entries(failures).slice(-500);
+  try {
+    if (entries.length === 0) await Storage.removeItem(failuresKey(userId));
+    else await Storage.setItem(failuresKey(userId), JSON.stringify(Object.fromEntries(entries)));
+  } catch {
+    // Not critical: worst case a photo is tried once more.
+  }
 }
 
 // ---------------------------------------------------------------------------

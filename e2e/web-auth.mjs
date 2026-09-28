@@ -60,6 +60,7 @@ const state = {
   txRows: [], // transactions saved through the REST API
   slipReadings: [], // queue of answers from the slip reader (parse-slip)
   slipBusy: 0, // this many next parse-slip calls answer "AI busy" (free-tier rate limit)
+  slipOffline: 0, // this many next parse-slip calls fail as if the phone lost its connection
   coach: { status: 200, body: { text: 'สัปดาห์นี้ใช้ไป ฿0 ยังไม่มีรายจ่ายเลยนะ' } }, // answer of the coach function
 };
 let seq = 0;
@@ -164,6 +165,10 @@ async function supabase(route) {
   }
   if (p === '/functions/v1/coach') return reply(state.coach);
   if (p === '/functions/v1/parse-slip') {
+    if (state.slipOffline > 0) {
+      state.slipOffline -= 1;
+      return route.abort('internetdisconnected');
+    }
     if (state.slipBusy > 0) {
       state.slipBusy -= 1;
       return reply({ status: 503, body: { error: { code: 'busy', message: 'x' } } });
@@ -689,7 +694,12 @@ try {
     await introGone(page);
     const chooser = page.waitForEvent('filechooser');
     await button(page, 'เลือกรูปสลิป').click();
+    state.slipOffline = 2; // the connection drops: the retry after 3 s fails too
     await (await chooser).setFiles(['photo-1.jpg', 'photo-2.jpg'].map((f) => join(FIXTURES, f)));
+    const offlineNotice = await visible(page, 'เชื่อมต่ออินเทอร์เน็ตไม่ได้', 15000);
+    await shot(page, '19-scan-offline');
+    check('Offline: the scan pauses and says why, instead of marking slips as unreadable', offlineNotice && (await button(page, 'อ่านต่อ').isVisible()));
+    await button(page, 'อ่านต่อ').click();
     check('Unclear slip: only the clear one counts at once', (await visible(page, 'อ่านเสร็จแล้ว ได้ 2 รายการ', 20000)) && (await visible(page, 'รวมในยอดเงินแล้ว 1 รายการ')));
     await button(page, 'ตรวจ 1 รายการที่อ่านไม่ชัด').click();
     check('Unclear slip: listed under "ต้องตรวจก่อน"', await visible(page, 'ต้องตรวจก่อน (1)'));

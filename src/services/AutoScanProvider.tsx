@@ -8,10 +8,13 @@
  *   auto-confirm is on; unsure ones wait in "สลิปรอยืนยัน".
  * - Never shows the permission prompt by itself: if access is missing, the home
  *   screen offers a button instead.
+ * - Nothing is skipped for good by accident: when the phone is offline or the AI
+ *   is unavailable the run stops without moving its window forward, and a photo
+ *   that could not be read is tried again next run (MAX_AUTO_ATTEMPTS in all).
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
-import { autoScanSince, MAX_IMAGES_PER_RUN, shouldAutoScan } from '../domain/autoScan';
+import { autoScanSince, MAX_AUTO_ATTEMPTS, MAX_IMAGES_PER_RUN, nextAutoScanMark, shouldAutoScan } from '../domain/autoScan';
 import { rangeDays } from '../domain/dates';
 import { buildDuplicateIndex } from '../domain/slip';
 import type { Transaction } from '../domain/types';
@@ -23,11 +26,17 @@ import {
   galleryAvailable,
   galleryUri,
   getGalleryAccess,
+  loadScanFailures,
   loadScannedIds,
   rememberScanned,
+  saveScanFailures,
   requestGalleryAccess,
   SlipReaderError,
 } from './slips';
+
+/** Wait before trying a photo again after a network error. */
+const NETWORK_RETRY_MS = 3000;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export type AutoScanPhase = 'idle' | 'needs_permission' | 'scanning' | 'done' | 'error';
 
@@ -88,52 +97,73 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
       let processed = 0;
       let stoppedBy: string | null = null;
       try {
-        const [images, scanned] = await Promise.all([
+        const [images, scanned, failures] = await Promise.all([
           findGalleryImages(autoScanSince(p.lastAutoScanAt, startedAt), 500),
           loadScannedIds(userId),
+          loadScanFailures(userId),
         ]);
-        const fresh = images.filter((i) => !scanned.has(i.assetId));
+        // Photos that failed MAX_AUTO_ATTEMPTS times are left for the scan screen.
+        const fresh = images.filter((i) => !scanned.has(i.assetId) && (failures[i.assetId] ?? 0) < MAX_AUTO_ATTEMPTS);
         const batch = fresh.slice(0, MAX_IMAGES_PER_RUN);
         setState((s) => ({ ...s, total: batch.length }));
         const index = buildDuplicateIndex(txsRef.current);
         const range = rangeDays('1y');
+        /** Oldest photo to try again next run (it must stay inside the next run's window). */
+        let retryFrom: number | null = null;
 
         for (const img of batch) {
-          try {
-            const r = await processSlipImage({
-              uri: await galleryUri(img.assetId),
-              width: img.width,
-              requireQr: true,
-              range,
-              index,
-              repo,
-              autoConfirm: p.autoConfirm,
-              fallbackTimeMs: img.createdAt,
-              onWait: (seconds) => setState((s) => ({ ...s, waitUntil: Date.now() + seconds * 1000 })),
-            });
-            if (r.tx) {
-              upsertLocal(r.tx);
-              if (r.confirmed) confirmed.push(r.tx);
-              else drafts += 1;
+          for (let attempt = 0; ; attempt++) {
+            try {
+              const r = await processSlipImage({
+                uri: await galleryUri(img.assetId),
+                width: img.width,
+                requireQr: true,
+                range,
+                index,
+                repo,
+                autoConfirm: p.autoConfirm,
+                fallbackTimeMs: img.createdAt,
+                onWait: (seconds) => setState((s) => ({ ...s, waitUntil: Date.now() + seconds * 1000 })),
+              });
+              if (r.tx) {
+                upsertLocal(r.tx);
+                if (r.confirmed) confirmed.push(r.tx);
+                else drafts += 1;
+              }
+              scanned.add(img.assetId);
+              delete failures[img.assetId];
+            } catch (e) {
+              const code = e instanceof SlipReaderError ? e.code : null;
+              if (code === 'network' && attempt === 0) {
+                await sleep(NETWORK_RETRY_MS); // a short drop in the connection: try this photo once more
+                continue;
+              }
+              if (code === 'network') {
+                // Offline: stop without moving the window, so nothing found this time is skipped.
+                stoppedBy = 'เชื่อมต่ออินเทอร์เน็ตไม่ได้ สลิปที่เหลือจะอ่านต่อตอนเปิดแอปครั้งหน้า';
+              } else if (code && code !== 'reader_error' && code !== 'too_large') {
+                stoppedBy = (e as Error).message; // affects every photo (not configured, AI busy, quota, signed out)
+              } else {
+                // This photo could not be read: try it again next run, up to MAX_AUTO_ATTEMPTS times.
+                failures[img.assetId] = (failures[img.assetId] ?? 0) + 1;
+                if (failures[img.assetId] < MAX_AUTO_ATTEMPTS) retryFrom = Math.min(retryFrom ?? img.createdAt, img.createdAt);
+              }
             }
-            scanned.add(img.assetId);
-          } catch (e) {
-            if (e instanceof SlipReaderError && e.code !== 'reader_error' && e.code !== 'network') {
-              stoppedBy = e.message; // affects every image (not configured, AI busy, quota, signed out): next run continues
-              break;
-            }
-            // One unreadable image: skip it this time, try again next run.
+            break;
           }
+          if (stoppedBy) break;
           processed += 1;
           setState((s) => ({ ...s, processed, confirmed: [...confirmed], drafts, waitUntil: null }));
         }
 
         await rememberScanned(userId, scanned);
-        // Advance the window only when everything in it was handled.
+        await saveScanFailures(userId, failures);
+        // Move the window forward only when everything in it was handled.
         if (!stoppedBy && fresh.length <= MAX_IMAGES_PER_RUN) {
-          setPrefsState(await saveScanPrefs({ lastAutoScanAt: startedAt }));
+          setPrefsState(await saveScanPrefs({ lastAutoScanAt: nextAutoScanMark(startedAt, retryFrom) }));
         }
-        if (stoppedBy) setState({ ...IDLE, phase: 'error', message: stoppedBy });
+        // Keep what was recorded before stopping, so the banner can still say so.
+        if (stoppedBy) setState({ ...IDLE, phase: 'error', message: stoppedBy, total: batch.length, processed, confirmed, drafts });
         else if (confirmed.length + drafts > 0) setState({ ...IDLE, phase: 'done', total: batch.length, processed, confirmed, drafts });
         else setState(IDLE); // nothing new: stay quiet
       } catch {
