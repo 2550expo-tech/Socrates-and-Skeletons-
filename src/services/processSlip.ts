@@ -15,7 +15,7 @@ import {
 import type { ItemStatus } from '../domain/scanQueue';
 import type { Transaction } from '../domain/types';
 import { DuplicateSlipError, type Repo } from '../data/repo';
-import { detectSlipQr, prepareImage, readSlip } from './slips';
+import { detectSlipQr, prepareImage, READER_MESSAGES, readSlip, SlipReaderError } from './slips';
 
 export interface ProcessResult {
   status: Exclude<ItemStatus, 'queued' | 'working'>;
@@ -29,6 +29,7 @@ export interface ProcessResult {
 export async function processSlipImage(opts: {
   uri: string;
   width?: number | null;
+  height?: number | null;
   /** Skip images without a Thai slip QR code (saves cost; photos never leave the phone). */
   requireQr: boolean;
   range: { from: string; to: string };
@@ -40,8 +41,12 @@ export async function processSlipImage(opts: {
   /** Called when the AI is busy and the reader waits before trying again. */
   onWait?: (seconds: number) => void;
 }): Promise<ProcessResult> {
-  const qr = await detectSlipQr(opts.uri);
-  if (!qr && opts.requireQr) return { status: 'not_slip', message: 'ไม่พบ QR ของสลิป' };
+  const { qr, scannerWorks } = await detectSlipQr(opts.uri, { width: opts.width, height: opts.height });
+  if (!qr && opts.requireQr) {
+    // Without a working scanner every photo would look like "not a slip": say so instead.
+    if (!scannerWorks) throw new SlipReaderError('qr_unavailable', READER_MESSAGES.qr_unavailable);
+    return { status: 'not_slip', message: 'ไม่พบ QR ของสลิป' };
+  }
 
   const prepared = await prepareImage(opts.uri, opts.width);
   if (opts.index.hashes.has(prepared.hash)) return { status: 'duplicate', message: 'รูปนี้เคยบันทึกแล้ว' };

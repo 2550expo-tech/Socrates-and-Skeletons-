@@ -120,6 +120,55 @@ export function parseSlipQr(data: string | null | undefined): SlipQr | null {
   return { sendingBank: bank, transRef: ref, crcValid };
 }
 
+/** The first code in a picture that is a Thai slip-verification QR. */
+export function firstSlipQr(codes: (string | null | undefined)[]): SlipQr | null {
+  for (const code of codes) {
+    const qr = parseSlipQr(code);
+    if (qr) return qr;
+  }
+  return null;
+}
+
+export interface PictureSize {
+  width?: number | null;
+  height?: number | null;
+}
+
+/**
+ * Pictures about the size of a phone screen: slips saved by bank apps and
+ * screenshots, not camera photos (those are 1,500+ pixels wide). Only these get
+ * the closer look below, which keeps scanning a big gallery quick.
+ */
+export function isScreenSized(size: PictureSize | null | undefined): boolean {
+  const w = size?.width ?? 0;
+  const h = size?.height ?? 0;
+  if (!w || !h) return true; // size unknown: look closer anyway
+  return w <= 1600 && h >= w;
+}
+
+/**
+ * Where banks print the verification QR on a slip, as fractions of the picture.
+ * Phone QR scanners (Android's in particular) read best when the code fills a
+ * large part of the image, and the slip QR is small, so when the whole picture
+ * shows no slip QR the scan looks again at these parts, one by one.
+ */
+export const SLIP_QR_REGIONS: readonly { x: number; y: number; width: number; height: number }[] = [
+  { x: 0, y: 0.45, width: 1, height: 0.55 }, // lower half (most banks)
+  { x: 0.45, y: 0.55, width: 0.55, height: 0.45 }, // lower right corner (K PLUS, SCB EASY, Krungthai NEXT...)
+];
+
+/** A region in whole pixels, always inside the picture. */
+export function regionInPixels(region: { x: number; y: number; width: number; height: number }, size: { width: number; height: number }) {
+  const originX = Math.max(0, Math.floor(region.x * size.width));
+  const originY = Math.max(0, Math.floor(region.y * size.height));
+  return {
+    originX,
+    originY,
+    width: Math.max(1, Math.min(size.width - originX, Math.round(region.width * size.width))),
+    height: Math.max(1, Math.min(size.height - originY, Math.round(region.height * size.height))),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Reading -> candidate
 // ---------------------------------------------------------------------------

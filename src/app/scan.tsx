@@ -172,13 +172,21 @@ export default function Scan() {
                 <T v="micro">
                   {counted > 0 ? `รวมในยอดเงินแล้ว ${counted} รายการ` : ''}
                   {counts.duplicate > 0 ? `${counted > 0 ? ' · ' : ''}ซ้ำ ${counts.duplicate}` : ''}
-                  {counts.not_slip > 0 ? ` · ไม่ใช่สลิป ${counts.not_slip}` : ''}
+                  {counts.not_slip > 0 ? ` · รูปอื่น (ไม่มี QR สลิป) ${counts.not_slip}` : ''}
                   {counts.failed > 0 ? ` · อ่านไม่ได้ ${counts.failed}` : ''}
                   {counts.out_of_range > 0 ? ` · เก่ากว่า 1 ปี ${counts.out_of_range}` : ''}
                 </T>
               </View>
             </Row>
             {!done ? <ProgressBar value={counts.total ? counts.finished / counts.total : 0} color={theme.accent} /> : null}
+            {done && recorded.length === 0 && counts.not_slip > 0 && galleryAvailable ? (
+              <View style={{ backgroundColor: theme.surfaceAlt, borderRadius: radius.md, padding: space.md, gap: space.sm }}>
+                <T v="small">
+                  มีสลิปในเครื่องแต่{BUDDY_NAME}ไม่เจอ? {BUDDY_NAME}หาสลิปจาก QR ตรวจสอบสลิปที่แอปธนาคารพิมพ์ไว้ ถ้าเป็นรูปถ่ายสลิปกระดาษ หรือรูปที่ตัด QR ออก ให้เลือกรูปนั้นเอง
+                </T>
+                <Button label="เลือกรูปเอง" kind="soft" small icon="hand-left-outline" onPress={s.loadPicked} />
+              </View>
+            ) : null}
             {running && s.waiting ? <WaitNotice until={s.waiting} /> : null}
             {running ? <Button label="หยุดชั่วคราว" kind="soft" small icon="pause" onPress={s.pause} /> : null}
             {paused && !s.notice ? <Button label="อ่านต่อ" small icon="play" onPress={s.resume} /> : null}

@@ -57,7 +57,9 @@ export function useSlipScanner(initialRange: RangeKey = '1m') {
     txsRef.current = txs;
   }, [txs]);
   const indexRef = useRef<DuplicateIndex>(buildDuplicateIndex([]));
-  const pickedRef = useRef(new Map<string, { width: number | null }>());
+  const pickedRef = useRef(new Map<string, { width: number | null; height: number | null }>());
+  /** Picture sizes of gallery photos in the queue (screen-sized ones get a closer QR check). */
+  const sizesRef = useRef(new Map<string, { width: number | null; height: number | null }>());
   const scannedRef = useRef<Set<string>>(new Set());
   const loopRef = useRef(false);
   const mounted = useRef(true);
@@ -93,6 +95,7 @@ export function useSlipScanner(initialRange: RangeKey = '1m') {
       const fresh = images.filter((i) => !scanned.has(i.assetId));
       setSkippedKnown(images.length - fresh.length);
       pickedRef.current.clear();
+      sizesRef.current = new Map(fresh.map((i) => [i.assetId, { width: i.width, height: i.height }]));
       setRunTxIds([]);
       apply({ type: 'load', items: fresh.map((i) => ({ assetId: i.assetId, createdAt: i.createdAt })) });
       apply({ type: 'start' });
@@ -115,7 +118,7 @@ export function useSlipScanner(initialRange: RangeKey = '1m') {
       quality: 1,
     });
     if (res.canceled || res.assets.length === 0) return;
-    pickedRef.current = new Map(res.assets.map((a) => [a.uri, { width: a.width ?? null }]));
+    pickedRef.current = new Map(res.assets.map((a) => [a.uri, { width: a.width ?? null, height: a.height ?? null }]));
     setSkippedKnown(0);
     setRunTxIds([]);
     const now = Date.now();
@@ -125,10 +128,12 @@ export function useSlipScanner(initialRange: RangeKey = '1m') {
 
   async function processOne(item: ScanItem): Promise<Omit<Finished, 'type' | 'runId' | 'assetId'>> {
     const picked = pickedRef.current.get(item.assetId);
+    const size = picked ?? sizesRef.current.get(item.assetId);
     const prefs = await loadScanPrefs();
     const r = await processSlipImage({
       uri: picked ? item.assetId : await galleryUri(item.assetId),
-      width: picked?.width,
+      width: size?.width,
+      height: size?.height,
       requireQr: requireQr && !picked,
       range: rangeDays(SLIP_WINDOW),
       index: indexRef.current,

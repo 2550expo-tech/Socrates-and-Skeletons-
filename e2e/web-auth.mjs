@@ -21,6 +21,7 @@ const IN_CI = !!process.env.GITHUB_ACTIONS;
 const DIST = process.argv[2] ?? 'dist';
 const SHOTS = process.argv[3] ?? 'e2e-shots';
 const FIXTURES = new URL('./fixtures/', import.meta.url).pathname;
+const ZXING_WASM = new URL('../node_modules/zxing-wasm/dist/reader/zxing_reader.wasm', import.meta.url).pathname;
 await mkdir(SHOTS, { recursive: true });
 const BASE_PATH = '/Socrates-and-Skeletons-';
 const PORT = 4173;
@@ -201,6 +202,8 @@ async function freshPage(tag) {
   page.on('console', (m) => { if (m.type() === 'error') console.log(`[${tag}] console.error`, m.text().slice(0, 200)); });
   page.on('requestfailed', (r) => { if (!r.url().startsWith(SUPA)) console.log(`[${tag}] request failed`, r.url().slice(0, 160)); });
   await page.route(`${SUPA}/**`, supabase);
+  // The web QR reader downloads its decoder from a CDN: serve the same file from node_modules.
+  await page.route('**/zxing_reader.wasm', (route) => route.fulfill({ path: ZXING_WASM, contentType: 'application/wasm' }));
   return { ctx, page };
 }
 const shot = (page, name) => page.screenshot({ path: join(SHOTS, `${name}.png`) });
@@ -709,6 +712,39 @@ try {
     check('Nothing left to review', await visible(page, 'เคลียร์หมดแล้ว', 8000));
     const row = state.txRows.find((r) => r.title === 'ร้านเบลอ');
     check('Unclear slip: saved as confirmed only after the user confirmed', row?.status === 'confirmed');
+    await ctx.close();
+    state.confirmEmail = true;
+  }
+
+  // 16. The slip-verification QR printed small in the corner is found, and its reference is the duplicate key
+  {
+    state.confirmEmail = false;
+    const bkkDay = (daysAgo) => new Date(Date.now() + 7 * 3600e3 - daysAgo * 86400e3).toISOString().slice(0, 10);
+    state.slipReadings = [
+      { isSlip: true, direction: 'expense', amount: '250.00', dateText: 'x', dateIso: bkkDay(0), time: '09:40', counterparty: 'ร้านคิวอาร์', bank: 'KBank', reference: 'AIREAD999', confidence: { amount: 0.97, date: 0.95, counterparty: 0.93 } },
+    ];
+    const { ctx, page } = await freshPage('qr');
+    await page.goto(APP);
+    await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
+    await introGone(page);
+    await page.getByText('สมัครสมาชิก', { exact: true }).click();
+    await page.fill('#name', 'คิวอาร์');
+    await page.fill('#email', 'qr@example.com');
+    await page.fill('#password', 'secret123');
+    await button(page, 'สร้างบัญชี').click();
+    await visible(page, 'สมัครบัญชีสำเร็จ');
+    await button(page, 'ไปตั้งค่าเงิน').click();
+    await page.fill('#ob-balance', '1000');
+    await button(page, 'เริ่มใช้ MindPay').click();
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    await page.goto(`${APP}scan`);
+    await introGone(page);
+    const chooser = page.waitForEvent('filechooser');
+    await button(page, 'เลือกรูปสลิป').click();
+    await (await chooser).setFiles([join(FIXTURES, 'slip-qr.jpg')]);
+    await visible(page, 'อ่านเสร็จแล้ว ได้ 1 รายการ', 20000);
+    const saved = state.txRows.find((r) => r.title === 'ร้านคิวอาร์');
+    check('Slip QR in the corner is found: its reference (not the AI\'s guess) is kept', saved?.slip_ref === '016271094231BTF05678', `slip_ref=${saved?.slip_ref}`);
     await ctx.close();
     state.confirmEmail = true;
   }

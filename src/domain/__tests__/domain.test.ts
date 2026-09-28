@@ -21,8 +21,12 @@ import {
   buildDuplicateIndex,
   classifyCandidate,
   crc16,
+  firstSlipQr,
+  isScreenSized,
   normalizeReading,
   parseSlipQr,
+  regionInPixels,
+  SLIP_QR_REGIONS,
   type SlipReading,
 } from '../slip';
 import { computeBalance, dailyTotals, summarizeRange } from '../summary';
@@ -409,5 +413,42 @@ describe('Periods shown to the user', () => {
     expect([today.incomeSatang, today.expenseSatang, today.netSatang]).toEqual([50_000, 10_000, 40_000]);
     const week = summarizeRange(list, '7d', late);
     expect(week.expenseSatang).toBe(14_000); // 21 Sep is outside the 7 days
+  });
+});
+
+describe('Finding the slip QR on the phone', () => {
+  const slipQr = (bank: string, ref: string) => {
+    const inner = `000600000101${String(bank.length).padStart(2, '0')}${bank}02${String(ref.length).padStart(2, '0')}${ref}`;
+    const body = `00${String(inner.length).padStart(2, '0')}${inner}5102TH9104`;
+    return body + crc16(body);
+  };
+
+  it('TC-57 picks the slip QR among other codes, and looks closer only at screen-sized pictures', () => {
+    const promptPay = '00020101021129370016A000000677010111011300668123456785802TH53037646304ABCD';
+    expect(firstSlipQr([promptPay, slipQr('004', '015271094231ATF01234')])).toEqual({
+      sendingBank: '004',
+      transRef: '015271094231ATF01234',
+      crcValid: true,
+    });
+    expect(firstSlipQr([promptPay, null, 'https://example.com'])).toBeNull();
+    expect(firstSlipQr([])).toBeNull();
+
+    // Saved slips and screenshots get the closer look; camera photos and landscape pictures do not.
+    expect(isScreenSized({ width: 1080, height: 2400 })).toBe(true);
+    expect(isScreenSized({ width: 1440, height: 3088 })).toBe(true);
+    expect(isScreenSized({ width: 3000, height: 4000 })).toBe(false);
+    expect(isScreenSized({ width: 1920, height: 1080 })).toBe(false);
+    expect(isScreenSized(null)).toBe(true);
+
+    // Every region stays inside the picture, and together they cover the lower half.
+    for (const size of [{ width: 1080, height: 2400 }, { width: 721, height: 1283 }]) {
+      for (const region of SLIP_QR_REGIONS) {
+        const px = regionInPixels(region, size);
+        expect(px.originX + px.width).toBeLessThanOrEqual(size.width);
+        expect(px.originY + px.height).toBeLessThanOrEqual(size.height);
+        expect(px.width).toBeGreaterThan(size.width * 0.5);
+      }
+      expect(regionInPixels(SLIP_QR_REGIONS[0], size).originY).toBeLessThanOrEqual(size.height / 2);
+    }
   });
 });

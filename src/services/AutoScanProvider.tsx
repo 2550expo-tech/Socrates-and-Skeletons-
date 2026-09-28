@@ -117,6 +117,7 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
               const r = await processSlipImage({
                 uri: await galleryUri(img.assetId),
                 width: img.width,
+                height: img.height,
                 requireQr: true,
                 range,
                 index,
