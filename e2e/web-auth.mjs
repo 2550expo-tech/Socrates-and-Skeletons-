@@ -508,6 +508,21 @@ try {
     await visible(page, 'ยอดคงเหลือ', 8000);
     await page.goto(`${APP}runway`);
     await introGone(page);
+    // What-if slider: drag the gold thumb to spend 30% less a day.
+    const slider = page.getByRole('slider', { name: 'ใช้น้อยลงวันละกี่เปอร์เซ็นต์' }).first();
+    await slider.scrollIntoViewIfNeeded();
+    const box = await slider.boundingBox();
+    if (box) {
+      await page.mouse.move(box.x + 15, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 15 + (box.width - 30) * 0.3, box.y + box.height / 2, { steps: 8 });
+      await page.mouse.move(box.x + 15 + (box.width - 30) * 0.6, box.y + box.height / 2, { steps: 8 });
+      await page.mouse.up();
+    }
+    const slid = (await slider.getAttribute('aria-valuenow').catch(() => null)) ?? '';
+    await page.waitForTimeout(900);
+    await shot(page, '28-runway-slider');
+    check('Runway: dragging the slider to 30% less a day shows the extra days', slid === '30' && (await visible(page, 'เพิ่มขึ้น')), `value=${slid}`);
     await page.fill('#runway-price', '2000');
     check('Runway: buying ฿2,000 shows the days before and after', (await visible(page, 'ถ้าซื้อ ฿2,000')) && (await visible(page, 'ตอนนี้')));
     await button(page, 'ถามโค้ชเรื่องนี้').click();

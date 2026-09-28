@@ -11,10 +11,11 @@ import { addDays, formatThaiDay } from '../../domain/dates';
 import { formatBaht, parseBahtToSatang } from '../../domain/money';
 import { runwayAfterPurchase, runwayWithReduction, RUNWAY_WINDOW_DAYS, type Runway } from '../../domain/runway';
 import { ContourLines, MoneyTree, ProgressRing, treeHealth } from '../../ui/art';
-import { Badge, Button, Card, Chip, Divider, Ionicons, Money, Row, Screen, T } from '../../ui/components';
+import { Badge, Button, Card, Divider, Ionicons, Money, Row, Screen, T } from '../../ui/components';
 import { Aurora, GrowBar, Reveal, Sparkles } from '../../ui/effects';
 import { Field } from '../../ui/inputs';
 import { useCountUp, useReduceMotion } from '../../ui/motion';
+import { Slider } from '../../ui/Slider';
 import { fonts, palette, radius, space, useTheme } from '../../ui/theme';
 
 function daysText(r: Runway) {
@@ -164,17 +165,44 @@ export default function RunwayScreen() {
       {runway.averageSatang > 0 && runway.status !== 'below_floor' ? (
         <Card>
           <T v="h3">ลองปรับ: ถ้าใช้น้อยลงวันละ</T>
-          <Row gap={space.sm} style={{ flexWrap: 'wrap' }}>
-            {[0, 10, 20, 30].map((p) => (
-              <Chip key={p} label={p === 0 ? 'เท่าเดิม' : `${p}%`} selected={reduce === p} onPress={() => setReduce(p)} />
-            ))}
+          <Row gap={space.md} align="center">
+            <View style={{ flex: 1, gap: 2 }}>
+              <T v="display" color={reduce ? theme.primary : theme.inkFaint} style={{ fontVariant: ['tabular-nums'] }}>
+                {reduce}%
+              </T>
+              <T v="small">
+                {reduce === 0
+                  ? `ตอนนี้ใช้วันละ ${formatBaht(runway.averageSatang, { decimals: false })}`
+                  : `ใช้วันละ ${formatBaht(reduced.averageSatang, { decimals: false })} (ประหยัดวันละ ${formatBaht(runway.averageSatang - reduced.averageSatang, { decimals: false })})`}
+              </T>
+            </View>
+            <View style={{ alignItems: 'center' }}>
+              <MoneyTree
+                health={treeHealth(reduced.status, reduced.days)}
+                size={86}
+                trunk={theme.dark ? '#E8E1CC' : '#A88F5E'}
+                leaf={palette.goldBright}
+                bare={theme.dark ? '#3D5A4C' : '#C9D3CC'}
+                grow
+              />
+            </View>
           </Row>
+          <Slider
+            value={reduce}
+            onChange={setReduce}
+            min={0}
+            max={50}
+            step={5}
+            label="ใช้น้อยลงวันละกี่เปอร์เซ็นต์"
+            format={(v) => `${v}%`}
+            ticks={[0, 10, 20, 30, 40, 50]}
+          />
           <Row gap={space.md}>
             <Ionicons name="leaf" size={20} color={theme.primary} />
             <T v="body" style={{ flex: 1 }}>
               {reduce === 0
-                ? `ตอนนี้ใช้วันละ ${formatBaht(runway.averageSatang, { decimals: false })} เงินพอ ${daysText(runway)}`
-                : `ใช้วันละ ${formatBaht(reduced.averageSatang, { decimals: false })} เงินจะพอ ${daysText(reduced.days === null ? reduced : { ...reduced, days: reducedDays })}${reduced.days !== null && runway.days !== null ? ` (เพิ่มขึ้น ${reducedDays - runway.days} วัน)` : ''}`}
+                ? `เลื่อนดูว่าถ้าใช้น้อยลง เงินจะพอนานขึ้นกี่วัน (ตอนนี้ ${daysText(runway)})`
+                : `เงินจะพอ ${daysText(reduced.days === null ? reduced : { ...reduced, days: reducedDays })}${reduced.days !== null && runway.days !== null ? ` · เพิ่มขึ้น ${reducedDays - runway.days} วัน` : ''}`}
             </T>
           </Row>
         </Card>
