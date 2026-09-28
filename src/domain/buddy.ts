@@ -82,3 +82,34 @@ export function buddyLine(p: {
     }
   }
 }
+
+/** Friendly tips น้องกล้า gives when tapped (short, kind, about using MindPay well). */
+export const BUDDY_TIPS: readonly string[] = [
+  `เก็บสลิปไว้ในเครื่องได้เลย เปิดแอปเมื่อไหร่ ${BUDDY_NAME}จดให้เอง`,
+  'ใบทองบนต้นไม้คือจำนวนวันที่เงินพอใช้ ยิ่งใบเยอะยิ่งสบาย',
+  'ก่อนซื้อของชิ้นใหญ่ ลองกด "เช็กก่อนจ่าย" ในหน้าเงินพอถึงดูนะ',
+  'ตั้งงบรายเดือนไว้ในหน้าตั้งค่า แล้วจะเห็นว่าเดือนนี้ใช้ไปกี่เปอร์เซ็นต์',
+  'สงสัยอะไรเรื่องเงิน ถามโค้ชได้เลย เช่น หมวดไหนควรลดก่อน',
+  'เงินสำรองคือเงินที่ไม่นับเป็นเงินใช้ เผื่อไว้ยามฉุกเฉินนะ',
+  'จดทุกวันนิดเดียว ต้นไม้เงินก็โตได้ทุกวัน',
+];
+
+/** After this many taps in a row the companion giggles instead of giving a tip. */
+export const BUDDY_TICKLE_AFTER = 6;
+
+/**
+ * What the companion says when the user taps it (`n` = taps so far, from 1).
+ * Tips in turn, so two taps in a row never repeat; a kind word first when money
+ * is tight; and a giggle when tapped a lot.
+ */
+export function buddyPoke(n: number, status: RunwayStatus): BuddyLine {
+  if (n >= BUDDY_TICKLE_AFTER && n % BUDDY_TICKLE_AFTER === 0) {
+    return { mood: 'cheer', text: `จั๊กจี้แล้วน้า~ ${BUDDY_NAME}ยังอยู่ตรงนี้ ไปจดรายการต่อกันดีกว่า` };
+  }
+  const tight = status === 'critical' || status === 'below_floor';
+  if (tight && n % 3 === 1) {
+    return { mood: 'calm', text: `ไม่เป็นไรนะ เดือนไหนตึงก็ค่อย ๆ ปรับไปด้วยกัน ${BUDDY_NAME}เป็นกำลังใจให้` };
+  }
+  const tip = BUDDY_TIPS[(n - 1) % BUDDY_TIPS.length];
+  return { mood: n % 2 === 0 ? 'happy' : 'thinking', text: tip };
+}

@@ -1,8 +1,9 @@
 /**
- * TC-49..TC-51, TC-53: the companion ("น้องกล้า") and the start of a new day.
+ * TC-49..TC-51, TC-53, TC-58: the companion ("น้องกล้า"), the start of a new
+ * day, and what it says when tapped.
  */
 import { describe, expect, it } from 'vitest';
-import { buddyLine, isNewFromSlip, spentOnDay, spentToday } from '../buddy';
+import { BUDDY_TICKLE_AFTER, BUDDY_TIPS, buddyLine, buddyPoke, isNewFromSlip, spentOnDay, spentToday } from '../buddy';
 import { bkkToIso, msUntilNextBkkMidnight } from '../dates';
 import type { Transaction } from '../types';
 
@@ -83,3 +84,20 @@ describe('A new day', () => {
     expect(spentOnDay([tx({ day: '2026-09-27', amount: 70 })], '2026-09-27')).toBe(7_000);
   });
 });
+
+describe('Tapping the companion', () => {
+  it('TC-58 gives tips in turn (never the same twice in a row), comforts first when money is tight, giggles when tapped a lot', () => {
+    for (let n = 1; n < 20; n++) {
+      const a = buddyPoke(n, 'healthy');
+      const b = buddyPoke(n + 1, 'healthy');
+      expect(a.text.length).toBeGreaterThan(10);
+      expect(a.text).not.toBe(b.text);
+    }
+    expect(buddyPoke(1, 'healthy').text).toBe(BUDDY_TIPS[0]);
+    expect(buddyPoke(1, 'critical').text).toContain('ไม่เป็นไร');
+    expect(buddyPoke(BUDDY_TICKLE_AFTER, 'healthy').text).toContain('จั๊กจี้');
+    // Never scolds.
+    for (const t of BUDDY_TIPS) expect(t).not.toMatch(/เกินไป!|ห้าม|แย่/);
+  });
+});
+
