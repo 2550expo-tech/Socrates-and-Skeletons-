@@ -177,3 +177,36 @@ export function createFakeSupabase() {
 export async function routeQrDecoder(page) {
   await page.route('**/zxing_reader.wasm', (route) => route.fulfill({ path: ZXING_WASM, contentType: 'application/wasm' }));
 }
+
+const FIXTURES = new URL('./fixtures/', import.meta.url).pathname;
+
+/**
+ * Stand in for a phone's photo library (see src/services/gallery.web.ts), so the
+ * web app runs the same automatic scan as the Android app.
+ * `photos`: [{ name: 'slip-qr.jpg', minutesAgo: 30, width: 1080, height: 1920 }, ...] from e2e/fixtures.
+ */
+export async function installTestGallery(page, photos) {
+  await page.route('**/__test-gallery__/*', (route) => {
+    const name = decodeURIComponent(new URL(route.request().url()).pathname.split('/').pop());
+    return route.fulfill({ path: FIXTURES + name, contentType: 'image/jpeg' });
+  });
+  const images = photos.map((p, i) => ({
+    id: `test-photo-${i + 1}`,
+    name: p.name,
+    minutesAgo: p.minutesAgo ?? (i + 1) * 20,
+    width: p.width ?? 1080,
+    height: p.height ?? 1920,
+  }));
+  await page.addInitScript((list) => {
+    window.__MINDPAY_TEST_GALLERY__ = {
+      images: list.map((p) => ({
+        id: p.id,
+        uri: `${location.origin}/__test-gallery__/${encodeURIComponent(p.name)}`,
+        createdAt: Date.now() - p.minutesAgo * 60_000,
+        width: p.width,
+        height: p.height,
+      })),
+    };
+  }, images);
+}
+

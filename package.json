@@ -51,7 +51,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
     "e2e:web": "EXPO_WEB_BASE_URL=/Socrates-and-Skeletons- expo export --platform web --output-dir dist && EXPO_WEB_BASE_URL=/Socrates-and-Skeletons- node scripts/web-home-screen.mjs dist && cp dist/index.html dist/404.html && node e2e/web-auth.mjs dist e2e-shots",
-    "demo:video": "node e2e/demo-video.mjs dist demo-video light && node e2e/demo-video.mjs dist demo-video dark"
+    "demo:video": "node e2e/demo-video.mjs dist demo-video light android && node e2e/demo-video.mjs dist demo-video dark android && node e2e/demo-video.mjs dist demo-video light web"
   },
   "private": true
 }

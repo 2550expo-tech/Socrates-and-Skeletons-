@@ -13,7 +13,7 @@
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium, webkit } from 'playwright';
-import { createFakeSupabase, routeQrDecoder, serveDist, SUPA } from './fake-backend.mjs';
+import { createFakeSupabase, installTestGallery, routeQrDecoder, serveDist, SUPA } from './fake-backend.mjs';
 
 // E2E_BROWSER=webkit runs the same checks on Safari's engine, set up like an iPhone.
 const ENGINE = process.env.E2E_BROWSER === 'webkit' ? 'webkit' : 'chromium';
@@ -590,6 +590,51 @@ try {
     await visible(page, 'อ่านเสร็จแล้ว ได้ 1 รายการ', 20000);
     const saved = state.txRows.find((r) => r.title === 'ร้านคิวอาร์');
     check('Slip QR in the corner is found: its reference (not the AI\'s guess) is kept', saved?.slip_ref === '016271094231BTF05678', `slip_ref=${saved?.slip_ref}`);
+    await ctx.close();
+    state.confirmEmail = true;
+  }
+
+  // 17. Android flow on a stand-in photo gallery: open the app and new slips are read by themselves
+  {
+    state.confirmEmail = false;
+    const bkkDay = (daysAgo) => new Date(Date.now() + 7 * 3600e3 - daysAgo * 86400e3).toISOString().slice(0, 10);
+    state.slipReadings = [
+      { isSlip: true, direction: 'expense', amount: '350.00', dateText: 'x', dateIso: bkkDay(0), time: '11:20', counterparty: 'ร้านข้าวมันไก่', bank: 'SCB', reference: 'AUTO1', confidence: { amount: 0.97, date: 0.96, counterparty: 0.94 } },
+      { isSlip: true, direction: 'income', amount: '1200.00', dateText: 'x', dateIso: bkkDay(1), time: '20:00', counterparty: 'พี่ชาย', bank: 'BBL', reference: 'AUTO2', confidence: { amount: 0.99, date: 0.97, counterparty: 0.95 } },
+    ];
+    const { ctx, page } = await freshPage('auto');
+    await installTestGallery(page, [
+      { name: 'slip-qr-2.jpg', minutesAgo: 10 },
+      { name: 'photo-1.jpg', minutesAgo: 20, width: 600, height: 1000 },
+      { name: 'slip-qr-3.jpg', minutesAgo: 30 },
+      { name: 'photo-2.jpg', minutesAgo: 40, width: 600, height: 1000 },
+    ]);
+    await page.goto(APP);
+    await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
+    await introGone(page);
+    await page.getByText('สมัครสมาชิก', { exact: true }).click();
+    await page.fill('#name', 'ออโต้');
+    await page.fill('#email', 'auto@example.com');
+    await page.fill('#password', 'secret123');
+    await button(page, 'สร้างบัญชี').click();
+    await visible(page, 'สมัครบัญชีสำเร็จ');
+    await button(page, 'ไปตั้งค่าเงิน').click();
+    await page.fill('#ob-balance', '5000');
+    const aiBefore = state.calls.filter((c) => c.startsWith('POST /functions/v1/parse-slip')).length;
+    await button(page, 'เริ่มใช้ MindPay').click();
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    // No photo is picked: the scan starts by itself once the user is in the app.
+    const scanned = await visible(page, 'จดให้แล้ว 2 รายการ', 25000);
+    await page.waitForTimeout(1200);
+    await shot(page, '20-auto-scan-done');
+    check('Android flow: new slips are read by themselves on opening the app, no photo picked', scanned);
+    const aiCalls = state.calls.filter((c) => c.startsWith('POST /functions/v1/parse-slip')).length - aiBefore;
+    check('Only photos with a slip QR are sent to the AI (2 of 4 photos)', aiCalls === 2, `${aiCalls} sent`);
+    const refs = state.txRows.filter((r) => ['ร้านข้าวมันไก่', 'พี่ชาย'].includes(r.title)).map((r) => r.slip_ref).sort();
+    check('The QR references are kept', JSON.stringify(refs) === JSON.stringify(['016272184455CKQ11220', '016273009912DMV30011']), refs.join(','));
+    check('The balance counts them at once', await visible(page, '฿5,850', 8000));
+    await page.getByRole('button', { name: 'สแกนสลิป' }).last().click();
+    check('The scan screen searches the gallery by itself and finds nothing new', await visible(page, 'ทุกรูปเคยตรวจแล้ว (4 รูป)', 15000));
     await ctx.close();
     state.confirmEmail = true;
   }

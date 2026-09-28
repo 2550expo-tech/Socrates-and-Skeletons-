@@ -11,10 +11,12 @@ export interface ScanPrefs {
   autoConfirm: boolean;
   /** When the last automatic scan started (ms). 0 = never. */
   lastAutoScanAt: number;
+  /** The phone's photo permission was asked for once by itself (the first time the app opened). */
+  askedGalleryOnce: boolean;
 }
 
 const KEY = 'mindpay.scanPrefs.v1';
-export const DEFAULT_SCAN_PREFS: ScanPrefs = { autoScan: true, autoConfirm: true, lastAutoScanAt: 0 };
+export const DEFAULT_SCAN_PREFS: ScanPrefs = { autoScan: true, autoConfirm: true, lastAutoScanAt: 0, askedGalleryOnce: false };
 
 export async function loadScanPrefs(): Promise<ScanPrefs> {
   try {

@@ -36,6 +36,8 @@ import {
 
 /** Wait before trying a photo again after a network error. */
 const NETWORK_RETRY_MS = 3000;
+/** The automatic scan starts this long after the app is ready (the opening animation takes about 1.8 s). */
+const START_DELAY_MS = 1800;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export type AutoScanPhase = 'idle' | 'needs_permission' | 'scanning' | 'done' | 'error';
@@ -75,7 +77,9 @@ export function useAutoScan() {
 }
 
 export function AutoScanProvider({ children }: { children: ReactNode }) {
-  const { status, repo, userId, txs, upsertLocal, updateTx } = useApp();
+  const { status, repo, userId, txs, upsertLocal, updateTx, profile } = useApp();
+  // Only once the user is in the app (not during sign-up or money setup).
+  const inApp = status === 'ready' && !!profile?.onboarded;
   const [state, setState] = useState<AutoScanState>(IDLE);
   const [prefs, setPrefsState] = useState<ScanPrefs>(DEFAULT_SCAN_PREFS);
   const running = useRef(false);
@@ -178,10 +182,17 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
 
   const maybeRun = useCallback(async () => {
     if (!available || running.current) return;
-    const p = await loadScanPrefs();
+    let p = await loadScanPrefs();
     setPrefsState(p);
     if (!shouldAutoScan({ enabled: p.autoScan, lastAutoScanAt: p.lastAutoScanAt, nowMs: Date.now(), alreadyRunning: running.current })) return;
-    const access = await getGalleryAccess().catch(() => 'denied' as const);
+    let access = await getGalleryAccess().catch(() => 'denied' as const);
+    if (access === 'denied' && !p.askedGalleryOnce) {
+      // First time the app opens: ask for the photos right away (the phone shows its own
+      // permission dialog once), so scanning needs no tap at all from then on.
+      p = await saveScanPrefs({ askedGalleryOnce: true });
+      setPrefsState(p);
+      access = await requestGalleryAccess().catch(() => 'denied' as const);
+    }
     if (access === 'denied' || access === 'blocked') {
       setState({ ...IDLE, phase: 'needs_permission' });
       return;
@@ -189,13 +200,14 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
     await run(p);
   }, [available, run]);
 
-  // On open (once the user is signed in) and whenever the app returns to the foreground.
+  // On open (once the user is in the app) and whenever the app returns to the foreground.
   useEffect(() => {
-    if (status !== 'ready' || !available) return;
-    // Start after the first screen has rendered, so opening the app stays instant.
+    if (!inApp || !available) return;
+    // Start once the opening animation has finished and the first screen is on show,
+    // so opening the app stays instant (and the one-time photo prompt comes after it).
     const first = setTimeout(() => {
       maybeRun();
-    }, 800);
+    }, START_DELAY_MS);
     const sub = AppState.addEventListener('change', (s) => {
       if (s === 'active') maybeRun();
     });
@@ -203,7 +215,7 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
       clearTimeout(first);
       sub.remove();
     };
-  }, [status, available, maybeRun]);
+  }, [inApp, available, maybeRun]);
 
   const value = useMemo<AutoScanContextValue>(
     () => ({

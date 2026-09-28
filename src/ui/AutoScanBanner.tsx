@@ -96,9 +96,14 @@ export function AutoScanBanner() {
         <Buddy mood={state.confirmed.length > 0 ? 'cheer' : 'thinking'} size={52} />
         <View style={{ flex: 1, gap: 4 }}>
           {state.confirmed.length > 0 ? (
-            <T v="h3">
-              {BUDDY_NAME}จดให้แล้ว {state.confirmed.length} รายการ ({formatBaht(total, { sign: true, decimals: false })})
-            </T>
+            <>
+              <T v="h3">
+                {BUDDY_NAME}จดให้แล้ว {state.confirmed.length} รายการ
+              </T>
+              <T v="h2" color={total >= 0 ? theme.income : theme.ink}>
+                {formatBaht(total, { sign: true, decimals: false })}
+              </T>
+            </>
           ) : (
             <T v="h3">{BUDDY_NAME}เจอสลิปใหม่ {state.drafts} ใบ</T>
           )}
