@@ -47,3 +47,4 @@ node_modules
 
 # demo videos made by e2e/demo-video.mjs
 demo-video/
+.scratch/

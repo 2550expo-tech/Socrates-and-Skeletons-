@@ -352,21 +352,33 @@ export function PulseRing({
 }) {
   const reduce = useReduceMotion();
   const [v] = useState(() => new Animated.Value(0));
+  // Fades the rings away when a counted run of pulses ends (no ring left hanging mid-ripple).
+  const [fade] = useState(() => new Animated.Value(1));
+  // The second ring joins half a pulse later instead of popping in mid-ripple.
+  const [late] = useState(() => new Animated.Value(0));
   useEffect(() => {
     if (reduce || !active) return;
     v.setValue(0);
-    const anim = Animated.loop(
-      Animated.timing(v, { toValue: 1, duration: 1500, easing: Easing.out(Easing.quad), useNativeDriver: useNative }),
-      { iterations: times === 'always' ? -1 : times },
-    );
-    anim.start();
+    fade.setValue(1);
+    late.setValue(0);
+    const anim = Animated.parallel([
+      Animated.loop(
+        Animated.timing(v, { toValue: 1, duration: 1500, easing: Easing.out(Easing.quad), useNativeDriver: useNative }),
+        { iterations: times === 'always' ? -1 : times },
+      ),
+      Animated.timing(late, { toValue: 1, duration: 1, delay: 740, useNativeDriver: useNative }),
+    ]);
+    anim.start(({ finished }) => {
+      if (finished) Animated.timing(fade, { toValue: 0, duration: 450, useNativeDriver: useNative }).start();
+    });
     return () => anim.stop();
-  }, [reduce, active, times, v]);
+  }, [reduce, active, times, v, fade, late]);
   if (reduce || !active) return null;
   return (
     <View pointerEvents="none" style={{ position: 'absolute', width: size, height: size, alignItems: 'center', justifyContent: 'center' }} {...hidden}>
       {[0, 0.5].map((offset) => {
         const p = Animated.modulo(Animated.add(v, offset), 1);
+        const joined = offset ? late : 1;
         return (
           <Animated.View
             key={offset}
@@ -377,7 +389,7 @@ export function PulseRing({
               borderRadius: size / 2,
               borderWidth: width,
               borderColor: color,
-              opacity: p.interpolate({ inputRange: [0, 0.1, 1], outputRange: [0, 0.55, 0] }),
+              opacity: Animated.multiply(Animated.multiply(p.interpolate({ inputRange: [0, 0.1, 1], outputRange: [0, 0.55, 0] }), joined), fade),
               transform: [{ scale: p.interpolate({ inputRange: [0, 1], outputRange: [1, 1.75] }) }],
             }}
           />

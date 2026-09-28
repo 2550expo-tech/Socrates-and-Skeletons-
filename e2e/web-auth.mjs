@@ -638,6 +638,66 @@ try {
     await ctx.close();
     state.confirmEmail = true;
   }
+
+  // 18. Voice entry: say "ข้าวมันไก่ 50 บาท" (a stand-in for the browser's speech recognizer), or type it the same way
+  {
+    const { ctx, page } = await freshPage('voice');
+    await ctx.addInitScript(() => {
+      class FakeRecognition {
+        constructor() {
+          this.lang = '';
+          this.onresult = null;
+          this.onerror = null;
+          this.onend = null;
+        }
+        start() {
+          window.__speechLang = this.lang;
+          const say = (text, isFinal) => {
+            const result = [{ transcript: text }];
+            result.isFinal = isFinal;
+            this.onresult?.({ resultIndex: 0, results: [result] });
+          };
+          setTimeout(() => say('ข้าวมันไก่', false), 300);
+          setTimeout(() => say('ข้าวมันไก่ 50 บาท', true), 900);
+          setTimeout(() => this.onend?.(), 1000);
+        }
+        stop() {
+          setTimeout(() => this.onend?.(), 0);
+        }
+      }
+      for (const name of ['SpeechRecognition', 'webkitSpeechRecognition']) {
+        Object.defineProperty(window, name, { value: FakeRecognition, configurable: true, writable: true });
+      }
+    });
+    await page.goto(APP);
+    await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
+    await introGone(page);
+    await page.getByText('ลองใช้ด้วยข้อมูลตัวอย่าง').click();
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    const balance = async () => {
+      await page.waitForTimeout(900);
+      const label = await page.locator('[aria-label^="ยอดคงเหลือ"]').first().getAttribute('aria-label');
+      return Math.round(Number(label.match(/฿([\d,]+\.\d{2})/)[1].replace(/,/g, '')) * 100);
+    };
+    const start = await balance();
+    await button(page, 'จดด้วยเสียง').click();
+    check('Voice: the mic on the home screen opens "พูดจดรายการ"', await visible(page, 'แตะไมค์แล้วพูด'));
+    await button(page, 'แตะแล้วพูด').click();
+    const heard = await visible(page, 'จะบันทึก 1 รายการ', 6000);
+    await page.waitForTimeout(600);
+    await shot(page, '21-voice-heard');
+    // (The home screen stays underneath with its own amounts, so look inside the item itself.)
+    const itemText = await button(page, 'รายจ่าย แตะเพื่อสลับ').textContent().catch(() => '');
+    check('Voice: "ข้าวมันไก่ 50 บาท" said -> one item of ฿50 ready to save', heard && itemText.includes('−฿50.00'), itemText);
+    check('Voice: the recognizer listens in Thai', (await page.evaluate(() => window.__speechLang)) === 'th-TH');
+    await page.fill('#voice-text', 'ค่ารถ 25 กาแฟ 65 ได้เงินจากแม่ 500');
+    check('Typed the same way: three items, the money from mom as income', (await visible(page, 'จะบันทึก 3 รายการ')) && (await visible(page, '+฿500.00')));
+    await button(page, 'บันทึก 3 รายการ').click();
+    check('Voice: saved with a confirmation', await visible(page, 'บันทึก 3 รายการแล้ว'));
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    check('Voice: the balance follows (−฿25 −฿65 +฿500)', (await balance()) === start - 2_500 - 6_500 + 50_000);
+    await ctx.close();
+  }
 } catch (e) {
   check('Test run crashed', false, e.stack?.slice(0, 500));
 }

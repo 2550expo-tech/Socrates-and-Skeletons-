@@ -110,6 +110,7 @@ function Screens({ signedIn, needsOnboarding, inApp }: { signedIn: boolean; need
           <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
           <Stack.Screen name="transaction" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
           <Stack.Screen name="scan" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="voice" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
           <Stack.Screen name="drafts" />
           <Stack.Screen name="settings" />
         </Stack.Protected>

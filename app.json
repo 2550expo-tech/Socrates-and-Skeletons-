@@ -24,7 +24,6 @@
       "package": "com.socratesandskeletons.mindpay",
       "blockedPermissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO"
       ]
@@ -58,7 +57,7 @@
         {
           "photosPermission": "เลือกรูปสลิปเพื่อให้ MindPay อ่านรายการ",
           "cameraPermission": false,
-          "microphonePermission": false
+          "microphonePermission": "MindPay ใช้ไมโครโฟนเมื่อคุณแตะปุ่มไมค์เพื่อพูดจดรายการ เช่น “ข้าว 50 บาท”"
         }
       ],
       [
@@ -67,6 +66,16 @@
           "backgroundColor": "#0E3B2C",
           "image": "./assets/splash-icon.png",
           "imageWidth": 160
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "MindPay ใช้ไมโครโฟนเมื่อคุณแตะปุ่มไมค์เพื่อพูดจดรายการ เช่น “ข้าว 50 บาท”",
+          "speechRecognitionPermission": "MindPay แปลงเสียงที่คุณพูดเป็นรายการรายรับรายจ่าย",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
         }
       ]
     ],

@@ -3,10 +3,11 @@
  * Order of information: how much I have -> how long it lasts -> what to do today
  * -> where the money went.
  */
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Animated, RefreshControl, View } from 'react-native';
+import { Animated, Pressable, RefreshControl, View } from 'react-native';
 import { useApp, useMoney } from '../../data/AppProvider';
 import { buddyLine, spentOnDay } from '../../domain/buddy';
 import { addDays, formatRangeSpan, formatThaiDay, formatThaiDayLong, RANGE_LABEL, RANGE_ORDER } from '../../domain/dates';
@@ -34,7 +35,7 @@ import {
 } from '../../ui/components';
 import { AutoScanBanner } from '../../ui/AutoScanBanner';
 import { Buddy, BuddySays } from '../../ui/Buddy';
-import { Aurora, Reveal, Shine, Sparkles } from '../../ui/effects';
+import { Aurora, PulseRing, Reveal, Shine, Sparkles, usePressSpring } from '../../ui/effects';
 import { useCountUp, useReduceMotion } from '../../ui/motion';
 import { TxRow } from '../../ui/TxRow';
 import { palette, radius, space, useTheme } from '../../ui/theme';
@@ -46,6 +47,39 @@ const RUNWAY_BADGE = {
   below_floor: { label: 'ต่ำกว่าเงินสำรอง', tone: 'critical' },
   no_spending: { label: 'ยังไม่มีรายจ่าย 7 วัน', tone: 'neutral' },
 } as const;
+
+/** "พูดจด": a round gold mic next to the quick actions; it ripples twice to be noticed. */
+function MicButton() {
+  const theme = useTheme();
+  const press = usePressSpring(0.9);
+  return (
+    <View style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center' }}>
+      <PulseRing size={52} times={2} color={theme.accent} />
+      <Animated.View style={{ transform: [{ scale: press.scale }] }}>
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {});
+            router.push('/voice');
+          }}
+          onPressIn={press.onPressIn}
+          onPressOut={press.onPressOut}
+          accessibilityRole="button"
+          accessibilityLabel="จดด้วยเสียง"
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 26,
+            backgroundColor: theme.accent,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Ionicons name="mic" size={24} color="#1D1405" />
+        </Pressable>
+      </Animated.View>
+    </View>
+  );
+}
 
 export default function Home() {
   const theme = useTheme();
@@ -213,8 +247,9 @@ export default function Home() {
 
       <Reveal index={3}>
         <Row gap={space.sm}>
-          <Button label="สแกนสลิป" icon="scan-outline" shine onPress={() => router.push('/scan')} style={{ flex: 1 }} />
-          <Button label="จดรายการ" icon="add" kind="soft" onPress={() => router.push('/transaction')} style={{ flex: 1 }} />
+          <Button label="สแกนสลิป" icon="scan-outline" shine onPress={() => router.push('/scan')} style={{ flex: 1, paddingHorizontal: 12 }} />
+          <Button label="จดรายการ" icon="add" kind="soft" onPress={() => router.push('/transaction')} style={{ flex: 1, paddingHorizontal: 12 }} />
+          <MicButton />
         </Row>
       </Reveal>
 
