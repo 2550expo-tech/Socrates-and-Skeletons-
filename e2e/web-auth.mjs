@@ -701,6 +701,25 @@ try {
     await visible(page, 'ยืนยันรายการแล้ว');
     const row = state.txRows.find((r) => r.title === 'ร้านสองค่า');
     check('The amount the user picked is saved and counted', row?.status === 'confirmed' && row?.amount_satang === 128_000, `${row?.status} ${row?.amount_satang}`);
+
+    // Savings goal (กระปุกออม): create one, drop money in, and the runway keeps it aside.
+    await page.goto(`${APP}goals`);
+    await introGone(page);
+    await button(page, 'ตั้งกระปุกแรก').click();
+    await page.fill('#goal-title', 'หูฟังใหม่');
+    await page.fill('#goal-amount', '2500');
+    await button(page, 'ตั้งกระปุก').click();
+    check('Goal: created and listed with its jar', (await visible(page, 'หูฟังใหม่')) && (await visible(page, 'เก็บวันละ')));
+    await button(page, 'หยอดกระปุก').click();
+    await page.getByRole('button', { name: '฿500', exact: true }).first().click();
+    await visible(page, 'หยอด ฿500 แล้ว');
+    await page.waitForTimeout(1200);
+    await shot(page, '29-goal-jar');
+    const goalRow = state.goalRows.find((r) => r.title === 'หูฟังใหม่');
+    check('Goal: money put in is saved (20% of ฿2,500)', goalRow?.saved_satang === 50_000 && (await visible(page, '20%')), `saved=${goalRow?.saved_satang}`);
+    await page.goto(`${APP}runway`);
+    await introGone(page);
+    check('Runway: money in the jar is kept out of what can be spent', await visible(page, 'หักเงินที่กันไว้ในกระปุกออม'));
     await ctx.close();
     state.confirmEmail = true;
   }

@@ -51,7 +51,7 @@ function remember(who: string, ids: string[]) {
 }
 
 export function useAchievements() {
-  const { txs, today, userId, repo } = useApp();
+  const { txs, goals, today, userId, repo } = useApp();
   const { runway } = useMoney();
   const who = repo?.mode === 'demo' ? 'demo' : userId;
   const seen = useSyncExternalStore(subscribe, snapshot, snapshot);
@@ -63,8 +63,8 @@ export function useAchievements() {
   const known = seen && seen.who === who ? seen.ids : null;
   const streak = useMemo(() => computeStreak(txs, today), [txs, today]);
   const badges = useMemo(
-    () => computeBadges({ txs, streak, runwayStatus: runway.status, earnedBefore: known ?? undefined, today }),
-    [txs, streak, runway.status, known, today],
+    () => computeBadges({ txs, streak, runwayStatus: runway.status, earnedBefore: known ?? undefined, today, goals }),
+    [txs, streak, runway.status, known, today, goals],
   );
   // Only once the remembered list is loaded, or every badge would look new.
   const fresh = useMemo(() => (known ? newlyEarned(badges, known) : []), [badges, known]);

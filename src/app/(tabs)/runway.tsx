@@ -26,7 +26,7 @@ function daysText(r: Runway) {
 
 export default function RunwayScreen() {
   const theme = useTheme();
-  const { balance, runway, average } = useMoney();
+  const { balance, runway, average, reserved, floor } = useMoney();
   const { today } = useApp();
   const [reduce, setReduce] = useState(0);
   const [price, setPrice] = useState('');
@@ -113,8 +113,14 @@ export default function RunwayScreen() {
           </Row>
           <Row justify="space-between">
             <T v="small">หักเงินสำรองที่ตั้งไว้</T>
-            <T v="body" style={{ fontFamily: fonts.sansSemi }}>− {formatBaht(runway.floorSatang)}</T>
+            <T v="body" style={{ fontFamily: fonts.sansSemi }}>− {formatBaht(floor)}</T>
           </Row>
+          {reserved > 0 ? (
+            <Row justify="space-between">
+              <T v="small">หักเงินที่กันไว้ในกระปุกออม</T>
+              <T v="body" style={{ fontFamily: fonts.sansSemi }}>− {formatBaht(reserved)}</T>
+            </Row>
+          ) : null}
           <Divider />
           <Row justify="space-between">
             <T v="small">ใช้ได้จริง</T>

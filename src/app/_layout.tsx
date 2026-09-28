@@ -113,6 +113,8 @@ function Screens({ signedIn, needsOnboarding, inApp }: { signedIn: boolean; need
           <Stack.Screen name="voice" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
           <Stack.Screen name="achievements" />
           <Stack.Screen name="recap" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
+          <Stack.Screen name="goals" />
+          <Stack.Screen name="goal" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
           <Stack.Screen name="drafts" />
           <Stack.Screen name="settings" />
         </Stack.Protected>

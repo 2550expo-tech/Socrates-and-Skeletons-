@@ -46,6 +46,7 @@ export function createFakeSupabase() {
     redirects: [],
     calls: [],
     txRows: [], // transactions saved through the REST API
+    goalRows: [], // savings_goals table
     slipReadings: [], // queue of answers from the slip reader (parse-slip): a reading, or { reading, check }
     slipBusy: 0, // this many next parse-slip calls answer "AI busy" (free-tier rate limit)
     slipOffline: 0, // this many next parse-slip calls fail as if the phone lost its connection
@@ -151,6 +152,27 @@ export function createFakeSupabase() {
         return reply({ body: changed.length === 1 ? changed[0] : changed });
       }
       return reply({ body: state.txRows.filter((r) => r.user_id === u.id) });
+    }
+    if (p === '/rest/v1/savings_goals') {
+      const u = byToken(req.headers().authorization);
+      if (!u) return reply({ status: 401, body: {} });
+      const id = (url.searchParams.get('id') ?? '').replace(/^eq\./, '');
+      if (req.method() === 'POST') {
+        const row = { saved_satang: 0, due_day: null, done_at: null, emoji: '🎯', ...body, id: `goal-${state.goalRows.length + 1}`, user_id: u.id, created_at: new Date().toISOString() };
+        state.goalRows.push(row);
+        return reply({ status: 201, body: row });
+      }
+      if (req.method() === 'PATCH') {
+        const row = state.goalRows.find((r) => r.user_id === u.id && r.id === id);
+        if (!row) return reply({ status: 406, body: { code: 'PGRST116', message: 'no rows' } });
+        Object.assign(row, body);
+        return reply({ body: row });
+      }
+      if (req.method() === 'DELETE') {
+        state.goalRows = state.goalRows.filter((r) => !(r.user_id === u.id && r.id === id));
+        return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' } });
+      }
+      return reply({ body: state.goalRows.filter((r) => r.user_id === u.id) });
     }
     if (p.startsWith('/functions/v1/') && state.aiDelayMs) await new Promise((r) => setTimeout(r, state.aiDelayMs));
     if (p === '/functions/v1/coach') return reply(state.coach);

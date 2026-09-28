@@ -8,6 +8,7 @@
 import { Storage } from './storage';
 import { buildSampleTransactions, DEMO_OPENING_BALANCE_SATANG } from '../domain/sample';
 import type { Profile, Transaction, TransactionInput } from '../domain/types';
+import type { GoalInput, SavingsGoal } from '../domain/goals';
 import { supabase } from './supabase';
 
 export class DuplicateSlipError extends Error {
@@ -26,6 +27,10 @@ export interface Repo {
   update(id: string, patch: Partial<TransactionInput>): Promise<Transaction>;
   remove(id: string): Promise<void>;
   confirmMany(ids: string[]): Promise<void>;
+  listGoals(): Promise<SavingsGoal[]>;
+  insertGoal(input: GoalInput): Promise<SavingsGoal>;
+  updateGoal(id: string, patch: Partial<GoalInput>): Promise<SavingsGoal>;
+  removeGoal(id: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -114,6 +119,39 @@ function profileToRow(p: Partial<Omit<Profile, 'id'>>) {
   return row;
 }
 
+type GoalRow = {
+  id: string;
+  title: string;
+  emoji: string;
+  target_satang: number;
+  saved_satang: number;
+  due_day: string | null;
+  done_at: string | null;
+  created_at: string;
+};
+
+const goalFromRow = (r: GoalRow): SavingsGoal => ({
+  id: r.id,
+  title: r.title,
+  emoji: r.emoji,
+  targetSatang: Number(r.target_satang),
+  savedSatang: Number(r.saved_satang),
+  dueDay: r.due_day,
+  doneAt: r.done_at,
+  createdAt: r.created_at,
+});
+
+function goalToRow(p: Partial<GoalInput>) {
+  const row: Record<string, unknown> = {};
+  if (p.title !== undefined) row.title = p.title;
+  if (p.emoji !== undefined) row.emoji = p.emoji;
+  if (p.targetSatang !== undefined) row.target_satang = p.targetSatang;
+  if (p.savedSatang !== undefined) row.saved_satang = p.savedSatang;
+  if (p.dueDay !== undefined) row.due_day = p.dueDay;
+  if (p.doneAt !== undefined) row.done_at = p.doneAt;
+  return row;
+}
+
 /** Postgres unique violation = the same slip was saved before (see unique indexes in the migration). */
 const isUniqueViolation = (e: { code?: string } | null) => e?.code === '23505';
 
@@ -173,6 +211,25 @@ export function createCloudRepo(userId: string): Repo {
       const { error } = await db.from('transactions').update({ status: 'confirmed', review_flags: [] }).in('id', ids);
       if (error) throw error;
     },
+    async listGoals() {
+      const { data, error } = await db.from('savings_goals').select('*').order('created_at', { ascending: true });
+      if (error) throw error;
+      return (data as GoalRow[]).map(goalFromRow);
+    },
+    async insertGoal(input) {
+      const { data, error } = await db.from('savings_goals').insert(goalToRow(input)).select().single();
+      if (error) throw error;
+      return goalFromRow(data as GoalRow);
+    },
+    async updateGoal(id, patch) {
+      const { data, error } = await db.from('savings_goals').update(goalToRow(patch)).eq('id', id).select().single();
+      if (error) throw error;
+      return goalFromRow(data as GoalRow);
+    },
+    async removeGoal(id) {
+      const { error } = await db.from('savings_goals').delete().eq('id', id);
+      if (error) throw error;
+    },
   };
 }
 
@@ -186,6 +243,7 @@ const DEMO_KEY = 'mindpay.demo.v2';
 interface DemoState {
   profile: Profile;
   txs: Transaction[];
+  goals?: SavingsGoal[];
 }
 
 const demoProfile: Profile = {
@@ -275,6 +333,31 @@ export function createDemoRepo(): Repo {
       const s = await load();
       const set = new Set(ids);
       s.txs = s.txs.map((t) => (set.has(t.id) ? { ...t, status: 'confirmed', reviewFlags: [] } : t));
+      await save();
+    },
+    async listGoals() {
+      return [...((await load()).goals ?? [])];
+    },
+    async insertGoal(input) {
+      const s = await load();
+      const goal: SavingsGoal = { ...input, id: newId(), createdAt: new Date().toISOString() };
+      s.goals = [...(s.goals ?? []), goal];
+      await save();
+      return goal;
+    },
+    async updateGoal(id, patch) {
+      const s = await load();
+      const list = s.goals ?? [];
+      const i = list.findIndex((g) => g.id === id);
+      if (i < 0) throw new Error('ไม่พบเป้าหมาย');
+      list[i] = { ...list[i], ...patch };
+      s.goals = list;
+      await save();
+      return list[i];
+    },
+    async removeGoal(id) {
+      const s = await load();
+      s.goals = (s.goals ?? []).filter((g) => g.id !== id);
       await save();
     },
   };

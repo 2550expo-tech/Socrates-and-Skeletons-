@@ -62,7 +62,9 @@ export type BadgeId =
   | 'slips_100'
   | 'all_clear'
   | 'saver_week'
-  | 'healthy_tree';
+  | 'healthy_tree'
+  | 'first_goal'
+  | 'goal_reached';
 
 export interface Badge {
   id: BadgeId;
@@ -81,6 +83,8 @@ export interface BadgeInput {
   runwayStatus: RunwayStatus;
   /** Badges earned before (kept even if, say, the runway later drops). */
   earnedBefore?: ReadonlySet<string>;
+  /** Savings goals: saved and target amounts. */
+  goals?: { savedSatang: number; targetSatang: number }[];
   today: string;
 }
 
@@ -115,6 +119,9 @@ export function computeBadges(p: BadgeInput): Badge[] {
   add({ id: 'all_clear', title: 'ตรวจครบ', how: 'มีสลิปแล้ว และไม่เหลือสลิปรอตรวจ', icon: 'checkmark-done' }, confirmedSlips > 0 && !waiting);
   add({ id: 'saver_week', title: 'สัปดาห์ประหยัด', how: '7 วันล่าสุดใช้น้อยกว่า 7 วันก่อนหน้า', icon: 'trending-down' }, thriftyWeek(p.txs, p.today));
   add({ id: 'healthy_tree', title: 'ต้นไม้งาม', how: 'เงินพอใช้ในระดับสบาย ๆ', icon: 'leaf' }, p.runwayStatus === 'healthy');
+  const goals = p.goals ?? [];
+  add({ id: 'first_goal', title: 'เริ่มออม', how: 'หยอดกระปุกออมครั้งแรก', icon: 'wallet' }, goals.some((g) => g.savedSatang > 0));
+  add({ id: 'goal_reached', title: 'ออมสำเร็จ', how: 'หยอดกระปุกจนครบเป้า', icon: 'gift' }, goals.some((g) => g.savedSatang >= g.targetSatang));
   return list;
 }
 

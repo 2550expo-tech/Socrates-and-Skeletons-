@@ -8,6 +8,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState } from 'react-native';
 import { authErrorMessage, authLinkErrorMessage, parseAuthLink } from '../domain/auth';
 import { bkkDayKey, msUntilNextBkkMidnight } from '../domain/dates';
+import { applyDeposit, reservedSatang, type GoalInput, type SavingsGoal } from '../domain/goals';
 import { averageDailyExpense, computeRunway } from '../domain/runway';
 import { computeBalance } from '../domain/summary';
 import type { Profile, Transaction, TransactionInput } from '../domain/types';
@@ -33,6 +34,13 @@ interface AppContextValue {
   userId: string | null;
   profile: Profile | null;
   txs: Transaction[];
+  /** Savings goals ("กระปุกออม"). */
+  goals: SavingsGoal[];
+  addGoal(input: GoalInput): Promise<SavingsGoal>;
+  updateGoal(id: string, patch: Partial<GoalInput>): Promise<SavingsGoal>;
+  /** Put money into a goal (or take it out with a negative amount). */
+  depositToGoal(id: string, deltaSatang: number): Promise<SavingsGoal>;
+  removeGoal(id: string): Promise<void>;
   loadError: string | null;
   refreshing: boolean;
   refresh(): Promise<void>;
@@ -68,6 +76,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [txs, setTxs] = useState<Transaction[]>([]);
+  const [goals, setGoals] = useState<SavingsGoal[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [authNotice, setAuthNotice] = useState<AuthNotice | null>(null);
@@ -82,9 +91,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const loadAll = useCallback(async (r: Repo) => {
     setLoadError(null);
     try {
-      const [p, list] = await Promise.all([r.getProfile(), r.listTransactions()]);
+      // Goals never block the app: if they cannot be loaded, the rest still works.
+      const [p, list, g] = await Promise.all([r.getProfile(), r.listTransactions(), r.listGoals().catch(() => [] as SavingsGoal[])]);
       setProfile(p);
       setTxs(list);
+      setGoals(g);
       setStatus('ready');
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ');
@@ -110,6 +121,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setUserId(null);
     setProfile(null);
     setTxs([]);
+    setGoals([]);
     setStatus('signedOut');
   }, []);
 
@@ -237,6 +249,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
       userId,
       profile,
       txs,
+      goals,
+      async addGoal(input) {
+        const g = await need().insertGoal(input);
+        setGoals((list) => [...list, g]);
+        return g;
+      },
+      async updateGoal(id, patch) {
+        const g = await need().updateGoal(id, patch);
+        setGoals((list) => list.map((x) => (x.id === id ? g : x)));
+        return g;
+      },
+      async depositToGoal(id, deltaSatang) {
+        const current = goals.find((x) => x.id === id);
+        if (!current) throw new Error('ไม่พบเป้าหมาย');
+        const g = await need().updateGoal(id, applyDeposit(current, deltaSatang));
+        setGoals((list) => list.map((x) => (x.id === id ? g : x)));
+        return g;
+      },
+      async removeGoal(id) {
+        await need().removeGoal(id);
+        setGoals((list) => list.filter((x) => x.id !== id));
+      },
       loadError,
       refreshing,
       async refresh() {
@@ -292,7 +326,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       today,
       newDay,
     }),
-    [status, repo, userId, profile, txs, loadError, refreshing, authNotice, today, newDay, loadAll, activateRepo, clear],
+    [status, repo, userId, profile, txs, goals, loadError, refreshing, authNotice, today, newDay, loadAll, activateRepo, clear],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
@@ -300,16 +334,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 /** Derived money numbers used across screens (FR-2 balance, FR-6 runway). */
 export function useMoney() {
-  const { profile, txs, today } = useApp();
+  const { profile, txs, goals, today } = useApp();
   return useMemo(() => {
     const opening = profile?.openingBalanceSatang ?? 0;
     const floor = profile?.runwayFloorSatang ?? 50_000;
     const balance = computeBalance(opening, txs);
     const average = averageDailyExpense(txs);
-    const runway = computeRunway({ balanceSatang: balance, floorSatang: floor, averageSatang: average.averageSatang });
+    // Money in savings goals is set aside: it does not count as money to spend.
+    const reserved = reservedSatang(goals);
+    const runway = computeRunway({ balanceSatang: balance, floorSatang: floor + reserved, averageSatang: average.averageSatang });
     const drafts = txs.filter((t) => t.status === 'draft');
-    return { balance, average, runway, drafts };
+    return { balance, average, runway, drafts, reserved, floor };
     // `today` makes the runway and averages start over at midnight.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, txs, today]);
+  }, [profile, txs, goals, today]);
 }

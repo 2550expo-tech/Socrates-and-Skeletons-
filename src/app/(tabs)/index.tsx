@@ -12,6 +12,7 @@ import { useApp, useMoney } from '../../data/AppProvider';
 import { buddyLine, buddyPoke, spentOnDay, treeLine, type BuddyLine } from '../../domain/buddy';
 import { addDays, formatRangeSpan, formatThaiDay, formatThaiDayLong, formatThaiMonth, RANGE_LABEL, RANGE_ORDER } from '../../domain/dates';
 import { formatBaht } from '../../domain/money';
+import { goalLine, goalProgress } from '../../domain/goals';
 import { recapToOffer } from '../../domain/recap';
 import { endOfMonthDay, safeDailySpend } from '../../domain/runway';
 import { dailyTotals, monthExpense, summarizeRange } from '../../domain/summary';
@@ -38,6 +39,7 @@ import { useAchievements } from '../../services/useAchievements';
 import { AutoScanBanner } from '../../ui/AutoScanBanner';
 import { Buddy, BuddySays } from '../../ui/Buddy';
 import { Aurora, PulseRing, Reveal, Shine, Sparkles, useCelebrate, usePressSpring } from '../../ui/effects';
+import { Jar } from '../../ui/Jar';
 import { Medal } from '../../ui/Medal';
 import { useCountUp, useReduceMotion } from '../../ui/motion';
 import { TxRow } from '../../ui/TxRow';
@@ -122,7 +124,7 @@ function StreakPill({ days, today }: { days: number; today: boolean }) {
 
 export default function Home() {
   const theme = useTheme();
-  const { profile, txs, repo, refresh, refreshing, loadError, today, newDay } = useApp();
+  const { profile, txs, goals, repo, refresh, refreshing, loadError, today, newDay } = useApp();
   const { balance, runway, average, drafts } = useMoney();
   const [range, setRange] = useState<RangeKey>('1m');
 
@@ -374,6 +376,26 @@ export default function Home() {
           </Pressable>
         </Reveal>
       ) : null}
+
+      {/* Savings goals: the one closest to its goal, or an invitation to start one */}
+      <Reveal index={5}>
+        {(() => {
+          const open = goals.filter((g) => g.savedSatang < g.targetSatang).sort((a, b) => goalProgress(b) - goalProgress(a));
+          const g = open[0] ?? goals[0];
+          return (
+            <Card onPress={() => router.push(goals.length ? '/goals' : '/goal')} style={{ paddingVertical: space.md }}>
+              <Row gap={space.md}>
+                {g ? <Jar progress={goalProgress(g)} size={44} /> : <T v="h1">🐷</T>}
+                <View style={{ flex: 1 }}>
+                  <T v="h3">{g ? `${g.emoji} ${g.title}` : 'ตั้งกระปุกออม'}</T>
+                  <T v="small">{g ? goalLine(g, today) : 'อยากได้อะไร ตั้งเป้าแล้วหยอดทีละนิด'}</T>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={theme.inkFaint} />
+              </Row>
+            </Card>
+          );
+        })()}
+      </Reveal>
 
       {/* FR-2 overview by range */}
       <SectionTitle title="ภาพรวม" />
