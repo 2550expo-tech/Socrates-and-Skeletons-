@@ -766,6 +766,23 @@ try {
     await visible(page, 'ยอดคงเหลือ', 8000);
     check('Voice: the balance follows (−฿25 −฿65 +฿500)', (await balance()) === start - 2_500 - 6_500 + 50_000);
     check('First voice entry earns the "พูดแล้วจด" badge', (await visible(page, 'ได้เหรียญใหม่')) && (await visible(page, 'พูดแล้วจด')));
+
+    // Month recap: a story of full screens that moves on by itself; tap right for the next one.
+    await button(page, 'ดูสรุปเดือน').click();
+    check('Recap: opens on the month\'s title screen', await visible(page, 'แตะด้านขวาเพื่อไปต่อ'));
+    check('Recap: moves on to the next screen by itself', await visible(page, 'เดือนนี้ใช้ไปแล้ว', 9000));
+    await button(page, 'ถัดไป').click();
+    const where = await visible(page, 'เงินไปที่ไหนมากที่สุด');
+    await page.waitForTimeout(1600);
+    await shot(page, '25-recap-where');
+    check('Recap: where the money went, biggest first', where);
+    for (let i = 0; i < 4; i++) await button(page, 'ถัดไป').click();
+    const outro = await visible(page, 'ดูอีกครั้ง');
+    await page.waitForTimeout(1200);
+    await shot(page, '26-recap-end');
+    check('Recap: ends with the money tree and the badges', outro && (await visible(page, 'เหรียญที่ได้แล้ว')));
+    await button(page, 'เสร็จ').click();
+    check('Recap: "เสร็จ" returns home', await visible(page, 'ยอดคงเหลือ', 8000));
     await ctx.close();
   }
 } catch (e) {

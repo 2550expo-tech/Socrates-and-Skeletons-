@@ -123,6 +123,24 @@ export function formatRangeSpan(range: RangeKey, now: Date = new Date()): string
   return `${start} – ${formatThaiDay(to)} · ${RANGE_DAYS[range]} วันเต็ม`;
 }
 
+/** "2026-09" -> "กันยายน 2569" */
+export function formatThaiMonth(monthKey: string): string {
+  const [y, m] = monthKey.split('-').map(Number);
+  return `${THAI_MONTHS_LONG[m - 1]} ${y + 543}`;
+}
+
+/** "2026-09" -> "2026-08" (and "2026-01" -> "2025-12"). */
+export function previousMonth(monthKey: string): string {
+  const [y, m] = monthKey.split('-').map(Number);
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+}
+
+/** Number of days in a month ("2026-02" -> 28). */
+export function daysInMonth(monthKey: string): number {
+  const [y, m] = monthKey.split('-').map(Number);
+  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+}
+
 /** "2026-09-27" -> "วันอาทิตย์ที่ 27 กันยายน 2569" */
 export function formatThaiDayLong(dayKey: string): string {
   const [y, m, d] = dayKey.split('-').map(Number);

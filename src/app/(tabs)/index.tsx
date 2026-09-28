@@ -10,8 +10,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, RefreshControl, View } from 'react-native';
 import { useApp, useMoney } from '../../data/AppProvider';
 import { buddyLine, buddyPoke, spentOnDay, treeLine, type BuddyLine } from '../../domain/buddy';
-import { addDays, formatRangeSpan, formatThaiDay, formatThaiDayLong, RANGE_LABEL, RANGE_ORDER } from '../../domain/dates';
+import { addDays, formatRangeSpan, formatThaiDay, formatThaiDayLong, formatThaiMonth, RANGE_LABEL, RANGE_ORDER } from '../../domain/dates';
 import { formatBaht } from '../../domain/money';
+import { recapToOffer } from '../../domain/recap';
 import { endOfMonthDay, safeDailySpend } from '../../domain/runway';
 import { dailyTotals, monthExpense, summarizeRange } from '../../domain/summary';
 import type { RangeKey } from '../../domain/types';
@@ -139,6 +140,7 @@ export default function Home() {
   const readyDrafts = drafts.filter((d) => d.reviewFlags.length === 0).length;
   const badge = RUNWAY_BADGE[runway.status];
   const reduce = useReduceMotion();
+  const recapMonth = useMemo(() => recapToOffer(txs, today), [txs, today]);
   const ach = useAchievements();
   const celebrate = useCelebrate();
   const freshIds = ach.fresh.map((b) => b.id).join(',');
@@ -347,6 +349,31 @@ export default function Home() {
           <MicButton />
         </Row>
       </Reveal>
+
+      {recapMonth ? (
+        <Reveal index={4}>
+          <Pressable
+            onPress={() => router.push({ pathname: '/recap', params: { month: recapMonth } })}
+            accessibilityRole="button"
+            accessibilityLabel={`ดูสรุปเดือน${formatThaiMonth(recapMonth)}`}
+            style={{ borderRadius: radius.lg, overflow: 'hidden' }}
+          >
+            <LinearGradient colors={['#4A1F3D', '#2E1327', palette.forestDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: space.lg }}>
+              <Shine times={1} delay={1400} color="rgba(255,255,255,0.18)" />
+              <Row gap={space.md}>
+                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(226,182,74,0.16)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="sparkles" size={22} color={palette.goldBright} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <T v="h3" color="#F4F1E6">{`สรุปเดือน${formatThaiMonth(recapMonth)}`}</T>
+                  <T v="small" color="#D9C8D3">เงินไปไหน วันไหนใช้เยอะ และเก่งขึ้นแค่ไหน</T>
+                </View>
+                <Ionicons name="play-circle" size={30} color={palette.goldBright} />
+              </Row>
+            </LinearGradient>
+          </Pressable>
+        </Reveal>
+      ) : null}
 
       {/* FR-2 overview by range */}
       <SectionTitle title="ภาพรวม" />
