@@ -767,6 +767,22 @@ try {
     check('Voice: the balance follows (−฿25 −฿65 +฿500)', (await balance()) === start - 2_500 - 6_500 + 50_000);
     check('First voice entry earns the "พูดแล้วจด" badge', (await visible(page, 'ได้เหรียญใหม่')) && (await visible(page, 'พูดแล้วจด')));
 
+    // Spending calendar on the transactions tab: each day shaded by spending; tap a day to see only it.
+    await page.getByRole('tab', { name: 'รายการ', exact: true }).first().click().catch(() => page.goto(`${APP}transactions`));
+    const calendarShown = (await visible(page, 'มีเงินเข้า')) && (await visible(page, 'เทียบกับวันที่ใช้ตามปกติ'));
+    check('Transactions: the spending calendar of this month is shown', calendarShown);
+    const spentDay = page.getByRole('button', { name: /ใช้ไป ฿/ }).first();
+    const dayLabel = (await spentDay.getAttribute('aria-label')) ?? '';
+    await spentDay.click();
+    await page.waitForTimeout(600);
+    await shot(page, '27-calendar-day');
+    check('Tapping a day shows only that day (with its total)', (await visible(page, 'ดูทุกวัน')) && dayLabel.length > 0, dayLabel);
+    await button(page, 'ดูทุกวัน').click();
+    check('"ดูทุกวัน" shows every day again', await gone(page, 'ดูทุกวัน'));
+    await page.goto(APP);
+    await introGone(page);
+    await visible(page, 'ยอดคงเหลือ', 8000);
+
     // Month recap: a story of full screens that moves on by itself; tap right for the next one.
     await button(page, 'ดูสรุปเดือน').click();
     check('Recap: opens on the month\'s title screen', await visible(page, 'แตะด้านขวาเพื่อไปต่อ'));

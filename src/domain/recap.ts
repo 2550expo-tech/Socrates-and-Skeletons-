@@ -118,3 +118,62 @@ export function recapToOffer(txs: Transaction[], today: string): string | null {
   const thisMonth = txs.filter((t) => t.status === 'confirmed' && bkkDayKey(t.occurredAt).slice(0, 7) === current).length;
   return thisMonth >= 3 ? current : null;
 }
+
+// ---------------------------------------------------------------------------
+// Spending calendar (a month as a heatmap)
+// ---------------------------------------------------------------------------
+
+export interface CalendarDay {
+  day: string;
+  expenseSatang: number;
+  incomeSatang: number;
+  count: number;
+  /** 0 = no spending; 1..4 = compared with the month's usual spending day (under half, under 1x, under 2x, 2x or more). */
+  level: 0 | 1 | 2 | 3 | 4;
+  isToday: boolean;
+  /** After today: nothing to show yet. */
+  future: boolean;
+}
+
+export interface SpendCalendar {
+  month: string;
+  label: string;
+  /** Weeks from Sunday to Saturday; null = a day of another month. */
+  weeks: (CalendarDay | null)[][];
+  /** The usual spending day this month (average of days with spending). */
+  usualSatang: number;
+}
+
+export function spendCalendar(txs: Transaction[], month: string, today: string): SpendCalendar {
+  const total = daysInMonth(month);
+  const per = new Map<string, { e: number; i: number; n: number }>();
+  for (const t of txs) {
+    if (t.status !== 'confirmed') continue;
+    const d = bkkDayKey(t.occurredAt);
+    if (d.slice(0, 7) !== month) continue;
+    const cur = per.get(d) ?? { e: 0, i: 0, n: 0 };
+    if (t.kind === 'expense') cur.e += t.amountSatang;
+    else cur.i += t.amountSatang;
+    cur.n += 1;
+    per.set(d, cur);
+  }
+  const spending = [...per.values()].filter((v) => v.e > 0);
+  const usual = spending.length ? spending.reduce((s, v) => s + v.e, 0) / spending.length : 0;
+  const level = (e: number): CalendarDay['level'] => {
+    if (e <= 0 || usual <= 0) return 0;
+    const r = e / usual;
+    return r < 0.5 ? 1 : r < 1 ? 2 : r < 2 ? 3 : 4;
+  };
+  const [y, m] = month.split('-').map(Number);
+  const firstWeekday = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+  const cells: (CalendarDay | null)[] = Array.from({ length: firstWeekday }, () => null);
+  for (let d = 1; d <= total; d++) {
+    const day = `${month}-${String(d).padStart(2, '0')}`;
+    const v = per.get(day) ?? { e: 0, i: 0, n: 0 };
+    cells.push({ day, expenseSatang: v.e, incomeSatang: v.i, count: v.n, level: level(v.e), isToday: day === today, future: day > today });
+  }
+  while (cells.length % 7) cells.push(null);
+  const weeks: (CalendarDay | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return { month, label: formatThaiMonth(month), weeks, usualSatang: Math.round(usual) };
+}

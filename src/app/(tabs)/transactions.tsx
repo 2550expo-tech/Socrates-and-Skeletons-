@@ -8,12 +8,14 @@ import { RefreshControl, SectionList, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp, useMoney } from '../../data/AppProvider';
 import { getCategory } from '../../domain/categories';
-import { relativeDayLabel } from '../../domain/dates';
+import { bkkDayKey, previousMonth, relativeDayLabel } from '../../domain/dates';
 import { formatBaht } from '../../domain/money';
+import { recapMonths, spendCalendar } from '../../domain/recap';
 import { groupByDay } from '../../domain/summary';
 import { Button, Card, Divider, EmptyState, IconButton, Ionicons, Row, Segmented, T } from '../../ui/components';
 import { Buddy } from '../../ui/Buddy';
 import { Reveal } from '../../ui/effects';
+import { SpendCalendar } from '../../ui/SpendCalendar';
 import { TxRow } from '../../ui/TxRow';
 import { fonts, radius, space, useTheme } from '../../ui/theme';
 
@@ -25,22 +27,46 @@ export default function Transactions() {
   const { drafts } = useMoney();
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
+  const [showCalendar, setShowCalendar] = useState(true);
+  const [month, setMonth] = useState(today.slice(0, 7));
+  const [day, setDay] = useState<string | null>(null);
+  const cal = useMemo(() => spendCalendar(txs, month, today), [txs, month, today]);
+  // Months that can be shown: back to the oldest with records, never past this month.
+  const oldest = useMemo(() => recapMonths(txs).at(-1) ?? today.slice(0, 7), [txs, today]);
+  const nextMonth = (m: string) => {
+    const [y, mm] = m.split('-').map(Number);
+    return mm === 12 ? `${y + 1}-01` : `${y}-${String(mm + 1).padStart(2, '0')}`;
+  };
+  const canPrev = month > oldest;
+  const canNext = month < today.slice(0, 7);
 
   const sections = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = txs
       .filter((t) => t.status === 'confirmed')
       .filter((t) => filter === 'all' || t.kind === filter)
+      .filter((t) => !day || bkkDayKey(t.occurredAt) === day)
       .filter((t) => !q || t.title.toLowerCase().includes(q) || getCategory(t.categoryKey).label.includes(q) || (t.note ?? '').toLowerCase().includes(q));
     return groupByDay(list).map((g) => ({ title: g.day, net: g.netSatang, data: g.items }));
-  }, [txs, filter, query]);
+  }, [txs, filter, query, day]);
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bg }}>
       <View style={{ paddingHorizontal: space.lg, gap: space.md, paddingTop: space.sm, paddingBottom: space.sm }}>
         <Row justify="space-between">
           <T v="h1">รายการ</T>
-          <IconButton icon="add-circle" label="จดรายการ" color={theme.primary} onPress={() => router.push('/transaction')} />
+          <Row gap={space.xs}>
+            <IconButton
+              icon={showCalendar ? 'calendar' : 'calendar-outline'}
+              label={showCalendar ? 'ซ่อนปฏิทิน' : 'ดูปฏิทินการใช้จ่าย'}
+              color={showCalendar ? theme.accent : theme.ink}
+              onPress={() => {
+                setShowCalendar((v) => !v);
+                setDay(null);
+              }}
+            />
+            <IconButton icon="add-circle" label="จดรายการ" color={theme.primary} onPress={() => router.push('/transaction')} />
+          </Row>
         </Row>
         <Row
           gap={space.sm}
@@ -84,6 +110,20 @@ export default function Transactions() {
         stickySectionHeadersEnabled
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.primary} />}
         contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: 120 }}
+        ListHeaderComponent={
+          showCalendar ? (
+            <View style={{ gap: space.sm, paddingTop: space.xs }}>
+              <SpendCalendar
+                cal={cal}
+                selected={day}
+                onSelect={setDay}
+                onPrev={canPrev ? () => { setMonth(previousMonth(month)); setDay(null); } : undefined}
+                onNext={canNext ? () => { setMonth(nextMonth(month)); setDay(null); } : undefined}
+              />
+              {day ? <Button label="ดูทุกวัน" kind="soft" small icon="close" onPress={() => setDay(null)} style={{ alignSelf: 'flex-start' }} /> : null}
+            </View>
+          ) : null
+        }
         renderSectionHeader={({ section }) => (
           <Row justify="space-between" style={{ backgroundColor: theme.bg, paddingTop: space.md, paddingBottom: space.xs }}>
             <T v="label" color={theme.inkSoft}>{relativeDayLabel(section.title)}</T>
@@ -97,7 +137,9 @@ export default function Transactions() {
           </Reveal>
         )}
         ListEmptyComponent={
-          query || filter !== 'all' ? (
+          day ? (
+            <EmptyState icon="calendar-outline" art={<Buddy mood="calm" size={84} />} title="วันนี้ไม่มีรายการ" body="แตะวันอื่นในปฏิทิน หรือกด ดูทุกวัน" />
+          ) : query || filter !== 'all' ? (
             <EmptyState icon="search" art={<Buddy mood="thinking" size={84} />} title="ไม่พบรายการ" body="ลองเปลี่ยนคำค้นหรือตัวกรองดูนะ" />
           ) : (
             <EmptyState

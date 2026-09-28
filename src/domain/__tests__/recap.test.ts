@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { VOICE_NOTE } from '../achievements';
 import { bkkToIso, daysInMonth, formatThaiMonth, previousMonth } from '../dates';
-import { monthRecap, recapMonths } from '../recap';
+import { monthRecap, recapMonths, spendCalendar } from '../recap';
 import type { Transaction } from '../types';
 
 let n = 0;
@@ -77,5 +77,36 @@ describe('Month recap', () => {
     expect(empty.top).toEqual([]);
     expect(empty.biggestDay).toBeNull();
     expect(empty.noSpendDays).toBe(15);
+  });
+});
+
+describe('Spending calendar', () => {
+  it('TC-70 lays the month out Sunday to Saturday and shades each day against the usual spending day', () => {
+    const txs = [
+      tx('2026-09-01', 100), // Tuesday
+      tx('2026-09-02', 40),
+      tx('2026-09-03', 400),
+      tx('2026-09-04', 60),
+      tx('2026-09-04', 0.5, { kind: 'income' }),
+      tx('2026-09-05', 999, { status: 'draft' }),
+      tx('2026-10-01', 500),
+    ];
+    const cal = spendCalendar(txs, '2026-09', '2026-09-15');
+    expect(cal.label).toBe('กันยายน 2569');
+    // September 2026 starts on a Tuesday: Sunday and Monday are empty.
+    expect(cal.weeks[0].slice(0, 2)).toEqual([null, null]);
+    expect(cal.weeks.every((w) => w.length === 7)).toBe(true);
+    expect(cal.weeks.flat().filter(Boolean)).toHaveLength(30);
+    // Usual day = (100 + 40 + 400 + 60) / 4 = ฿150.
+    expect(cal.usualSatang).toBe(15_000);
+    const byDay = Object.fromEntries(cal.weeks.flat().filter((c) => c).map((c) => [c!.day, c!]));
+    expect(byDay['2026-09-01'].level).toBe(2); // 0.67x
+    expect(byDay['2026-09-02'].level).toBe(1); // 0.27x
+    expect(byDay['2026-09-03'].level).toBe(4); // 2.7x
+    expect(byDay['2026-09-04']).toMatchObject({ level: 1, count: 2, incomeSatang: 50 });
+    expect(byDay['2026-09-05'].level).toBe(0); // a draft does not count
+    expect(byDay['2026-09-15'].isToday).toBe(true);
+    expect(byDay['2026-09-16'].future).toBe(true);
+    expect(spendCalendar([], '2026-02', '2026-09-15').weeks.flat().filter(Boolean)).toHaveLength(28);
   });
 });
