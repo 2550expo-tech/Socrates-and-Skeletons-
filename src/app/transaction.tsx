@@ -12,8 +12,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../data/AppProvider';
 import { categoriesFor, defaultCategory, suggestCategory } from '../domain/categories';
 import { bkkDayKey, bkkTime, bkkToIso, formatThaiDay, parseSlipDate, parseSlipTime } from '../domain/dates';
-import { parseBahtToSatang, satangToInput } from '../domain/money';
-import { FLAG_LABEL, type ReviewFlag } from '../domain/slip';
+import { formatBaht, parseBahtToSatang, satangToInput } from '../domain/money';
+import { ALT_PREFIX, amountChoices, FLAG_LABEL, type ReviewFlag } from '../domain/slip';
 import type { TxKind } from '../domain/types';
 import { Button, Card, Chip, IconButton, Ionicons, Row, Segmented, T } from '../ui/components';
 import { ConfirmSheet, useToast } from '../ui/feedback';
@@ -46,6 +46,9 @@ export default function TransactionForm() {
 
   const cats = categoriesFor(kind);
   const pickerDate = new Date(bkkToIso(day, time));
+  // The two AI reads disagreed: show both, and offer the amounts as buttons.
+  const altLine = isDraft ? (existing?.note ?? '').split('\n').find((l) => l.startsWith(ALT_PREFIX)) : undefined;
+  const choices = isDraft && flags.includes('amount') ? amountChoices(existing?.note) : [];
 
   function changeKind(k: TxKind) {
     setKind(k);
@@ -189,6 +192,27 @@ export default function TransactionForm() {
                     ยังไม่รวมในยอดเงินจนกว่าจะยืนยัน
                     {existing?.ocrConfidence != null ? ` · ความมั่นใจต่ำสุด ${Math.round(existing.ocrConfidence * 100)}%` : ''}
                   </T>
+                  {altLine ? (
+                    <T v="small" color={theme.ink}>
+                      {altLine}
+                    </T>
+                  ) : null}
+                  {choices.length > 1 ? (
+                    <Row gap={space.sm} style={{ flexWrap: 'wrap', marginTop: 4 }}>
+                      <T v="small">ดูที่สลิปแล้วเลือก:</T>
+                      {choices.map((c) => (
+                        <Chip
+                          key={c}
+                          label={formatBaht(c)}
+                          selected={parseBahtToSatang(amount) === c}
+                          onPress={() => {
+                            setAmount(satangToInput(c));
+                            setAmountError(null);
+                          }}
+                        />
+                      ))}
+                    </Row>
+                  ) : null}
                 </View>
               </Row>
             </Card>

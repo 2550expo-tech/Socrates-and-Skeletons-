@@ -129,6 +129,7 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
                 autoConfirm: p.autoConfirm,
                 fallbackTimeMs: img.createdAt,
                 onWait: (seconds) => setState((s) => ({ ...s, waitUntil: Date.now() + seconds * 1000 })),
+                userId,
               });
               if (r.tx) {
                 upsertLocal(r.tx);

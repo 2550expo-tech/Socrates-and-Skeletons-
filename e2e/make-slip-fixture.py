@@ -5,6 +5,8 @@ slip-verification QR printed small in a lower corner, the way bank apps do:
   e2e/fixtures/slip-qr.jpg     QR lower right, ref 016271094231BTF05678
   e2e/fixtures/slip-qr-2.jpg   QR lower right, ref 016272184455CKQ11220
   e2e/fixtures/slip-qr-3.jpg   QR lower left,  ref 016273009912DMV30011
+  e2e/fixtures/wallet-qr.jpg   an e-wallet style receipt whose QR is not a bank
+                               slip QR (e-wallets use their own), made-up payload
 
 Used by the browser test (the QR is found and its reference is the duplicate
 key) and by the demo video's stand-in photo gallery.
@@ -32,8 +34,8 @@ def slip_payload(bank: str, ref: str) -> str:
     return body + crc16(body)
 
 
-def make(name: str, bank: str, ref: str, header: str, qr_left: bool) -> None:
-    payload = slip_payload(bank, ref)
+def make(name: str, bank: str, ref: str, header: str, qr_left: bool, raw: str | None = None) -> None:
+    payload = raw or slip_payload(bank, ref)
     w, h = 1080, 1920
     img = Image.new("RGB", (w, h), "#FFFFFF")
     d = ImageDraw.Draw(img)
@@ -55,3 +57,4 @@ def make(name: str, bank: str, ref: str, header: str, qr_left: bool) -> None:
 make("slip-qr.jpg", "004", "016271094231BTF05678", "#2E7D5B", qr_left=False)
 make("slip-qr-2.jpg", "014", "016272184455CKQ11220", "#4B3F8F", qr_left=False)
 make("slip-qr-3.jpg", "006", "016273009912DMV30011", "#1F5FA8", qr_left=True)
+make("wallet-qr.jpg", "", "", "#E8672A", qr_left=False, raw="WALLET-RECEIPT-20260928-000123")

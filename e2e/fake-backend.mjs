@@ -46,7 +46,7 @@ export function createFakeSupabase() {
     redirects: [],
     calls: [],
     txRows: [], // transactions saved through the REST API
-    slipReadings: [], // queue of answers from the slip reader (parse-slip)
+    slipReadings: [], // queue of answers from the slip reader (parse-slip): a reading, or { reading, check }
     slipBusy: 0, // this many next parse-slip calls answer "AI busy" (free-tier rate limit)
     slipOffline: 0, // this many next parse-slip calls fail as if the phone lost its connection
     coach: { status: 200, body: { text: 'สัปดาห์นี้ใช้ไป ฿0 ยังไม่มีรายจ่ายเลยนะ' } }, // answer of the coach function
@@ -163,8 +163,10 @@ export function createFakeSupabase() {
         state.slipBusy -= 1;
         return reply({ status: 503, body: { error: { code: 'busy', message: 'x' } } });
       }
-      const reading = state.slipReadings.shift();
-      return reading ? reply({ body: { reading } }) : reply(err(502, 'reader_error', 'x'));
+      // Each answer is a reading, or { reading, check } like the real reader (two AI reads compared).
+      const next = state.slipReadings.shift();
+      if (!next) return reply(err(502, 'reader_error', 'x'));
+      return reply({ body: 'reading' in next ? next : { reading: next, check: { verified: true, reads: 2, disagree: {} } } });
     }
     if (p.startsWith('/functions/v1/')) return reply(err(503, 'not_configured', 'x'));
     return reply({ status: 404, body: {} });
@@ -184,11 +186,13 @@ const FIXTURES = new URL('./fixtures/', import.meta.url).pathname;
  * Stand in for a phone's photo library (see src/services/gallery.web.ts), so the
  * web app runs the same automatic scan as the Android app.
  * `photos`: [{ name: 'slip-qr.jpg', minutesAgo: 30, width: 1080, height: 1920 }, ...] from e2e/fixtures.
+ * `file` shows the same fixture under another name (a second, different photo in the gallery).
  */
 export async function installTestGallery(page, photos) {
+  const files = new Map(photos.map((p) => [p.name, p.file ?? p.name]));
   await page.route('**/__test-gallery__/*', (route) => {
     const name = decodeURIComponent(new URL(route.request().url()).pathname.split('/').pop());
-    return route.fulfill({ path: FIXTURES + name, contentType: 'image/jpeg' });
+    return route.fulfill({ path: FIXTURES + (files.get(name) ?? name), contentType: 'image/jpeg' });
   });
   const images = photos.map((p, i) => ({
     id: `test-photo-${i + 1}`,

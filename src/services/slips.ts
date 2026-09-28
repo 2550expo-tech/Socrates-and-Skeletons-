@@ -18,6 +18,7 @@ import {
   regionInPixels,
   SLIP_QR_REGIONS,
   type PictureSize,
+  type SlipCheck,
   type SlipQr,
   type SlipReading,
 } from '../domain/slip';
@@ -81,6 +82,8 @@ export interface QrCheck {
   qr: SlipQr | null;
   /** False when this phone cannot scan QR codes at all (Android without Google Play Services). */
   scannerWorks: boolean;
+  /** Some other QR code was found (e-wallet slips such as TrueMoney use their own). */
+  otherQr?: boolean;
 }
 
 /** The QR codes in one picture, or 'unavailable' when the phone has no QR scanner. Never throws. */
@@ -116,7 +119,8 @@ export async function detectSlipQr(uri: string, size?: PictureSize): Promise<QrC
   const whole = await scanCodes(uri);
   if (whole === 'unavailable') return { qr: null, scannerWorks: false };
   const found = firstSlipQr(whole);
-  if (found || !isScreenSized(size)) return { qr: found, scannerWorks: true };
+  const otherQr = whole.length > 0;
+  if (found || !isScreenSized(size)) return { qr: found, scannerWorks: true, otherQr: !found && otherQr };
   try {
     // Decode once; each part is cut from the decoded picture.
     const full = await ImageManipulator.manipulate(uri).renderAsync();
@@ -131,7 +135,7 @@ export async function detectSlipQr(uri: string, size?: PictureSize): Promise<QrC
   } catch {
     // The picture could not be cut: the answer from the whole picture stands.
   }
-  return { qr: null, scannerWorks: true };
+  return { qr: null, scannerWorks: true, otherQr };
 }
 
 /** Shrink to at most 1100px wide JPEG (enough to read a slip, about 150 KB) and hash it. */
@@ -186,11 +190,17 @@ export const BUSY_WAITS_S = [20, 40];
 /** Shown while the reader waits for the AI's rate limit to reset. */
 export const waitMessage = (seconds: number) => `AI มีคิวเยอะ รออีก ${seconds} วินาทีแล้วอ่านต่อให้เอง`;
 
+export interface SlipRead {
+  reading: SlipReading;
+  /** How the reader double-checked it (missing from older readers). */
+  check: SlipCheck | null;
+}
+
 /**
  * Send the prepared image to the slip reader (Edge Function parse-slip).
  * When the AI is busy, waits and tries again (onWait tells the screen).
  */
-export async function readSlip(base64: string, onWait?: (seconds: number) => void): Promise<SlipReading> {
+export async function readSlip(base64: string, onWait?: (seconds: number) => void): Promise<SlipRead> {
   for (let attempt = 0; ; attempt++) {
     try {
       return await readSlipOnce(base64);
@@ -203,7 +213,7 @@ export async function readSlip(base64: string, onWait?: (seconds: number) => voi
   }
 }
 
-async function readSlipOnce(base64: string): Promise<SlipReading> {
+async function readSlipOnce(base64: string): Promise<SlipRead> {
   if (!supabase) throw new SlipReaderError('cloud_required', READER_MESSAGES.cloud_required);
   const { data, error } = await supabase.functions.invoke('parse-slip', {
     body: { imageBase64: base64, mediaType: 'image/jpeg' },
@@ -217,7 +227,7 @@ async function readSlipOnce(base64: string): Promise<SlipReading> {
     }
     throw new SlipReaderError(code, READER_MESSAGES[code]);
   }
-  const reading = (data as { reading?: SlipReading })?.reading;
+  const { reading, check } = (data ?? {}) as { reading?: SlipReading; check?: SlipCheck };
   if (!reading || typeof reading.isSlip !== 'boolean') throw new SlipReaderError('reader_error', READER_MESSAGES.reader_error);
-  return reading;
+  return { reading, check: check && typeof check.verified === 'boolean' ? check : null };
 }

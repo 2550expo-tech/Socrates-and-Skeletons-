@@ -1,5 +1,5 @@
 /**
- * TC-38..TC-42: server-side AI helpers (Claude or Gemini).
+ * TC-38..TC-42, TC-54, TC-55, TC-62, TC-63: server-side AI helpers (Claude or Gemini).
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -8,7 +8,11 @@ import {
   geminiText,
   isInvalidKey,
   isZeroQuota,
+  mergeReadings,
   normalizeReading,
+  similarName,
+  UNCHECKED_MAX,
+  verifierModels,
   parseJsonText,
   pickProvider,
   plainText,
@@ -99,6 +103,8 @@ describe('Slip reading from any model', () => {
       counterparty: 'ร้านป้าแดง',
       bank: 'KBank',
       reference: '0152ABC',
+      fromName: null,
+      toName: null,
       confidence: { amount: 0.95, date: 0.9, counterparty: 1 },
     });
     expect(normalizeReading({ isSlip: true, amount: 89.5 }).amount).toBe('89.50');
@@ -123,5 +129,84 @@ describe('Slip reading from any model', () => {
     expect(notSlip.amount).toBeNull();
     expect(notSlip.confidence.amount).toBe(0);
     expect(normalizeReading(null).isSlip).toBe(false);
+  });
+});
+
+describe('Slip read twice (accuracy)', () => {
+  const slip = (over: Record<string, unknown> = {}) =>
+    normalizeReading({
+      isSlip: true,
+      direction: 'expense',
+      amount: '1250.00',
+      amountPrinted: '1,250.00',
+      fee: '0.00',
+      dateText: '27 ก.ย. 69',
+      dateIso: '2026-09-27',
+      time: '14:05',
+      fromName: 'นาย สมชาย ใจดี',
+      toName: 'ร้านข้าวมันไก่ป้าแดง',
+      counterparty: 'ร้านข้าวมันไก่ป้าแดง',
+      bank: 'KBank',
+      reference: '016271094231BTF05678',
+      confidence: { amount: 0.97, date: 0.96, counterparty: 0.95 },
+      ...over,
+    });
+
+  it('TC-62 the amount must match itself: as digits, as printed, and not the fee', () => {
+    expect(slip().confidence.amount).toBe(0.97);
+    expect(slip({ amountPrinted: '+1,250.00 บาท' }).confidence.amount).toBe(0.97);
+    // "1,520.00" printed but "1250.00" written: one of them is misread.
+    expect(slip({ amountPrinted: '1,520.00' }).confidence.amount).toBe(0);
+    expect(slip({ amountPrinted: null }).confidence.amount).toBe(0);
+    // The fee was taken as the amount.
+    expect(slip({ amount: '15.00', amountPrinted: '15.00', fee: '15.00' }).confidence.amount).toBe(0);
+    // Readers that do not send amountPrinted are not penalised.
+    expect(slip({ amountPrinted: undefined }).confidence.amount).toBe(0.97);
+    expect(slip().fromName).toBe('นาย สมชาย ใจดี');
+    expect(slip().toName).toBe('ร้านข้าวมันไก่ป้าแดง');
+    // The second read uses other models first.
+    expect(verifierModels(null)[0]).not.toBe(geminiModels(null)[0]);
+    expect(verifierModels('my-model')[0]).toBe('my-model');
+  });
+
+  it('TC-63 two reads: agreement is kept, any disagreement on a key field waits for the user', () => {
+    const agreed = mergeReadings(slip(), slip({ confidence: { amount: 0.99, date: 0.9, counterparty: 0.9 }, dateText: '27ก.ย.2569' }));
+    expect(agreed.check).toEqual({ verified: true, reads: 2, disagree: {} });
+    expect(agreed.reading.confidence).toEqual({ amount: 0.99, date: 0.96, counterparty: 0.95 });
+
+    const amount = mergeReadings(slip(), slip({ amount: '1280.00', amountPrinted: '1,280.00' }));
+    expect(amount.check.verified).toBe(false);
+    expect(amount.check.disagree.amount).toEqual(['1250.00', '1280.00']);
+    expect(amount.reading.confidence.amount).toBeLessThan(0.8);
+    expect(amount.reading.confidence.date).toBe(0.96);
+
+    const date = mergeReadings(slip(), slip({ dateText: '21 ก.ย. 69', dateIso: '2026-09-21' }));
+    expect(date.check.disagree.date).toEqual(['27 ก.ย. 69', '21 ก.ย. 69']);
+    expect(date.reading.confidence.date).toBeLessThan(0.8);
+
+    const direction = mergeReadings(slip(), slip({ direction: 'income' }));
+    expect(direction.reading.direction).toBe('unknown');
+    expect(mergeReadings(slip({ direction: 'unknown' }), slip()).reading.direction).toBe('expense');
+
+    // A masked name and the full name are the same person; a different shop is not.
+    const masked = mergeReadings(slip({ counterparty: 'ร้านข้าวมันไก่ป้า***' }), slip());
+    expect(masked.check.verified).toBe(true);
+    expect(masked.reading.counterparty).toBe('ร้านข้าวมันไก่ป้าแดง');
+    expect(similarName('นาย สมชาย ใ***', 'สมชาย ใจดี')).toBe(true);
+    expect(similarName('MR. SOMCHAI JAIDEE', 'Somchai Jaidee')).toBe(true);
+    expect(similarName('ร้านกาแฟดอยช้าง', 'ร้านข้าวมันไก่ป้าแดง')).toBe(false);
+    const other = mergeReadings(slip(), slip({ counterparty: 'ร้านกาแฟดอยช้าง' }));
+    expect(other.check.disagree.counterparty).toBeTruthy();
+
+    // Only one read could be made: nothing counts without a look.
+    const single = mergeReadings(slip(), null);
+    expect(single.check).toEqual({ verified: false, reads: 1, disagree: {} });
+    expect(Math.max(...Object.values(single.reading.confidence))).toBeLessThanOrEqual(UNCHECKED_MAX);
+    // One model sees a slip, the other does not.
+    const notSure = mergeReadings(slip(), normalizeReading({ isSlip: false }));
+    expect(notSure.reading.isSlip).toBe(true);
+    expect(notSure.check.verified).toBe(false);
+    expect(notSure.reading.confidence.amount).toBeLessThan(0.8);
+    expect(mergeReadings(normalizeReading({ isSlip: false }), normalizeReading({ isSlip: false })).reading.isSlip).toBe(false);
   });
 });

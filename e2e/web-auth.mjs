@@ -566,7 +566,7 @@ try {
     state.confirmEmail = false;
     const bkkDay = (daysAgo) => new Date(Date.now() + 7 * 3600e3 - daysAgo * 86400e3).toISOString().slice(0, 10);
     state.slipReadings = [
-      { isSlip: true, direction: 'expense', amount: '250.00', dateText: 'x', dateIso: bkkDay(0), time: '09:40', counterparty: 'ร้านคิวอาร์', bank: 'KBank', reference: 'AIREAD999', confidence: { amount: 0.97, date: 0.95, counterparty: 0.93 } },
+      { isSlip: true, direction: 'expense', amount: '250.00', dateText: 'x', dateIso: bkkDay(0), time: '09:40', counterparty: 'ร้านคิวอาร์', bank: 'Kasikorn Bank', reference: 'AIREAD999', confidence: { amount: 0.97, date: 0.95, counterparty: 0.93 } },
     ];
     const { ctx, page } = await freshPage('qr');
     await page.goto(APP);
@@ -590,6 +590,7 @@ try {
     await visible(page, 'อ่านเสร็จแล้ว ได้ 1 รายการ', 20000);
     const saved = state.txRows.find((r) => r.title === 'ร้านคิวอาร์');
     check('Slip QR in the corner is found: its reference (not the AI\'s guess) is kept', saved?.slip_ref === '016271094231BTF05678', `slip_ref=${saved?.slip_ref}`);
+    check('The bank comes from the QR code (004 = KBank), not from reading the logo', saved?.note === 'สลิปจาก KBank', String(saved?.note));
     await ctx.close();
     state.confirmEmail = true;
   }
@@ -601,6 +602,7 @@ try {
     state.slipReadings = [
       { isSlip: true, direction: 'expense', amount: '350.00', dateText: 'x', dateIso: bkkDay(0), time: '11:20', counterparty: 'ร้านข้าวมันไก่', bank: 'SCB', reference: 'AUTO1', confidence: { amount: 0.97, date: 0.96, counterparty: 0.94 } },
       { isSlip: true, direction: 'income', amount: '1200.00', dateText: 'x', dateIso: bkkDay(1), time: '20:00', counterparty: 'พี่ชาย', bank: 'BBL', reference: 'AUTO2', confidence: { amount: 0.99, date: 0.97, counterparty: 0.95 } },
+      { isSlip: true, direction: 'expense', amount: '120.00', dateText: 'x', dateIso: bkkDay(0), time: '08:30', counterparty: 'ร้านชานม', bank: 'TrueMoney', reference: 'TMN55501', confidence: { amount: 0.96, date: 0.95, counterparty: 0.92 } },
     ];
     const { ctx, page } = await freshPage('auto');
     await installTestGallery(page, [
@@ -608,6 +610,8 @@ try {
       { name: 'photo-1.jpg', minutesAgo: 20, width: 600, height: 1000 },
       { name: 'slip-qr-3.jpg', minutesAgo: 30 },
       { name: 'photo-2.jpg', minutesAgo: 40, width: 600, height: 1000 },
+      { name: 'wallet-qr.jpg', minutesAgo: 50 }, // e-wallet receipt: its own kind of QR
+      { name: 'camera-qr.jpg', file: 'wallet-qr.jpg', minutesAgo: 60, width: 3000, height: 4000 }, // a camera photo with a QR: stays on the phone
     ]);
     await page.goto(APP);
     await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
@@ -624,22 +628,69 @@ try {
     await button(page, 'เริ่มใช้ MindPay').click();
     await visible(page, 'ยอดคงเหลือ', 8000);
     // No photo is picked: the scan starts by itself once the user is in the app.
-    const scanned = await visible(page, 'จดให้แล้ว 2 รายการ', 25000);
+    const scanned = await visible(page, 'จดให้แล้ว 3 รายการ', 25000);
     await page.waitForTimeout(1200);
     await shot(page, '20-auto-scan-done');
     check('Android flow: new slips are read by themselves on opening the app, no photo picked', scanned);
     const aiCalls = state.calls.filter((c) => c.startsWith('POST /functions/v1/parse-slip')).length - aiBefore;
-    check('Only photos with a slip QR are sent to the AI (2 of 4 photos)', aiCalls === 2, `${aiCalls} sent`);
+    check('Only slip-like pictures are sent to the AI: 2 bank slips + 1 e-wallet receipt of 6 photos', aiCalls === 3, `${aiCalls} sent`);
     const refs = state.txRows.filter((r) => ['ร้านข้าวมันไก่', 'พี่ชาย'].includes(r.title)).map((r) => r.slip_ref).sort();
     check('The QR references are kept', JSON.stringify(refs) === JSON.stringify(['016272184455CKQ11220', '016273009912DMV30011']), refs.join(','));
-    check('The balance counts them at once', await visible(page, '฿5,850', 8000));
+    check('The balance counts them at once', await visible(page, '฿5,730', 8000));
     await page.getByRole('button', { name: 'สแกนสลิป' }).last().click();
-    check('The scan screen searches the gallery by itself and finds nothing new', await visible(page, 'ทุกรูปเคยตรวจแล้ว (4 รูป)', 15000));
+    const nothingNew = await visible(page, 'ทุกรูปเคยตรวจแล้ว (6 รูป)', 15000);
+    check('The scan screen searches the gallery by itself and finds nothing new', nothingNew, nothingNew ? '' : (await page.locator('body').innerText()).split('\n').filter((l) => /รูป|สลิป/.test(l)).slice(0, 6).join(' | '));
     await ctx.close();
     state.confirmEmail = true;
   }
 
-  // 18. Voice entry: say "ข้าวมันไก่ 50 บาท" (a stand-in for the browser's speech recognizer), or type it the same way
+  // 18. The two AI reads of a slip disagree on the amount: it waits, and the user picks the right one
+  {
+    state.confirmEmail = false;
+    const bkkDay = (daysAgo) => new Date(Date.now() + 7 * 3600e3 - daysAgo * 86400e3).toISOString().slice(0, 10);
+    state.slipReadings = [
+      {
+        reading: { isSlip: true, direction: 'expense', amount: '1250.00', dateText: 'x', dateIso: bkkDay(0), time: '10:10', counterparty: 'ร้านสองค่า', bank: 'SCB', reference: 'E2E201', confidence: { amount: 0.5, date: 0.97, counterparty: 0.95 } },
+        check: { verified: false, reads: 2, disagree: { amount: ['1250.00', '1280.00'] } },
+      },
+    ];
+    const { ctx, page } = await freshPage('two-reads');
+    await page.goto(APP);
+    await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
+    await introGone(page);
+    await page.getByText('สมัครสมาชิก', { exact: true }).click();
+    await page.fill('#name', 'สองค่า');
+    await page.fill('#email', 'tworeads@example.com');
+    await page.fill('#password', 'secret123');
+    await button(page, 'สร้างบัญชี').click();
+    await visible(page, 'สมัครบัญชีสำเร็จ');
+    await button(page, 'ไปตั้งค่าเงิน').click();
+    await page.fill('#ob-balance', '5000');
+    await button(page, 'เริ่มใช้ MindPay').click();
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    await page.goto(`${APP}scan`);
+    await introGone(page);
+    const chooser = page.waitForEvent('filechooser');
+    await button(page, 'เลือกรูปสลิป').click();
+    await (await chooser).setFiles([join(FIXTURES, 'photo-3.jpg')]);
+    await visible(page, 'อ่านเสร็จแล้ว ได้ 1 รายการ', 20000);
+    const draft = state.txRows.find((r) => r.title === 'ร้านสองค่า');
+    check('Two reads disagree: the slip is not counted, it waits for the user', draft?.status === 'draft' && (draft?.review_flags ?? []).includes('amount'), `${draft?.status} ${draft?.review_flags}`);
+    await button(page, 'ตรวจ 1 รายการที่อ่านไม่ชัด').click();
+    await page.getByText('ร้านสองค่า').first().click();
+    const both = (await visible(page, 'AI อ่านได้ 2 แบบ')) && (await visible(page, 'ดูที่สลิปแล้วเลือก'));
+    await shot(page, '22-two-reads');
+    check('The review shows both readings to choose from', both);
+    await page.getByRole('button', { name: '฿1,280.00' }).first().click();
+    await button(page, 'ยืนยันและรวมในยอดเงิน').click();
+    await visible(page, 'ยืนยันรายการแล้ว');
+    const row = state.txRows.find((r) => r.title === 'ร้านสองค่า');
+    check('The amount the user picked is saved and counted', row?.status === 'confirmed' && row?.amount_satang === 128_000, `${row?.status} ${row?.amount_satang}`);
+    await ctx.close();
+    state.confirmEmail = true;
+  }
+
+  // 19. Voice entry: say "ข้าวมันไก่ 50 บาท" (a stand-in for the browser's speech recognizer), or type it the same way
   {
     const { ctx, page } = await freshPage('voice');
     await ctx.addInitScript(() => {

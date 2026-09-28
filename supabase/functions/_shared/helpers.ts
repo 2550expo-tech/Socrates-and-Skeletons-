@@ -50,6 +50,17 @@ export function geminiModels(preferred?: string | null): string[] {
   return [...new Set(list.filter((m): m is string => !!m))];
 }
 
+/**
+ * Models for the second, independent read of a slip. A different (larger) model
+ * than the first read makes the two readings independent, so a misread digit
+ * shows up as a disagreement. Each model has its own free quota, so running both
+ * at once does not halve how many slips can be read.
+ */
+export function verifierModels(preferred?: string | null): string[] {
+  const list = [preferred?.trim(), 'gemini-flash-latest', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-lite-latest'];
+  return [...new Set(list.filter((m): m is string => !!m))];
+}
+
 /** The key itself was refused (wrong, deleted, or not allowed for this API). */
 export function isInvalidKey(status: number, body: string): boolean {
   if (status === 401 || status === 403) return true;
@@ -128,6 +139,9 @@ export interface SlipReadingOut {
   counterparty: string | null;
   bank: string | null;
   reference: string | null;
+  /** Payer and receiver as printed (the app works out which one is the user). */
+  fromName: string | null;
+  toName: string | null;
   confidence: { amount: number; date: number; counterparty: number };
 }
 
@@ -142,7 +156,7 @@ function amountText(v: unknown): string | null {
   if (typeof v === 'number') return Number.isFinite(v) && v > 0 ? v.toFixed(2) : null;
   const s = text(v);
   if (!s) return null;
-  const cleaned = s.replace(/฿|บาท|THB|,|\s/gi, '');
+  const cleaned = s.replace(/฿|บาท|THB|,|\s/gi, '').replace(/^[+\-−]/, '');
   return /^\d+(\.\d{1,2})?$/.test(cleaned) && Number(cleaned) > 0 ? cleaned : null;
 }
 
@@ -174,6 +188,10 @@ function score(v: unknown): number {
  * Make a slip reading safe for the app, whichever model produced it:
  * unknown values become null, and a null value never keeps a high confidence
  * (so an unreadable field always sends the slip to "รอยืนยัน").
+ *
+ * The amount is also checked against itself: the model writes it twice (as
+ * digits, and exactly as printed with commas), and a slip whose two amounts do
+ * not match, or whose amount equals the fee, gets no confidence in its amount.
  */
 export function normalizeReading(raw: unknown): SlipReadingOut {
   const r = (raw ?? {}) as Record<string, unknown>;
@@ -188,11 +206,18 @@ export function normalizeReading(raw: unknown): SlipReadingOut {
     counterparty: null,
     bank: null,
     reference: null,
+    fromName: null,
+    toName: null,
     confidence: { amount: 0, date: 0, counterparty: 0 },
   };
   if (r.isSlip !== true) return empty;
 
   const amount = amountText(r.amount);
+  const printed = r.amountPrinted === undefined ? undefined : amountText(r.amountPrinted);
+  const fee = amountText(r.fee);
+  // Written twice and the two differ, or it is the fee: the amount is not trusted.
+  const amountDoubtful =
+    !!amount && ((printed !== undefined && (printed === null || Number(printed) !== Number(amount))) || (!!fee && Number(fee) === Number(amount)));
   const dateText = text(r.dateText);
   const dateIso = isoDate(r.dateIso);
   const counterparty = text(r.counterparty);
@@ -208,10 +233,178 @@ export function normalizeReading(raw: unknown): SlipReadingOut {
     counterparty,
     bank: text(r.bank),
     reference,
+    fromName: text(r.fromName),
+    toName: text(r.toName),
     confidence: {
-      amount: amount ? score(conf.amount) : 0,
+      amount: amount && !amountDoubtful ? score(conf.amount) : 0,
       date: dateIso || dateText ? score(conf.date) : 0,
       counterparty: counterparty ? score(conf.counterparty) : 0,
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Two independent reads of the same slip
+// ---------------------------------------------------------------------------
+
+/** Below the app's 0.8 rule, so the field is shown to the user to check. */
+export const UNSURE = 0.5;
+/** A single read that could not be double-checked is never counted without a look. */
+export const UNCHECKED_MAX = 0.79;
+
+export type CheckedField = 'amount' | 'date' | 'direction' | 'counterparty';
+
+export interface SlipCheck {
+  /** Both reads agreed on every key field (or were merged without a doubt). */
+  verified: boolean;
+  /** How many independent reads were made (1 when the second one could not be made). */
+  reads: number;
+  /** Fields the two reads disagree on, with both values, for the user to choose from. */
+  disagree: Partial<Record<CheckedField, [string | null, string | null]>>;
+}
+
+const THAI_MONTHS: Record<string, string> = {
+  'ม.ค.': '01', 'ก.พ.': '02', 'มี.ค.': '03', 'เม.ย.': '04', 'พ.ค.': '05', 'มิ.ย.': '06',
+  'ก.ค.': '07', 'ส.ค.': '08', 'ก.ย.': '09', 'ต.ค.': '10', 'พ.ย.': '11', 'ธ.ค.': '12',
+};
+
+/** "27 ก.ย. 69" and "27ก.ย.2569" and "27 ก.ย. 2569" are the same date. */
+function dateTextKey(s: string | null): string | null {
+  if (!s) return null;
+  let t = s.replace(/\s+/g, '');
+  for (const [m, n] of Object.entries(THAI_MONTHS)) t = t.split(m).join(`/${n}/`);
+  const m = t.match(/(\d{1,2})\D+(\d{1,2})\D+(\d{2,4})/);
+  if (!m) return t.toLowerCase();
+  let year = Number(m[3]);
+  if (year < 100) year += year >= 40 ? 2500 : 2000; // "69" = 2569
+  if (year > 2400) year -= 543;
+  return `${year}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+}
+
+function sameDate(a: SlipReadingOut, b: SlipReadingOut): boolean {
+  if (a.dateIso && b.dateIso && a.dateIso === b.dateIso) return true;
+  const ta = dateTextKey(a.dateText);
+  const tb = dateTextKey(b.dateText);
+  if (ta && tb) return ta === tb;
+  return !a.dateIso && !b.dateIso && !a.dateText && !b.dateText;
+}
+
+const NAME_TITLES = /^(?:นางสาว|นาง|นาย|น\.ส\.|ด\.ช\.|ด\.ญ\.|คุณ|mrs\.?|mr\.?|ms\.?|miss)\s*/i;
+
+/** A name as letters only: no title, spaces, dots, or masking ("x", "*"). */
+export function nameLetters(s: string | null): string {
+  if (!s) return '';
+  return s
+    .trim()
+    .replace(NAME_TITLES, '')
+    .toLowerCase()
+    .replace(/[\s.\-*•·_]|x{2,}/g, '');
+}
+
+function editDistance(a: string, b: string): number {
+  const prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let diag = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const up = prev[j];
+      prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diag = up;
+    }
+  }
+  return prev[b.length];
+}
+
+/**
+ * The same name read twice: equal letters, one a masked start of the other
+ * ("สมชาย ใ***" and "สมชาย ใจดี"), or at most one letter in five different.
+ */
+export function similarName(a: string | null, b: string | null): boolean {
+  const x = nameLetters(a);
+  const y = nameLetters(b);
+  if (!x || !y) return !x && !y;
+  if (x === y) return true;
+  const [short, long] = x.length <= y.length ? [x, y] : [y, x];
+  if (short.length >= 3 && long.startsWith(short)) return true;
+  return editDistance(x, y) <= Math.floor(long.length / 5);
+}
+
+const higher = (x: number, y: number) => Math.max(x, y);
+
+/**
+ * Put two independent readings of one slip together. Where they agree the
+ * value is kept (with the higher confidence); where they disagree on the
+ * amount, date, direction or who was paid, the field is marked unsure so the
+ * slip waits for the user, and both values are returned to choose from.
+ * One reading only (the second could not be made): confidences are capped so
+ * nothing is counted without a look.
+ */
+export function mergeReadings(a: SlipReadingOut | null, b: SlipReadingOut | null): { reading: SlipReadingOut; check: SlipCheck } {
+  const only = a ?? b;
+  if (!only) throw new Error('No reading to merge');
+  if (!a || !b) {
+    const c = only.confidence;
+    return {
+      reading: { ...only, confidence: { amount: Math.min(c.amount, UNCHECKED_MAX), date: Math.min(c.date, UNCHECKED_MAX), counterparty: Math.min(c.counterparty, UNCHECKED_MAX) } },
+      check: { verified: false, reads: 1, disagree: {} },
+    };
+  }
+  if (!a.isSlip && !b.isSlip) return { reading: a, check: { verified: true, reads: 2, disagree: {} } };
+  if (a.isSlip !== b.isSlip) {
+    // One model sees a slip, the other does not: keep the slip, but nothing in it is sure.
+    const slip = a.isSlip ? a : b;
+    return {
+      reading: { ...slip, confidence: { amount: Math.min(slip.confidence.amount, UNSURE), date: Math.min(slip.confidence.date, UNSURE), counterparty: Math.min(slip.confidence.counterparty, UNSURE) } },
+      check: { verified: false, reads: 2, disagree: {} },
+    };
+  }
+
+  const disagree: SlipCheck['disagree'] = {};
+  const conf = { ...a.confidence };
+
+  const amountAgrees = !!a.amount && !!b.amount && Number(a.amount) === Number(b.amount);
+  if (amountAgrees) conf.amount = higher(a.confidence.amount, b.confidence.amount);
+  else {
+    conf.amount = Math.min(a.confidence.amount, UNSURE);
+    if (a.amount || b.amount) disagree.amount = [a.amount, b.amount];
+  }
+
+  if (sameDate(a, b)) conf.date = higher(a.confidence.date, b.confidence.date);
+  else {
+    conf.date = Math.min(a.confidence.date, UNSURE);
+    disagree.date = [a.dateText ?? a.dateIso, b.dateText ?? b.dateIso];
+  }
+
+  let direction = a.direction;
+  if (a.direction !== b.direction) {
+    if (a.direction === 'unknown') direction = b.direction;
+    else if (b.direction !== 'unknown') {
+      direction = 'unknown';
+      disagree.direction = [a.direction, b.direction];
+    }
+  }
+
+  let counterparty = a.counterparty;
+  if (similarName(a.counterparty, b.counterparty)) {
+    conf.counterparty = higher(a.confidence.counterparty, b.confidence.counterparty);
+    // Prefer the fuller spelling when one of them is masked or cut short.
+    const [la, lb] = [nameLetters(a.counterparty), nameLetters(b.counterparty)];
+    if (lb.length > la.length && lb.startsWith(la)) counterparty = b.counterparty;
+  } else {
+    conf.counterparty = Math.min(a.confidence.counterparty, UNSURE);
+    disagree.counterparty = [a.counterparty, b.counterparty];
+  }
+
+  const reading: SlipReadingOut = {
+    ...a,
+    direction,
+    counterparty,
+    time: a.time ?? b.time,
+    bank: a.bank ?? b.bank,
+    reference: a.reference ?? b.reference,
+    fromName: similarName(a.fromName, b.fromName) ? a.fromName ?? b.fromName : null,
+    toName: similarName(a.toName, b.toName) ? a.toName ?? b.toName : null,
+    confidence: conf,
+  };
+  return { reading, check: { verified: Object.keys(disagree).length === 0, reads: 2, disagree } };
 }

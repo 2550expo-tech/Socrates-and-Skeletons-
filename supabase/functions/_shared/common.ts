@@ -11,6 +11,7 @@ import {
   pickProvider,
   readKey,
   retryDelayMs,
+  verifierModels,
 } from './helpers.ts';
 
 /** Read one environment variable; a name the runtime refuses counts as "not set". */
@@ -92,6 +93,8 @@ export type Content = { type: 'text'; text: string } | { type: 'image'; mediaTyp
 
 interface AiRequest {
   task: 'slip' | 'coach';
+  /** 'verify': the second, independent read of a slip, made by a different model. */
+  variant?: 'primary' | 'verify';
   system: string;
   content: Content[];
   maxTokens: number;
@@ -116,7 +119,7 @@ export async function callAI(req: AiRequest): Promise<string> {
   const started = Date.now();
   const { text, model } = provider === 'claude' ? await callClaude(req) : await callGemini(req);
   // Metadata only: never log images, questions or replies.
-  console.log(JSON.stringify({ ai: provider, model, task: req.task, ms: Date.now() - started }));
+  console.log(JSON.stringify({ ai: provider, model, task: req.task, variant: req.variant ?? 'primary', ms: Date.now() - started }));
   return text;
 }
 
@@ -124,7 +127,8 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function callClaude(req: AiRequest): Promise<{ text: string; model: string }> {
   const key = claudeKey()!;
-  const model = Deno.env.get(req.task === 'slip' ? 'SLIP_MODEL' : 'COACH_MODEL') ?? CLAUDE_DEFAULT_MODEL;
+  const main = Deno.env.get(req.task === 'slip' ? 'SLIP_MODEL' : 'COACH_MODEL') ?? CLAUDE_DEFAULT_MODEL;
+  const model = req.variant === 'verify' ? (Deno.env.get('VERIFY_MODEL') ?? main) : main;
   const body: Record<string, unknown> = {
     model,
     max_tokens: req.maxTokens,
@@ -173,7 +177,7 @@ async function callGemini(req: AiRequest): Promise<{ text: string; model: string
   );
   let useJsonSchema = !!req.schema;
   let lastError = 'Gemini: no model available';
-  const models = geminiModels(Deno.env.get('GEMINI_MODEL'));
+  const models = req.variant === 'verify' ? verifierModels(Deno.env.get('GEMINI_VERIFY_MODEL')) : geminiModels(Deno.env.get('GEMINI_MODEL'));
 
   // Try every model; if some were only busy, wait once and try them all again.
   for (let round = 0; round < 2; round++) {

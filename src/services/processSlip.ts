@@ -9,12 +9,16 @@ import {
   addToIndex,
   classifyCandidate,
   initialStatus,
+  isScreenSized,
   normalizeReading,
+  slipNote,
   type DuplicateIndex,
 } from '../domain/slip';
+import { EMPTY_NAME_STATS } from '../domain/slipNames';
 import type { ItemStatus } from '../domain/scanQueue';
 import type { Transaction } from '../domain/types';
 import { DuplicateSlipError, type Repo } from '../data/repo';
+import { learnPayer, loadNames } from './myNames';
 import { detectSlipQr, prepareImage, READER_MESSAGES, readSlip, SlipReaderError } from './slips';
 
 export interface ProcessResult {
@@ -40,9 +44,14 @@ export async function processSlipImage(opts: {
   fallbackTimeMs: number;
   /** Called when the AI is busy and the reader waits before trying again. */
   onWait?: (seconds: number) => void;
+  /** The signed-in account: its own name on slips is learned to tell income from expense. */
+  userId?: string | null;
 }): Promise<ProcessResult> {
-  const { qr, scannerWorks } = await detectSlipQr(opts.uri, { width: opts.width, height: opts.height });
-  if (!qr && opts.requireQr) {
+  const size = { width: opts.width, height: opts.height };
+  const { qr, scannerWorks, otherQr } = await detectSlipQr(opts.uri, size);
+  // E-wallet slips (TrueMoney, ShopeePay...) carry their own kind of QR: a screen-sized
+  // picture with any QR code is read too, and the reader says whether it is a slip.
+  if (!qr && opts.requireQr && !(otherQr && isScreenSized(size))) {
     // Without a working scanner every photo would look like "not a slip": say so instead.
     if (!scannerWorks) throw new SlipReaderError('qr_unavailable', READER_MESSAGES.qr_unavailable);
     return { status: 'not_slip', message: 'ไม่พบ QR ของสลิป' };
@@ -51,12 +60,15 @@ export async function processSlipImage(opts: {
   const prepared = await prepareImage(opts.uri, opts.width);
   if (opts.index.hashes.has(prepared.hash)) return { status: 'duplicate', message: 'รูปนี้เคยบันทึกแล้ว' };
 
-  const reading = await readSlip(prepared.base64, opts.onWait);
+  const { reading, check } = await readSlip(prepared.base64, opts.onWait);
   if (!reading.isSlip) return { status: 'not_slip', message: 'ไม่ใช่สลิปโอนเงิน' };
 
-  const c = normalizeReading(reading, { qr, imageHash: prepared.hash });
+  const names = opts.userId ? await loadNames(opts.userId) : EMPTY_NAME_STATS;
+  const c = normalizeReading(reading, { qr, imageHash: prepared.hash, names });
+  // Most saved slips are the user's own payments: their payer line teaches the user's name.
+  if (opts.userId && reading.direction === 'expense' && reading.fromName) await learnPayer(opts.userId, reading.fromName);
   const outcome = classifyCandidate(c, { range: opts.range, index: opts.index });
-  const label = c.counterparty ?? 'รายการจากสลิป';
+  const label = c.ownTransfer ? 'โอนระหว่างบัญชีตัวเอง' : (c.counterparty ?? 'รายการจากสลิป');
   if (outcome === 'duplicate') return { status: 'duplicate', amountSatang: c.amountSatang, label, message: 'มีรายการนี้แล้ว' };
   if (outcome === 'out_of_range') return { status: 'out_of_range', amountSatang: c.amountSatang, label, message: 'วันที่บนสลิปเก่ากว่า 1 ปี จึงไม่บันทึกอัตโนมัติ' };
   if (c.amountSatang === null) return { status: 'failed', label, message: 'อ่านยอดเงินไม่ได้ ลองจดรายการนี้เอง' };
@@ -68,7 +80,7 @@ export async function processSlipImage(opts: {
       amountSatang: c.amountSatang,
       categoryKey: c.categoryKey,
       title: label,
-      note: c.bank ? `สลิปจาก ${c.bank}` : null,
+      note: slipNote(c, check),
       occurredAt: c.dayKey ? bkkToIso(c.dayKey, c.time) : new Date(opts.fallbackTimeMs).toISOString(),
       source: 'slip',
       status,

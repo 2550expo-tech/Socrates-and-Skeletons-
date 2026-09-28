@@ -143,6 +143,7 @@ export function useSlipScanner(initialRange: RangeKey = '1m') {
       onWait: (seconds) => {
         if (mounted.current) setWaiting(Date.now() + seconds * 1000);
       },
+      userId,
     });
     if (mounted.current) setWaiting(null);
     if (r.tx) {

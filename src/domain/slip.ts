@@ -15,7 +15,8 @@
  */
 import { suggestCategory } from './categories';
 import { addDays, bkkDayKey, isDayInRange, parseSlipDate, parseSlipTime } from './dates';
-import { parseBahtToSatang } from './money';
+import { formatBaht, parseBahtToSatang } from './money';
+import { decideDirection, EMPTY_NAME_STATS, type NameStats } from './slipNames';
 import type { Transaction, TxKind, TxStatus } from './types';
 
 export const CONFIDENCE_THRESHOLD = 0.8;
@@ -33,7 +34,17 @@ export interface SlipReading {
   counterparty: string | null;
   bank: string | null;
   reference: string | null;
+  /** Payer and receiver as printed (newer readers only). */
+  fromName?: string | null;
+  toName?: string | null;
   confidence: { amount: number; date: number; counterparty: number };
+}
+
+/** How the reader double-checked the slip (parse-slip reads every slip twice with two models). */
+export interface SlipCheck {
+  verified: boolean;
+  reads: number;
+  disagree: Partial<Record<'amount' | 'date' | 'direction' | 'counterparty', [string | null, string | null]>>;
 }
 
 export type ReviewFlag = 'amount' | 'date' | 'counterparty' | 'direction';
@@ -58,6 +69,8 @@ export interface SlipCandidate {
   /** Lowest of the three field confidences */
   confidence: number;
   flags: ReviewFlag[];
+  /** Payer and receiver are both the user (money moved between the user's own accounts). */
+  ownTransfer: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -118,6 +131,40 @@ export function parseSlipQr(data: string | null | undefined): SlipQr | null {
   const crc = top.get('91');
   const crcValid = !!crc && crc.toUpperCase() === crc16(data.slice(0, data.lastIndexOf('9104') + 4));
   return { sendingBank: bank, transRef: ref, crcValid };
+}
+
+/**
+ * Bank codes in the slip QR (the Bank of Thailand's 3-digit codes). The QR is
+ * made by the sending bank, so its code names the bank more reliably than
+ * reading the logo on the picture.
+ */
+export const BANK_BY_CODE: Record<string, string> = {
+  '002': 'Bangkok Bank',
+  '004': 'KBank',
+  '006': 'Krungthai',
+  '011': 'ttb',
+  '014': 'SCB',
+  '017': 'Citibank',
+  '020': 'Standard Chartered',
+  '022': 'CIMB Thai',
+  '024': 'UOB',
+  '025': 'Krungsri',
+  '030': 'GSB (ออมสิน)',
+  '031': 'HSBC',
+  '033': 'GHB (ธอส.)',
+  '034': 'BAAC (ธ.ก.ส.)',
+  '066': 'Islamic Bank',
+  '067': 'TISCO',
+  '069': 'KKP',
+  '070': 'ICBC Thai',
+  '071': 'Thai Credit',
+  '073': 'LH Bank',
+  '098': 'SME D Bank',
+};
+
+export function bankFromCode(code: string | null | undefined): string | null {
+  if (!code) return null;
+  return BANK_BY_CODE[code.padStart(3, '0').slice(-3)] ?? null;
 }
 
 /** The first code in a picture that is a Thai slip-verification QR. */
@@ -183,7 +230,7 @@ const clamp01 = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) ? M
 
 export function normalizeReading(
   reading: SlipReading,
-  extra: { qr?: SlipQr | null; imageHash?: string | null; now?: Date } = {},
+  extra: { qr?: SlipQr | null; imageHash?: string | null; now?: Date; names?: NameStats } = {},
 ): SlipCandidate {
   const now = extra.now ?? new Date();
   const today = bkkDayKey(now);
@@ -205,12 +252,12 @@ export function normalizeReading(
   const inFuture = !!dayKey && dayKey > addDays(today, 1);
   if (!dayKey || conf.date < CONFIDENCE_THRESHOLD || disagree || inFuture) flags.push('date');
 
-  const counterparty = reading.counterparty?.trim() || null;
+  // Income or expense: from the names on the slip once the user's own name is known.
+  const dir = decideDirection(reading, extra.names ?? EMPTY_NAME_STATS);
+  const kind: TxKind = dir.kind;
+  const counterparty = dir.counterparty?.trim() || null;
   if (!counterparty || conf.counterparty < CONFIDENCE_THRESHOLD) flags.push('counterparty');
-
-  let kind: TxKind = 'expense';
-  if (reading.direction === 'income') kind = 'income';
-  if (reading.direction === 'unknown') flags.push('direction');
+  if (dir.unsure) flags.push('direction');
 
   return {
     kind,
@@ -218,13 +265,53 @@ export function normalizeReading(
     dayKey: inFuture ? null : dayKey,
     time: parseSlipTime(reading.time),
     counterparty,
-    bank: reading.bank?.trim() || null,
+    // The QR's bank code first: it comes from the bank itself.
+    bank: bankFromCode(extra.qr?.sendingBank) ?? (reading.bank?.trim() || null),
     ref: normalizeRef(extra.qr?.transRef) ?? normalizeRef(reading.reference),
     imageHash: extra.imageHash ?? null,
     categoryKey: suggestCategory(counterparty, kind),
     confidence: Math.min(conf.amount, conf.date, conf.counterparty),
     flags,
+    ownTransfer: dir.ownTransfer,
   };
+}
+
+const bahtText = (v: string | null) => {
+  const satang = parseBahtToSatang(v);
+  return satang === null ? (v ?? 'อ่านไม่ได้') : formatBaht(satang);
+};
+
+/**
+ * The note saved with a slip: which bank made it, and how it was checked.
+ * When the two AI reads disagree, both values are written down so the user can
+ * pick the right one (the review screen offers the amounts as buttons).
+ */
+export function slipNote(c: Pick<SlipCandidate, 'bank' | 'ownTransfer'>, check?: SlipCheck | null): string | null {
+  const lines: string[] = [];
+  if (c.bank) lines.push(`สลิปจาก ${c.bank}`);
+  const d = check?.disagree ?? {};
+  const parts: string[] = [];
+  if (d.amount) parts.push(`ยอดเงิน ${bahtText(d.amount[0])} หรือ ${bahtText(d.amount[1])}`);
+  if (d.date) parts.push(`วันที่ ${d.date[0] ?? 'อ่านไม่ได้'} หรือ ${d.date[1] ?? 'อ่านไม่ได้'}`);
+  if (d.direction) parts.push('เงินเข้าหรือออก');
+  if (d.counterparty) parts.push(`ชื่อ ${d.counterparty[0] ?? 'อ่านไม่ได้'} หรือ ${d.counterparty[1] ?? 'อ่านไม่ได้'}`);
+  if (parts.length) lines.push(`${ALT_PREFIX} ${parts.join(' · ')}`);
+  else if (check && check.reads < 2) lines.push('อ่านได้รอบเดียว ช่วยตรวจกับสลิปอีกครั้ง');
+  else if (check && !check.verified) lines.push('AI 2 ตัวเห็นไม่ตรงกันว่าเป็นสลิปหรือไม่ ช่วยตรวจกับรูปอีกครั้ง');
+  if (c.ownTransfer) lines.push('ดูเหมือนโอนระหว่างบัญชีของคุณเอง ถ้าใช่ ลบรายการนี้ได้ (ไม่ใช่รายรับหรือรายจ่าย)');
+  return lines.length ? lines.join('\n') : null;
+}
+
+/** Start of the note line that lists the two readings. */
+export const ALT_PREFIX = 'AI อ่านได้ 2 แบบ:';
+
+/** The amounts offered in a note written by slipNote, in satang (for the review screen's buttons). */
+export function amountChoices(note: string | null | undefined): number[] {
+  const line = note?.split('\n').find((l) => l.startsWith(ALT_PREFIX));
+  const m = line?.match(/ยอดเงิน (.+?) หรือ (.+?)(?: ·|$)/);
+  if (!m) return [];
+  const out = [m[1], m[2]].map((v) => parseBahtToSatang(v.replace(/[^\d.,]/g, ''))).filter((v): v is number => v !== null);
+  return [...new Set(out)];
 }
 
 // ---------------------------------------------------------------------------

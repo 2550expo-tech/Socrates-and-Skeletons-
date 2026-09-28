@@ -1,11 +1,19 @@
-// FR-4: read one Thai bank slip image and return structured fields.
+// FR-4: read one Thai bank or e-wallet slip image and return structured fields.
+//
+// Accuracy: every slip is read twice, at the same time, by two different AI
+// models that do not see each other's answer (_shared/helpers.ts
+// mergeReadings). Where they agree the value is kept; where they disagree on the
+// amount, date, direction or who was paid, the slip waits for the user with
+// both values to choose from. A slip that could be read only once is never
+// counted without a look. The app then checks the reading against the slip's
+// QR code (bank and reference) on the phone.
 //
 // Privacy: the image is used only for this request. It is not written to the
 // database or to storage, and only images that already looked like slips on
 // the phone are sent here. The AI service (Claude or Gemini, see
 // _shared/common.ts) receives the image to read it.
 import { aiProvider, BusyError, callAI, corsHeaders, fail, json, NotConfiguredError, requireUser, takeQuota } from '../_shared/common.ts';
-import { normalizeReading, parseJsonText } from '../_shared/helpers.ts';
+import { mergeReadings, normalizeReading, parseJsonText, type SlipReadingOut } from '../_shared/helpers.ts';
 
 const DAILY_LIMIT = Number(Deno.env.get('SLIP_DAILY_LIMIT') ?? '300');
 const MAX_BASE64_CHARS = 6_000_000; // about 4.5 MB of image
@@ -16,16 +24,20 @@ const SCHEMA = {
   type: 'object',
   additionalProperties: false,
   required: [
-    'isSlip', 'direction', 'amount', 'dateText', 'dateIso', 'time',
-    'counterparty', 'bank', 'reference', 'confidence',
+    'isSlip', 'direction', 'amount', 'amountPrinted', 'fee', 'dateText', 'dateIso', 'time',
+    'fromName', 'toName', 'counterparty', 'bank', 'reference', 'confidence',
   ],
   properties: {
     isSlip: { type: 'boolean' },
     direction: { type: 'string', enum: ['expense', 'income', 'unknown'] },
     amount: nullableString,
+    amountPrinted: nullableString,
+    fee: nullableString,
     dateText: nullableString,
     dateIso: nullableString,
     time: nullableString,
+    fromName: nullableString,
+    toName: nullableString,
     counterparty: nullableString,
     bank: nullableString,
     reference: nullableString,
@@ -42,19 +54,42 @@ const SCHEMA = {
   },
 };
 
-const SYSTEM = `You read images from a Thai user's phone gallery and extract bank transfer / payment slip data for a personal finance app.
+const SYSTEM = `You read images from a Thai user's phone gallery and extract transfer / payment slip data for a personal finance app. Accuracy matters more than anything: a wrong amount or date is worse than no answer.
 
-Return JSON only, matching the schema. Rules:
-- isSlip: true only for a completed transfer or payment confirmation from a bank or e-wallet app (e.g. "โอนเงินสำเร็จ", "ชำระเงินสำเร็จ", "Transfer successful"). Screenshots of chats, bills not yet paid, QR codes to pay, and other photos are false. If false, set every other string to null, direction "unknown" and all confidences 0.
-- amount: the transferred amount only, digits with a dot for decimals (e.g. "1250.00"). Never the fee and never an account balance.
-- dateText: the date exactly as printed (e.g. "27 ก.ย. 69"). dateIso: the same date as YYYY-MM-DD in the Gregorian calendar. Thai slips print Buddhist Era years: 2569 = 2026, and a 2-digit "69" means 2569 = 2026.
-- time: HH:MM (24h) as printed, or null.
-- direction: "expense" when the slip shows money leaving the payer's account (the normal case for a slip the payer saved); "income" when the image is a receive notification ("ได้รับเงิน", "รับเงินสำเร็จ"); otherwise "unknown".
-- counterparty: for an expense the receiver (shop or person name as printed); for income the sender. Do not include account numbers.
-- bank: the bank or wallet that produced the slip (e.g. "KBank", "SCB", "Krungthai", "TrueMoney").
-- reference: the transaction reference number (เลขที่รายการ / รหัสอ้างอิง / Ref), digits and letters only.
-- confidence: for amount, date and counterparty, your certainty from 0 to 1 that the value is exactly right. Use below 0.8 if any character is blurred, cropped, covered, or ambiguous. Use 0 when the value is null.
-- Never guess. If you cannot read a field, return null for it.`;
+Return JSON only, matching the schema.
+
+isSlip is true only for a COMPLETED transfer, payment, top-up or withdrawal confirmation made by any Thai bank or e-wallet app, for example: K PLUS or MAKE by KBank (Kasikorn), SCB EASY, Krungthai NEXT or เป๋าตัง, Bualuang mBanking (Bangkok Bank), KMA (Krungsri), ttb touch, MyMo (GSB ออมสิน), BAAC A-Mobile (ธ.ก.ส.), UOB TMRW, CIMB THAI, KKP Mobile, LH Bank, TISCO, GHB (ธอส.), ICBC, Thai Credit, LINE BK, TrueMoney Wallet, ShopeePay, Rabbit LINE Pay, dime!, including PromptPay (พร้อมเพย์) transfers and bill payments. Typical words: "โอนเงินสำเร็จ", "ชำระเงินสำเร็จ", "ทำรายการสำเร็จ", "รายการสำเร็จ", "เติมเงินสำเร็จ", "จ่ายบิลสำเร็จ", "Transfer successful", "Payment successful", "Completed".
+isSlip is false for: chats, bills or invoices not yet paid, a QR code to pay (PromptPay QR), balance screens, statements with many rows, failed or pending transfers ("ไม่สำเร็จ", "รอดำเนินการ", "Failed"), and any other photo. When false, set every other string to null, direction "unknown" and all confidences 0.
+
+Fields:
+- amount: the amount transferred or paid, digits with a dot for decimals (e.g. "1250.00"). It is labelled "จำนวนเงิน", "จำนวน", "ยอดเงิน", "ยอดชำระ", "Amount", or printed large in the middle. Never the fee ("ค่าธรรมเนียม", "Fee"), never a balance ("ยอดเงินคงเหลือ", "ยอดคงเหลือ", "Balance"), never a reference, phone or account number.
+- amountPrinted: the same amount exactly as printed, with its commas and decimals (e.g. "1,250.00"). It must be the same number as amount.
+- fee: the fee as digits (e.g. "0.00") when printed, else null.
+- dateText: the date exactly as printed (e.g. "27 ก.ย. 69", "27 Sep 2026", "27/09/2569").
+- dateIso: that date as YYYY-MM-DD in the Gregorian calendar. Thai slips print Buddhist Era years: 2569 = 2026, and a 2-digit "69" means 2569 = 2026. English slips print Gregorian years. Thai months: ม.ค. 01, ก.พ. 02, มี.ค. 03, เม.ย. 04, พ.ค. 05, มิ.ย. 06, ก.ค. 07, ส.ค. 08, ก.ย. 09, ต.ค. 10, พ.ย. 11, ธ.ค. 12.
+- time: HH:MM (24h) as printed ("14:05 น." gives "14:05"), or null.
+- fromName: the payer as printed ("จาก", "From", "ผู้โอน"), usually at the top. toName: the receiver, shop or biller as printed ("ไปยัง", "ไปที่", "To", "ผู้รับ"). Keep masked parts as printed (e.g. "นาย สมชาย ใ***"). Never include account numbers.
+- direction: "expense" for a slip that shows money sent or paid (the normal slip the payer's app makes); "income" only when the image itself says money was received ("ได้รับเงิน", "รับเงินสำเร็จ", "เงินเข้า", "You received"); otherwise "unknown".
+- counterparty: for an expense the receiver (toName), for income the sender (fromName).
+- bank: the bank or wallet app that made the slip, from its logo or name at the top, e.g. "KBank", "SCB", "Krungthai", "Bangkok Bank", "Krungsri", "ttb", "GSB", "BAAC", "UOB", "CIMB", "KKP", "LH Bank", "TrueMoney", "ShopeePay".
+- reference: the transaction reference ("เลขที่รายการ", "รหัสอ้างอิง", "หมายเลขอ้างอิง", "Ref No.", "Transaction ID"), letters and digits only.
+- confidence: for amount, date and counterparty, your certainty from 0 to 1 that the value is exactly right, character for character. Use below 0.8 if any character is blurred, cropped, covered, small, or could be read two ways (1 or 7, 3 or 8, 5 or 6, 0 or 8, comma or dot). Use 0 when the value is null.
+- Never guess, and never compute a value that is not printed. If a field cannot be read, return null.`;
+
+async function readOnce(variant: 'primary' | 'verify', image: string, mediaType: string): Promise<SlipReadingOut> {
+  const text = await callAI({
+    task: 'slip',
+    variant,
+    system: SYSTEM,
+    maxTokens: 900,
+    schema: SCHEMA,
+    content: [
+      { type: 'image', mediaType, data: image },
+      { type: 'text', text: 'Extract the slip fields from this image.' },
+    ],
+  });
+  return normalizeReading(parseJsonText(text));
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -83,17 +118,21 @@ Deno.serve(async (req) => {
     if (!(await takeQuota(userId, 'slip', DAILY_LIMIT))) {
       return fail('quota', 'Daily slip limit reached, try again tomorrow', 429);
     }
-    const text = await callAI({
-      task: 'slip',
-      system: SYSTEM,
-      maxTokens: 600,
-      schema: SCHEMA,
-      content: [
-        { type: 'image', mediaType, data: image },
-        { type: 'text', text: 'Extract the slip fields from this image.' },
-      ],
-    });
-    return json({ reading: normalizeReading(parseJsonText(text)) });
+    // Two independent reads at the same time (one slip = one use of the daily limit).
+    const [first, second] = await Promise.allSettled([readOnce('primary', image, mediaType), readOnce('verify', image, mediaType)]);
+    const a = first.status === 'fulfilled' ? first.value : null;
+    const b = second.status === 'fulfilled' ? second.value : null;
+    if (!a && !b) {
+      const reasons = [first, second].map((r) => (r as PromiseRejectedResult).reason);
+      throw reasons.find((r) => r instanceof NotConfiguredError) ?? reasons.find((r) => r instanceof BusyError) ?? reasons[0];
+    }
+    if (!a || !b) {
+      const why = (!a ? first : second) as PromiseRejectedResult;
+      console.warn(JSON.stringify({ slip: 'single_read', failed: !a ? 'primary' : 'verify', error: String(why.reason?.message ?? why.reason).slice(0, 200) }));
+    }
+    const { reading, check } = mergeReadings(a, b);
+    console.log(JSON.stringify({ slip: 'checked', reads: check.reads, verified: check.verified, disagree: Object.keys(check.disagree) }));
+    return json({ reading, check });
   } catch (e) {
     if (e instanceof NotConfiguredError) {
       console.error('parse-slip: AI key missing or refused', e.message);
