@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../data/AppProvider';
+import { VOICE_NOTE } from '../domain/achievements';
 import { BUDDY_NAME } from '../domain/buddy';
 import { getCategory } from '../domain/categories';
 import { addDays, bkkDayKey, bkkTime, bkkToIso, relativeDayLabel } from '../domain/dates';
@@ -146,7 +147,7 @@ export default function VoiceEntry() {
           amountSatang: item.amountSatang,
           categoryKey: item.categoryKey,
           title: item.title,
-          note: 'จดด้วยเสียง',
+          note: VOICE_NOTE,
           occurredAt: bkkToIso(addDays(today || bkkDayKey(new Date()), item.dayOffset), time),
           source: 'manual',
           status: 'confirmed',

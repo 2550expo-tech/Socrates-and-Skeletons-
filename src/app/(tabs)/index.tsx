@@ -33,12 +33,14 @@ import {
   Segmented,
   T,
 } from '../../ui/components';
+import { useAchievements } from '../../services/useAchievements';
 import { AutoScanBanner } from '../../ui/AutoScanBanner';
 import { Buddy, BuddySays } from '../../ui/Buddy';
-import { Aurora, PulseRing, Reveal, Shine, Sparkles, usePressSpring } from '../../ui/effects';
+import { Aurora, PulseRing, Reveal, Shine, Sparkles, useCelebrate, usePressSpring } from '../../ui/effects';
+import { Medal } from '../../ui/Medal';
 import { useCountUp, useReduceMotion } from '../../ui/motion';
 import { TxRow } from '../../ui/TxRow';
-import { palette, radius, space, useTheme } from '../../ui/theme';
+import { fonts, palette, radius, space, useTheme } from '../../ui/theme';
 
 const RUNWAY_BADGE = {
   healthy: { label: 'สบาย ๆ', tone: 'good' },
@@ -81,6 +83,42 @@ function MicButton() {
   );
 }
 
+/** Badges already celebrated in this session (the home screen can mount again). */
+const celebrated = new Set<string>();
+
+/** The recording streak: a flame and the number of days; opens the achievements. */
+function StreakPill({ days, today }: { days: number; today: boolean }) {
+  const theme = useTheme();
+  const press = usePressSpring(0.92);
+  return (
+    <Animated.View style={{ transform: [{ scale: press.scale }] }}>
+      <Pressable
+        onPress={() => router.push('/achievements')}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
+        accessibilityRole="button"
+        accessibilityLabel={`จดต่อเนื่อง ${days} วัน ดูความสำเร็จ`}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+          paddingHorizontal: 12,
+          height: 36,
+          borderRadius: 18,
+          backgroundColor: theme.dark ? 'rgba(226,182,74,0.14)' : theme.accentSoft,
+          borderWidth: 1,
+          borderColor: today ? theme.accent : 'transparent',
+        }}
+      >
+        <Ionicons name="flame" size={18} color={today ? '#E07B2E' : theme.inkFaint} />
+        <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi }}>
+          {days}
+        </T>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 export default function Home() {
   const theme = useTheme();
   const { profile, txs, repo, refresh, refreshing, loadError, today, newDay } = useApp();
@@ -101,6 +139,15 @@ export default function Home() {
   const readyDrafts = drafts.filter((d) => d.reviewFlags.length === 0).length;
   const badge = RUNWAY_BADGE[runway.status];
   const reduce = useReduceMotion();
+  const ach = useAchievements();
+  const celebrate = useCelebrate();
+  const freshIds = ach.fresh.map((b) => b.id).join(',');
+  useEffect(() => {
+    const ids = freshIds ? freshIds.split(',') : [];
+    if (!ids.some((id) => !celebrated.has(id))) return;
+    ids.forEach((id) => celebrated.add(id));
+    celebrate();
+  }, [freshIds, celebrate]);
   // Parallax: while scrolling, the hero card eases back and the tree drifts up a little.
   const [scrollY] = useState(() => new Animated.Value(0));
   const heroScale = reduce ? 1 : scrollY.interpolate({ inputRange: [-120, 0, 260], outputRange: [1.05, 1, 0.95], extrapolate: 'clamp' });
@@ -145,7 +192,10 @@ export default function Home() {
           <T v="small">{formatThaiDayLong(today)}</T>
           <T v="h2">สวัสดี {profile?.displayName || ''}</T>
         </View>
-        <IconButton icon="settings-outline" label="ตั้งค่า" onPress={() => router.push('/settings')} />
+        <Row gap={space.xs}>
+          <StreakPill days={ach.streak.days} today={ach.streak.today} />
+          <IconButton icon="settings-outline" label="ตั้งค่า" onPress={() => router.push('/settings')} />
+        </Row>
       </Row>
 
       <Reveal>
@@ -153,6 +203,24 @@ export default function Home() {
           {(said ?? buddy).text}
         </BuddySays>
       </Reveal>
+
+      {ach.fresh.length > 0 ? (
+        <Reveal zoom>
+          <Card style={{ borderColor: theme.accent, borderWidth: 1.5, paddingVertical: space.md }}>
+            <Row gap={space.md}>
+              <Medal badge={ach.fresh[0]} size={52} shine />
+              <View style={{ flex: 1, gap: 2 }}>
+                <T v="h3">{ach.fresh.length > 1 ? `ได้เหรียญใหม่ ${ach.fresh.length} เหรียญ!` : 'ได้เหรียญใหม่!'}</T>
+                <T v="small">{ach.fresh.map((b) => b.title).join(' · ')}</T>
+                <Row gap={space.sm} style={{ marginTop: space.xs }}>
+                  <Button label="ดูเหรียญ" small kind="gold" icon="ribbon" onPress={() => router.push('/achievements')} />
+                  <Button label="ไว้ทีหลัง" small kind="ghost" onPress={() => ach.markSeen(ach.fresh.map((b) => b.id))} />
+                </Row>
+              </View>
+            </Row>
+          </Card>
+        </Reveal>
+      ) : null}
 
       {repo?.mode === 'demo' ? (
         <Card tone="alt" style={{ paddingVertical: space.md }}>

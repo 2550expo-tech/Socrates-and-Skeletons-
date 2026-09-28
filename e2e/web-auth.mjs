@@ -731,6 +731,16 @@ try {
       return Math.round(Number(label.match(/฿([\d,]+\.\d{2})/)[1].replace(/,/g, '')) * 100);
     };
     const start = await balance();
+    // Streak and badges: the sample data has already earned some.
+    check('Home: the recording streak is shown', await button(page, 'จดต่อเนื่อง').isVisible());
+    check('Home: earned badges are announced', await visible(page, 'ได้เหรียญใหม่'));
+    await button(page, 'ดูเหรียญ').click();
+    const achievements = (await visible(page, 'เหรียญของฉัน')) && (await visible(page, 'สถิติสูงสุด'));
+    await page.waitForTimeout(1500);
+    await shot(page, '24-achievements');
+    check('Achievements: streak of the last 14 days and the badge collection', achievements);
+    await button(page, 'กลับ').click();
+    check('Seen badges are not announced again', await gone(page, 'ได้เหรียญใหม่'));
     // The companion and the money tree answer when tapped.
     await button(page, 'แตะน้องกล้าเพื่อฟังเคล็ดลับ').click();
     check('Tapping the companion: it gives a tip', await visible(page, 'เก็บสลิปไว้ในเครื่องได้เลย'));
@@ -755,6 +765,7 @@ try {
     check('Voice: saved with a confirmation', await visible(page, 'บันทึก 3 รายการแล้ว'));
     await visible(page, 'ยอดคงเหลือ', 8000);
     check('Voice: the balance follows (−฿25 −฿65 +฿500)', (await balance()) === start - 2_500 - 6_500 + 50_000);
+    check('First voice entry earns the "พูดแล้วจด" badge', (await visible(page, 'ได้เหรียญใหม่')) && (await visible(page, 'พูดแล้วจด')));
     await ctx.close();
   }
 } catch (e) {
