@@ -768,6 +768,14 @@ try {
     // Streak and badges: the sample data has already earned some.
     check('Home: the recording streak is shown', await button(page, 'จดต่อเนื่อง').isVisible());
     check('Home: earned badges are announced', await visible(page, 'ได้เหรียญใหม่'));
+    // "มีอะไรใหม่": one card on home opens the list of new features, then goes away.
+    await page.getByText('มีอะไรใหม่ในอัปเดตนี้').first().click();
+    const news = (await visible(page, 'ตั้งเป้าของที่อยากได้')) && (await visible(page, 'อ่านสลิปแม่นขึ้น ทุกธนาคาร'));
+    await page.waitForTimeout(900);
+    await shot(page, '30-whats-new');
+    check('What\'s new: the new features, each with a way to try it', news);
+    await button(page, 'ปิด').click();
+    check('What\'s new: the card is not shown again', await gone(page, 'มีอะไรใหม่ในอัปเดตนี้'));
     await button(page, 'ดูเหรียญ').click();
     const achievements = (await visible(page, 'เหรียญของฉัน')) && (await visible(page, 'สถิติสูงสุด'));
     await page.waitForTimeout(1500);

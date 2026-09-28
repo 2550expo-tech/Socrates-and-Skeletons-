@@ -36,6 +36,7 @@ import {
   T,
 } from '../../ui/components';
 import { useAchievements } from '../../services/useAchievements';
+import { markWhatsNewSeen, useWhatsNewPending } from '../../services/whatsNew';
 import { AutoScanBanner } from '../../ui/AutoScanBanner';
 import { Buddy, BuddySays } from '../../ui/Buddy';
 import { Aurora, PulseRing, Reveal, Shine, Sparkles, useCelebrate, usePressSpring } from '../../ui/effects';
@@ -144,6 +145,7 @@ export default function Home() {
   const reduce = useReduceMotion();
   const recapMonth = useMemo(() => recapToOffer(txs, today), [txs, today]);
   const ach = useAchievements();
+  const whatsNew = useWhatsNewPending();
   const celebrate = useCelebrate();
   const freshIds = ach.fresh.map((b) => b.id).join(',');
   useEffect(() => {
@@ -207,6 +209,23 @@ export default function Home() {
           {(said ?? buddy).text}
         </BuddySays>
       </Reveal>
+
+      {whatsNew && txs.length > 0 ? (
+        <Reveal zoom>
+          <Card onPress={() => router.push('/whatsnew')} style={{ paddingVertical: space.md, borderColor: theme.accent, borderWidth: 1.5 }}>
+            <Row gap={space.md}>
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: theme.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="gift" size={22} color={theme.dark ? palette.goldBright : '#7A5A0E'} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <T v="h3">มีอะไรใหม่ในอัปเดตนี้</T>
+                <T v="small">พูดจด, อ่านสลิปแม่นขึ้น, กระปุกออม, สรุปเดือน และอีกเพียบ</T>
+              </View>
+              <IconButton icon="close" label="ไม่ต้องแสดงอีก" onPress={() => markWhatsNewSeen()} />
+            </Row>
+          </Card>
+        </Reveal>
+      ) : null}
 
       {ach.fresh.length > 0 ? (
         <Reveal zoom>
