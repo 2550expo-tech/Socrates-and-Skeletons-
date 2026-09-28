@@ -8,7 +8,7 @@
  */
 import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Animated, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp, useMoney } from '../../data/AppProvider';
 import { buildCoachContext, buildInsights, personaFor, PERSONAS } from '../../domain/insights';
@@ -18,6 +18,7 @@ import type { CoachTone } from '../../domain/types';
 import { askCoach, CoachError } from '../../services/coach';
 import { Buddy, BuddySays } from '../../ui/Buddy';
 import { Card, Chip, Ionicons, Row, T } from '../../ui/components';
+import { Reveal, TypingDots, Typewriter, usePressSpring } from '../../ui/effects';
 import { useToast } from '../../ui/feedback';
 import { fonts, radius, space, useTheme } from '../../ui/theme';
 
@@ -123,36 +124,18 @@ export default function Coach() {
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
-            {PERSONAS.map((p) => {
-              const active = p.tone === persona.tone;
-              return (
-                <Pressable
-                  key={p.tone}
-                  onPress={() => setTone(p.tone)}
-                  accessibilityRole="radio"
-                  aria-selected={active}
-                  style={{
-                    width: 150,
-                    padding: space.md,
-                    borderRadius: radius.lg,
-                    borderWidth: 1.5,
-                    borderColor: active ? theme.accent : theme.line,
-                    backgroundColor: active ? theme.accentSoft : theme.surface,
-                    gap: 4,
-                  }}
-                >
-                  <T v="h2">{p.glyph}</T>
-                  <T v="body" style={{ fontFamily: fonts.sansSemi }}>{p.name}</T>
-                  <T v="micro">{p.tagline}</T>
-                </Pressable>
-              );
-            })}
+            {PERSONAS.map((p, i) => (
+              <Reveal key={p.tone} index={i} from={10}>
+                <PersonaCard persona={p} active={p.tone === persona.tone} onPress={() => setTone(p.tone)} />
+              </Reveal>
+            ))}
           </ScrollView>
 
           <View style={{ gap: space.sm }}>
             <T v="h3">สิ่งที่ควรรู้ตอนนี้</T>
             {insights.map((i, n) => (
-              <Card key={n} style={{ borderLeftWidth: 0 }}>
+              <Reveal key={n} index={n + 1}>
+              <Card style={{ borderLeftWidth: 0 }}>
                 <Row align="flex-start" gap={space.md}>
                   <Ionicons
                     name={i.severity === 'watch' ? 'alert-circle-outline' : i.severity === 'good' ? 'checkmark-circle-outline' : 'information-circle-outline'}
@@ -165,6 +148,7 @@ export default function Coach() {
                   </View>
                 </Row>
               </Card>
+              </Reveal>
             ))}
           </View>
 
@@ -176,35 +160,68 @@ export default function Coach() {
                 <T v="micro">โค้ชตอบจากตัวเลขที่คุณยืนยันแล้วเท่านั้น ไม่เห็นรูปสลิปหรือชื่อคนที่คุณโอนให้</T>
               </>
             ) : null}
-            {msgs.map((m) => (
-              <Row key={m.id} gap={6} align="flex-end" style={{ alignSelf: m.from === 'me' ? 'flex-end' : 'flex-start', maxWidth: '92%' }}>
-              {m.from === 'coach' ? <Buddy mood={m.error ? 'worried' : 'happy'} size={34} still /> : null}
-              <View
-                style={{
-                  flexShrink: 1,
-                  backgroundColor: m.from === 'me' ? theme.primary : m.error ? theme.surfaceAlt : theme.surface,
-                  borderRadius: radius.lg,
-                  borderBottomRightRadius: m.from === 'me' ? 6 : radius.lg,
-                  borderBottomLeftRadius: m.from === 'coach' ? 6 : radius.lg,
-                  borderWidth: m.from === 'coach' ? 1 : 0,
-                  borderColor: theme.line,
-                  padding: space.md,
-                  gap: 4,
-                }}
-              >
-                {m.from === 'coach' && !m.error ? <T v="micro">{persona.glyph} {persona.name} · ตอบโดย AI</T> : null}
-                <T v="body" color={m.from === 'me' ? theme.onPrimary : m.error ? theme.inkSoft : theme.ink} selectable>
-                  {m.text}
-                </T>
-              </View>
-              </Row>
-            ))}
+            {msgs.map((m, n) => {
+              const color = m.from === 'me' ? theme.onPrimary : m.error ? theme.inkSoft : theme.ink;
+              // The newest answer writes itself out; earlier ones are shown whole.
+              const write = m.from === 'coach' && !m.error && n === msgs.length - 1;
+              return (
+                <Reveal key={m.id} from={12} zoom style={{ alignSelf: m.from === 'me' ? 'flex-end' : 'flex-start', maxWidth: '92%' }}>
+                  <Row gap={6} align="flex-end">
+                    {m.from === 'coach' ? <Buddy mood={m.error ? 'worried' : 'happy'} size={34} still /> : null}
+                    <View
+                      style={{
+                        flexShrink: 1,
+                        backgroundColor: m.from === 'me' ? theme.primary : m.error ? theme.surfaceAlt : theme.surface,
+                        borderRadius: radius.lg,
+                        borderBottomRightRadius: m.from === 'me' ? 6 : radius.lg,
+                        borderBottomLeftRadius: m.from === 'coach' ? 6 : radius.lg,
+                        borderWidth: m.from === 'coach' ? 1 : 0,
+                        borderColor: theme.line,
+                        padding: space.md,
+                        gap: 4,
+                      }}
+                    >
+                      {m.from === 'coach' && !m.error ? <T v="micro">{persona.glyph} {persona.name} · ตอบโดย AI</T> : null}
+                      {write ? (
+                        <Typewriter text={m.text}>
+                          {(shown) => (
+                            <T v="body" color={color} selectable>
+                              {shown}
+                            </T>
+                          )}
+                        </Typewriter>
+                      ) : (
+                        <T v="body" color={color} selectable>
+                          {m.text}
+                        </T>
+                      )}
+                    </View>
+                  </Row>
+                </Reveal>
+              );
+            })}
             {busy ? (
-              <Row gap={space.sm}>
-                <Buddy mood="thinking" size={34} />
-                <ActivityIndicator color={theme.primary} />
-                <T v="small">{persona.name}กำลังดูตัวเลขของคุณ…</T>
-              </Row>
+              <Reveal from={10}>
+                <Row gap={6} align="flex-end">
+                  <Buddy mood="thinking" size={34} />
+                  <View
+                    style={{
+                      backgroundColor: theme.surface,
+                      borderRadius: radius.lg,
+                      borderBottomLeftRadius: 6,
+                      borderWidth: 1,
+                      borderColor: theme.line,
+                      paddingHorizontal: space.md,
+                      paddingVertical: space.sm,
+                      gap: 2,
+                    }}
+                    accessibilityLabel={`${persona.name}กำลังดูตัวเลขของคุณ`}
+                  >
+                    <TypingDots color={theme.primary} />
+                    <T v="micro">{persona.name}กำลังดูตัวเลขของคุณ…</T>
+                  </View>
+                </Row>
+              </Reveal>
             ) : null}
           </View>
 
@@ -259,5 +276,48 @@ export default function Coach() {
         </Row>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+/** A persona to pick; the chosen one grows a little and glows gold. */
+function PersonaCard({
+  persona,
+  active,
+  onPress,
+}: {
+  persona: (typeof PERSONAS)[number];
+  active: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  const press = usePressSpring(0.94);
+  return (
+    <Animated.View style={{ transform: [{ scale: press.scale }] }}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
+        accessibilityRole="radio"
+        aria-selected={active}
+        style={{
+          width: 150,
+          padding: space.md,
+          borderRadius: radius.lg,
+          borderWidth: 1.5,
+          borderColor: active ? theme.accent : theme.line,
+          backgroundColor: active ? theme.accentSoft : theme.surface,
+          gap: 4,
+          shadowColor: theme.accent,
+          shadowOpacity: active ? 0.35 : 0,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 3 },
+          elevation: active ? 4 : 0,
+        }}
+      >
+        <T v="h2">{persona.glyph}</T>
+        <T v="body" style={{ fontFamily: fonts.sansSemi }}>{persona.name}</T>
+        <T v="micro">{persona.tagline}</T>
+      </Pressable>
+    </Animated.View>
   );
 }

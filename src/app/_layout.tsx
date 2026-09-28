@@ -15,6 +15,7 @@ import { NotoSerifThai_600SemiBold, NotoSerifThai_700Bold } from '@expo-google-f
 import { AppProvider, useApp } from '../data/AppProvider';
 import { AutoScanProvider } from '../services/AutoScanProvider';
 import { AuthNoticeHost } from '../ui/AuthNotice';
+import { CelebrationProvider } from '../ui/effects';
 import { ToastProvider } from '../ui/feedback';
 import { LaunchIntro } from '../ui/LaunchIntro';
 import { UpdateBanner } from '../ui/UpdateBanner';
@@ -35,13 +36,15 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <WebFrame>
-        <AppProvider>
-          <ToastProvider>
-            <AutoScanProvider>
-              <Navigator ready={fontsLoaded || !!fontError} />
-            </AutoScanProvider>
-          </ToastProvider>
-        </AppProvider>
+        <CelebrationProvider>
+          <AppProvider>
+            <ToastProvider>
+              <AutoScanProvider>
+                <Navigator ready={fontsLoaded || !!fontError} />
+              </AutoScanProvider>
+            </ToastProvider>
+          </AppProvider>
+        </CelebrationProvider>
       </WebFrame>
     </SafeAreaProvider>
   );
@@ -95,17 +98,18 @@ function Screens({ signedIn, needsOnboarding, inApp }: { signedIn: boolean; need
   const theme = useTheme();
   return (
     <>
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.bg } }}>
+      {/* Screens slide in from the side; scanning and adding a transaction rise from the bottom. */}
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.bg }, animation: 'slide_from_right' }}>
         <Stack.Protected guard={!signedIn}>
-          <Stack.Screen name="welcome" />
+          <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
         </Stack.Protected>
         <Stack.Protected guard={needsOnboarding}>
-          <Stack.Screen name="onboarding" />
+          <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
         </Stack.Protected>
         <Stack.Protected guard={inApp}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="transaction" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="scan" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+          <Stack.Screen name="transaction" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="scan" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
           <Stack.Screen name="drafts" />
           <Stack.Screen name="settings" />
         </Stack.Protected>

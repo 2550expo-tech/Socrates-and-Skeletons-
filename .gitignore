@@ -44,3 +44,6 @@ yarn-error.*
 .env
 node_modules
 /e2e-shots
+
+# demo videos made by e2e/demo-video.mjs
+demo-video/

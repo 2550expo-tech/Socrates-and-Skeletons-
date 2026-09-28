@@ -3,9 +3,10 @@
  * Order of information: how much I have -> how long it lasts -> what to do today
  * -> where the money went.
  */
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { RefreshControl, View } from 'react-native';
+import { Animated, RefreshControl, View } from 'react-native';
 import { useApp, useMoney } from '../../data/AppProvider';
 import { buddyLine, spentOnDay } from '../../domain/buddy';
 import { addDays, formatRangeSpan, formatThaiDay, formatThaiDayLong, RANGE_LABEL, RANGE_ORDER } from '../../domain/dates';
@@ -33,6 +34,8 @@ import {
 } from '../../ui/components';
 import { AutoScanBanner } from '../../ui/AutoScanBanner';
 import { Buddy, BuddySays } from '../../ui/Buddy';
+import { Aurora, Reveal, Shine, Sparkles } from '../../ui/effects';
+import { useCountUp, useReduceMotion } from '../../ui/motion';
 import { TxRow } from '../../ui/TxRow';
 import { palette, radius, space, useTheme } from '../../ui/theme';
 
@@ -63,6 +66,12 @@ export default function Home() {
   const spentMonth = monthExpense(txs);
   const readyDrafts = drafts.filter((d) => d.reviewFlags.length === 0).length;
   const badge = RUNWAY_BADGE[runway.status];
+  const reduce = useReduceMotion();
+  // Parallax: while scrolling, the hero card eases back and the tree drifts up a little.
+  const [scrollY] = useState(() => new Animated.Value(0));
+  const heroScale = reduce ? 1 : scrollY.interpolate({ inputRange: [-120, 0, 260], outputRange: [1.05, 1, 0.95], extrapolate: 'clamp' });
+  const treeLift = reduce ? 0 : scrollY.interpolate({ inputRange: [-120, 0, 260], outputRange: [10, 0, -22], extrapolate: 'clamp' });
+  const daysShown = useCountUp(runway.days ?? 0, !reduce && runway.days !== null && !runway.capped, 900);
   const buddy = buddyLine({
     status: runway.status,
     days: runway.days,
@@ -75,7 +84,7 @@ export default function Home() {
   });
 
   return (
-    <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.primary} />}>
+    <Screen scrollY={scrollY} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.primary} />}>
       <Row justify="space-between" style={{ paddingTop: space.sm }}>
         <View style={{ flex: 1 }}>
           <T v="small">{formatThaiDayLong(today)}</T>
@@ -84,7 +93,9 @@ export default function Home() {
         <IconButton icon="settings-outline" label="ตั้งค่า" onPress={() => router.push('/settings')} />
       </Row>
 
-      <BuddySays mood={buddy.mood}>{buddy.text}</BuddySays>
+      <Reveal>
+        <BuddySays mood={buddy.mood}>{buddy.text}</BuddySays>
+      </Reveal>
 
       {repo?.mode === 'demo' ? (
         <Card tone="alt" style={{ paddingVertical: space.md }}>
@@ -105,42 +116,77 @@ export default function Home() {
       <AutoScanBanner />
 
       {/* Hero: balance + runway (the one place gold is used for the number that matters) */}
-      <View
-        style={{ backgroundColor: palette.forest, borderRadius: radius.xl, overflow: 'hidden', padding: space.xl, gap: space.md }}
-        accessible
-        accessibilityLabel={`ยอดคงเหลือ ${formatBaht(balance)} ${runway.days !== null ? `เงินพอใช้อีก ${runway.days} วัน` : ''}`}
-      >
-        <ContourLines width={420} height={260} color={palette.goldBright} />
-        <Row align="flex-start" justify="space-between">
-          <View style={{ flex: 1, gap: 2 }}>
-            <T v="label" color="#B9CEC2">ยอดคงเหลือ</T>
-            <Money satang={balance} size="display" color="#F4F1E6" countUp />
-            <View style={{ marginTop: space.sm }}>
-              <Badge label={badge.label} tone={badge.tone} onDark />
-            </View>
-          </View>
-          <MoneyTree health={treeHealth(runway.status, runway.days)} size={104} trunk="#E8E1CC" leaf={palette.goldBright} bare="#6F9483" />
-        </Row>
-        <View style={{ height: 1, backgroundColor: 'rgba(244,241,230,0.15)' }} />
-        <Row justify="space-between" align="flex-end">
-          <View style={{ flex: 1 }}>
-            <T v="small" color="#B9CEC2">เงินพอใช้อีก</T>
-            {runway.days !== null && runway.status !== 'below_floor' ? (
-              <T v="h1" color={palette.goldBright}>
-                {runway.capped ? '365+ ' : `${runway.days} `}
-                <T v="body" color="#F4F1E6">วัน · ถึง {formatThaiDay(runway.depletionDay!, { year: false })}</T>
-              </T>
-            ) : runway.status === 'below_floor' ? (
-              <T v="h3" color="#F4F1E6">แตะเส้นเงินสำรองแล้ว</T>
-            ) : (
-              <T v="h3" color="#F4F1E6">ยังคำนวณไม่ได้</T>
-            )}
-          </View>
-          <Button label="ดูรายละเอียด" small kind="onDark" icon="chevron-forward" onPress={() => router.navigate('/runway')} />
-        </Row>
-      </View>
+      <Reveal index={1} zoom>
+        <Animated.View style={{ transform: [{ scale: heroScale }] }}>
+        <View
+          style={{
+            borderRadius: radius.xl,
+            overflow: 'hidden',
+            shadowColor: palette.forestDeep,
+            shadowOpacity: theme.dark ? 0 : 0.28,
+            shadowRadius: 18,
+            shadowOffset: { width: 0, height: 10 },
+            elevation: 8,
+          }}
+          accessible
+          accessibilityLabel={`ยอดคงเหลือ ${formatBaht(balance)} ${runway.days !== null ? `เงินพอใช้อีก ${runway.days} วัน` : ''}`}
+        >
+          <LinearGradient
+            colors={[theme.dark ? '#124232' : '#135A40', palette.forest, palette.forestDeep]}
+            locations={[0, 0.55, 1]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{ padding: space.xl, gap: space.md }}
+          >
+            <Aurora />
+            <ContourLines width={420} height={260} color={palette.goldBright} />
+            <Sparkles trigger={balance} count={9} area={{ top: 4, bottom: 55 }} />
+            <Shine trigger={balance} />
+            <Row align="flex-start" justify="space-between">
+              <View style={{ flex: 1, gap: 2 }}>
+                <T v="label" color="#B9CEC2">ยอดคงเหลือ</T>
+                <Money satang={balance} size="display" color="#F4F1E6" countUp />
+                <View style={{ marginTop: space.sm }}>
+                  <Badge label={badge.label} tone={badge.tone} onDark />
+                </View>
+              </View>
+              <Animated.View style={{ transform: [{ translateY: treeLift }] }}>
+                <MoneyTree
+                  health={treeHealth(runway.status, runway.days)}
+                  size={104}
+                  trunk="#E8E1CC"
+                  leaf={palette.goldBright}
+                  bare="#6F9483"
+                  glow={palette.goldBright}
+                  grow
+                  sway
+                />
+              </Animated.View>
+            </Row>
+            <View style={{ height: 1, backgroundColor: 'rgba(244,241,230,0.15)' }} />
+            <Row justify="space-between" align="flex-end">
+              <View style={{ flex: 1 }}>
+                <T v="small" color="#B9CEC2">เงินพอใช้อีก</T>
+                {runway.days !== null && runway.status !== 'below_floor' ? (
+                  <T v="h1" color={palette.goldBright}>
+                    {runway.capped ? '365+ ' : `${daysShown} `}
+                    <T v="body" color="#F4F1E6">วัน · ถึง {formatThaiDay(runway.depletionDay!, { year: false })}</T>
+                  </T>
+                ) : runway.status === 'below_floor' ? (
+                  <T v="h3" color="#F4F1E6">แตะเส้นเงินสำรองแล้ว</T>
+                ) : (
+                  <T v="h3" color="#F4F1E6">ยังคำนวณไม่ได้</T>
+                )}
+              </View>
+              <Button label="ดูรายละเอียด" small kind="onDark" icon="chevron-forward" onPress={() => router.navigate('/runway')} />
+            </Row>
+          </LinearGradient>
+        </View>
+        </Animated.View>
+      </Reveal>
 
       {/* Today */}
+      <Reveal index={2}>
       <Card tone="accent" style={{ paddingVertical: space.md }}>
         <Row gap={space.md}>
           <Ionicons name="sunny-outline" size={22} color={theme.dark ? theme.accent : '#7A5A0E'} />
@@ -150,6 +196,7 @@ export default function Home() {
           </View>
         </Row>
       </Card>
+      </Reveal>
 
       {drafts.length > 0 ? (
         <Card onPress={() => router.push('/drafts')} style={{ borderColor: theme.accent, borderWidth: 1.5 }}>
@@ -164,10 +211,12 @@ export default function Home() {
         </Card>
       ) : null}
 
-      <Row gap={space.sm}>
-        <Button label="สแกนสลิป" icon="scan-outline" onPress={() => router.push('/scan')} style={{ flex: 1 }} />
-        <Button label="จดรายการ" icon="add" kind="soft" onPress={() => router.push('/transaction')} style={{ flex: 1 }} />
-      </Row>
+      <Reveal index={3}>
+        <Row gap={space.sm}>
+          <Button label="สแกนสลิป" icon="scan-outline" shine onPress={() => router.push('/scan')} style={{ flex: 1 }} />
+          <Button label="จดรายการ" icon="add" kind="soft" onPress={() => router.push('/transaction')} style={{ flex: 1 }} />
+        </Row>
+      </Reveal>
 
       {/* FR-2 overview by range */}
       <SectionTitle title="ภาพรวม" />
@@ -187,14 +236,14 @@ export default function Home() {
             <Ionicons name="arrow-down-circle" size={18} color={theme.income} />
             <T v="small">เงินเข้า</T>
           </Row>
-          <Money satang={summary.incomeSatang} size="h3" color={theme.income} decimals={false} />
+          <Money satang={summary.incomeSatang} size="h3" color={theme.income} decimals={false} countUp />
         </Card>
         <Card style={{ flex: 1 }}>
           <Row gap={6}>
             <Ionicons name="arrow-up-circle" size={18} color={theme.inkSoft} />
             <T v="small">เงินออก</T>
           </Row>
-          <Money satang={summary.expenseSatang} size="h3" decimals={false} />
+          <Money satang={summary.expenseSatang} size="h3" decimals={false} countUp />
         </Card>
       </Row>
       <Card>
@@ -260,10 +309,10 @@ export default function Home() {
           />
         ) : (
           recent.map((t, i) => (
-            <View key={t.id}>
+            <Reveal key={t.id} index={i} from={10}>
               {i > 0 ? <Divider /> : null}
               <TxRow tx={t} />
-            </View>
+            </Reveal>
           ))
         )}
       </Card>

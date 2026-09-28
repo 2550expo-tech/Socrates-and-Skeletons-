@@ -10,12 +10,14 @@ import { Button, Card, Screen, T } from '../ui/components';
 import { useToast } from '../ui/feedback';
 import { Field } from '../ui/inputs';
 import { BuddySays } from '../ui/Buddy';
+import { Reveal, useCelebrate } from '../ui/effects';
 import { StepDots } from '../ui/StepDots';
 import { space, useTheme } from '../ui/theme';
 
 export default function Onboarding() {
   const theme = useTheme();
   const toast = useToast();
+  const celebrate = useCelebrate();
   const { profile, saveProfile } = useApp();
   const [name, setName] = useState(profile?.displayName ?? '');
   const [balance, setBalance] = useState('');
@@ -44,6 +46,7 @@ export default function Onboarding() {
         monthlyBudgetSatang: budgetSatang,
         onboarded: true,
       });
+      celebrate();
     } catch {
       toast({ message: 'บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง', tone: 'error' });
     } finally {
@@ -55,10 +58,13 @@ export default function Onboarding() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen edges={['top', 'bottom']} contentStyle={{ paddingTop: space.xl }}>
         <StepDots step={3} />
-        <T v="h1">ตั้งค่า 1 นาที แล้วเริ่มเห็นภาพเงินของคุณ</T>
+        <Reveal>
+          <T v="h1">ตั้งค่า 1 นาที แล้วเริ่มเห็นภาพเงินของคุณ</T>
+        </Reveal>
         <BuddySays mood="happy">
           {`ยินดีที่ได้รู้จัก${name.trim() ? ` ${name.trim()}` : ''}! บอกกล้าหน่อยว่าตอนนี้มีเงินเท่าไหร่ แล้วกล้าจะนับให้ว่าเงินพอใช้ถึงวันไหน`}
         </BuddySays>
+        <Reveal index={2}>
         <Card style={{ gap: space.lg }}>
           <Field id="ob-name" label="ชื่อเล่น" value={name} onChangeText={setName} placeholder="เช่น มิ้นท์" error={errors.name} maxLength={30} />
           <Field
@@ -90,7 +96,8 @@ export default function Onboarding() {
             error={errors.budget}
           />
         </Card>
-        <Button label="เริ่มใช้ MindPay" kind="gold" onPress={finish} loading={busy} />
+        </Reveal>
+        <Button label="เริ่มใช้ MindPay" kind="gold" shine onPress={finish} loading={busy} />
         <T v="micro" center color={theme.inkFaint}>แก้ไขทุกค่าได้ภายหลังในหน้าตั้งค่า</T>
       </Screen>
     </KeyboardAvoidingView>

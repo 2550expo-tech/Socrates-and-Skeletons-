@@ -14,6 +14,7 @@ import { supabase } from '../data/supabase';
 import { authErrorMessage, MIN_PASSWORD_LENGTH } from '../domain/auth';
 import { Buddy } from './Buddy';
 import { Button, Ionicons, T } from './components';
+import { useCelebrate } from './effects';
 import { useToast } from './feedback';
 import { PasswordField } from './inputs';
 import { useReduceMotion } from './motion';
@@ -85,7 +86,7 @@ function Celebration() {
   const [pop] = useState(() => new Animated.Value(0));
   const [burst] = useState(() => new Animated.Value(0));
   useEffect(() => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    // The success tap comes with the confetti (useCelebrate), not from here.
     if (reduce) {
       pop.setValue(1);
       burst.setValue(1);
@@ -165,7 +166,12 @@ function Celebration() {
 function SignedUpDialog({ name, viaEmail, onClose }: { name: string | null; viaEmail: boolean; onClose: () => void }) {
   const theme = useTheme();
   const { profile } = useApp();
+  const celebrate = useCelebrate();
   const ready = !!profile?.onboarded;
+  useEffect(() => {
+    const t = setTimeout(() => celebrate(), 260);
+    return () => clearTimeout(t);
+  }, [celebrate]);
   return (
     <DialogShell label="สมัครบัญชีสำเร็จ">
       <Celebration />

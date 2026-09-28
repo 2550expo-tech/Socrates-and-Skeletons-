@@ -13,6 +13,7 @@ import { formatBaht } from '../../domain/money';
 import { groupByDay } from '../../domain/summary';
 import { Button, Card, Divider, EmptyState, IconButton, Ionicons, Row, Segmented, T } from '../../ui/components';
 import { Buddy } from '../../ui/Buddy';
+import { Reveal } from '../../ui/effects';
 import { TxRow } from '../../ui/TxRow';
 import { fonts, radius, space, useTheme } from '../../ui/theme';
 
@@ -90,10 +91,10 @@ export default function Transactions() {
           </Row>
         )}
         renderItem={({ item, index }) => (
-          <View>
+          <Reveal index={Math.min(index, 6)} from={8}>
             {index > 0 ? <Divider /> : null}
             <TxRow tx={item} />
-          </View>
+          </Reveal>
         )}
         ListEmptyComponent={
           query || filter !== 'all' ? (

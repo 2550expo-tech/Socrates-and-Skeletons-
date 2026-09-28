@@ -11,6 +11,7 @@ import { useApp, useMoney } from '../data/AppProvider';
 import { formatBaht } from '../domain/money';
 import { Buddy } from '../ui/Buddy';
 import { Button, Card, Divider, EmptyState, IconButton, Row, T } from '../ui/components';
+import { Reveal, useCelebrate } from '../ui/effects';
 import { useToast } from '../ui/feedback';
 import { TxRow } from '../ui/TxRow';
 import { space, useTheme } from '../ui/theme';
@@ -19,6 +20,7 @@ export default function Drafts() {
   const theme = useTheme();
   const toast = useToast();
   const { confirmTxs } = useApp();
+  const celebrate = useCelebrate();
   const { drafts } = useMoney();
   const [busy, setBusy] = useState(false);
   const sorted = [...drafts].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
@@ -30,6 +32,7 @@ export default function Drafts() {
     setBusy(true);
     try {
       await confirmTxs(ready.map((d) => d.id));
+      celebrate();
       toast({ message: `ยืนยัน ${ready.length} รายการแล้ว` });
     } catch {
       toast({ message: 'ยืนยันไม่สำเร็จ ลองอีกครั้ง', tone: 'error' });
@@ -63,13 +66,13 @@ export default function Drafts() {
             <T v="small">อ่านได้ครบทุกช่องด้วยความมั่นใจ 80% ขึ้นไป รวมแล้ว {formatBaht(readyTotal, { sign: true })}</T>
             <Card style={{ paddingVertical: space.xs, gap: 0 }}>
               {ready.map((t, i) => (
-                <View key={t.id}>
+                <Reveal key={t.id} index={i} from={10}>
                   {i > 0 ? <Divider /> : null}
                   <TxRow tx={t} />
-                </View>
+                </Reveal>
               ))}
             </Card>
-            <Button label={`ยืนยันทั้ง ${ready.length} รายการ`} kind="gold" icon="checkmark-done" onPress={confirmAll} loading={busy} />
+            <Button label={`ยืนยันทั้ง ${ready.length} รายการ`} kind="gold" icon="checkmark-done" shine onPress={confirmAll} loading={busy} />
           </View>
         ) : null}
 
@@ -79,10 +82,10 @@ export default function Drafts() {
             <T v="small">มีบางช่องที่อ่านไม่ชัด แตะเพื่อแก้แล้วยืนยันทีละรายการ</T>
             <Card style={{ paddingVertical: space.xs, gap: 0 }}>
               {review.map((t, i) => (
-                <View key={t.id}>
+                <Reveal key={t.id} index={i} from={10}>
                   {i > 0 ? <Divider /> : null}
                   <TxRow tx={t} />
-                </View>
+                </Reveal>
               ))}
             </Card>
           </View>

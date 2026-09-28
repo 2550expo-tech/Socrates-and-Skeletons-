@@ -1,14 +1,22 @@
 /**
  * Bottom navigation: four places plus a raised gold button in the middle for
  * the most frequent action, scanning slips (FR-4).
+ *
+ * Motion: a soft pill slides to the chosen tab and its icon pops; the scan
+ * button sends out gold ripples a few times when the app opens, and keeps
+ * rippling while the automatic scan is reading new slips.
  */
 import { router } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import * as Haptics from 'expo-haptics';
-import { Pressable, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAutoScan } from '../../services/AutoScanProvider';
 import { Ionicons, type IconName } from '../../ui/components';
+import { PulseRing, usePressSpring } from '../../ui/effects';
+import { useNative, useReduceMotion } from '../../ui/motion';
 import { fonts, palette, useTheme } from '../../ui/theme';
 
 const TABS: Record<string, { label: string; icon: IconName; iconActive: IconName }> = {
@@ -18,11 +26,50 @@ const TABS: Record<string, { label: string; icon: IconName; iconActive: IconName
   coach: { label: 'โค้ช', icon: 'chatbubble-ellipses-outline', iconActive: 'chatbubble-ellipses' },
 };
 
+const PILL_W = 56;
+
+/** The tab icon pops when its tab becomes the chosen one. */
+function TabIcon({ name, focused, color }: { name: IconName; focused: boolean; color: string }) {
+  const reduce = useReduceMotion();
+  const [pop] = useState(() => new Animated.Value(1));
+  useEffect(() => {
+    if (!focused || reduce) return;
+    pop.setValue(0.6);
+    Animated.spring(pop, { toValue: 1, speed: 14, bounciness: 16, useNativeDriver: useNative }).start();
+  }, [focused, reduce, pop]);
+  return (
+    <Animated.View style={{ transform: [{ scale: pop }, { translateY: pop.interpolate({ inputRange: [0.6, 1], outputRange: [3, 0] }) }] }}>
+      <Ionicons name={name} size={22} color={color} />
+    </Animated.View>
+  );
+}
+
 function TabBar({ state, navigation }: BottomTabBarProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const reduce = useReduceMotion();
+  const auto = useAutoScan();
+  const press = usePressSpring(0.9);
   const routes = state.routes;
   const half = Math.ceil(routes.length / 2);
+  // Centre of each tab, measured after layout, so the pill can slide there.
+  const [centers, setCenters] = useState<Record<number, number>>({});
+  const [slide] = useState(() => new Animated.Value(0));
+  const [shown] = useState(() => new Animated.Value(0));
+  const first = useRef(true);
+  const target = centers[state.index];
+  const measured = target !== undefined;
+  useEffect(() => {
+    if (target === undefined) return;
+    if (reduce || first.current) {
+      // The first time, appear on the chosen tab instead of sliding in from the edge.
+      first.current = false;
+      slide.setValue(target);
+      shown.setValue(1);
+      return;
+    }
+    Animated.spring(slide, { toValue: target, speed: 14, bounciness: 9, useNativeDriver: useNative }).start();
+  }, [target, reduce, slide, shown]);
 
   const tab = (route: (typeof routes)[number], index: number) => {
     const meta = TABS[route.name];
@@ -34,6 +81,11 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
         accessibilityRole="tab"
         aria-selected={focused}
         accessibilityLabel={meta.label}
+        onLayout={(e: LayoutChangeEvent) => {
+          const { x, width } = e.nativeEvent.layout;
+          const c = x + width / 2;
+          setCenters((prev) => (prev[index] === c ? prev : { ...prev, [index]: c }));
+        }}
         onPress={() => {
           Haptics.selectionAsync().catch(() => {});
           const e = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
@@ -41,7 +93,7 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
         }}
         style={{ flex: 1, alignItems: 'center', paddingVertical: 8, gap: 2 }}
       >
-        <Ionicons name={focused ? meta.iconActive : meta.icon} size={22} color={focused ? theme.primary : theme.inkFaint} />
+        <TabIcon name={focused ? meta.iconActive : meta.icon} focused={focused} color={focused ? theme.primary : theme.inkFaint} />
         <Text style={{ fontFamily: focused ? fonts.sansSemi : fonts.sans, fontSize: 11, color: focused ? theme.ink : theme.inkFaint }}>
           {meta.label}
         </Text>
@@ -61,35 +113,56 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
         paddingHorizontal: 6,
       }}
     >
+      {measured ? (
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 5,
+            left: 0,
+            width: PILL_W,
+            height: 30,
+            borderRadius: 15,
+            backgroundColor: theme.dark ? '#153B2A' : '#E3F1E8',
+            opacity: shown,
+            transform: [{ translateX: Animated.subtract(slide, PILL_W / 2) }],
+          }}
+        />
+      ) : null}
       {routes.slice(0, half).map((r, i) => tab(r, i))}
       <View style={{ width: 76, alignItems: 'center' }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="สแกนสลิป"
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-            router.push('/scan');
-          }}
-          style={({ pressed }) => ({
-            width: 60,
-            height: 60,
-            borderRadius: 30,
-            marginTop: -26,
-            backgroundColor: palette.forest,
-            borderWidth: 3,
-            borderColor: theme.accent,
-            alignItems: 'center',
-            justifyContent: 'center',
-            transform: [{ scale: pressed ? 0.94 : 1 }],
-            shadowColor: '#000',
-            shadowOpacity: 0.2,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 6,
-          })}
-        >
-          <Ionicons name="scan" size={26} color={palette.goldBright} />
-        </Pressable>
+        <View style={{ width: 60, height: 60, marginTop: -26, alignItems: 'center', justifyContent: 'center' }}>
+          <PulseRing size={60} active times={auto.state.phase === 'scanning' ? 'always' : 3} />
+          <Animated.View style={{ transform: [{ scale: press.scale }] }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="สแกนสลิป"
+              onPressIn={press.onPressIn}
+              onPressOut={press.onPressOut}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                router.push('/scan');
+              }}
+              style={{
+                width: 60,
+                height: 60,
+                borderRadius: 30,
+                backgroundColor: palette.forest,
+                borderWidth: 3,
+                borderColor: theme.accent,
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: palette.gold,
+                shadowOpacity: 0.35,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 4 },
+                elevation: 8,
+              }}
+            >
+              <Ionicons name="scan" size={26} color={palette.goldBright} />
+            </Pressable>
+          </Animated.View>
+        </View>
         <Text style={{ fontFamily: fonts.sansSemi, fontSize: 11, color: theme.ink, marginTop: 4 }}>สแกนสลิป</Text>
       </View>
       {routes.slice(half).map((r, i) => tab(r, i + half))}

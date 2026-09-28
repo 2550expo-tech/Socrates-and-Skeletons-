@@ -5,20 +5,26 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import type { ComponentProps, ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  type LayoutChangeEvent,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useCountUp, useReduceMotion } from './motion';
+import { GrowBar, Reveal, Shine, usePressSpring } from './effects';
+import { useCountUp, useNative, useReduceMotion } from './motion';
 import { fonts, radius, space, type, useTheme } from './theme';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -133,6 +139,7 @@ export function Screen({
   edges = ['top'],
   contentStyle,
   refreshControl,
+  scrollY,
 }: {
   children: ReactNode;
   scroll?: boolean;
@@ -140,12 +147,24 @@ export function Screen({
   edges?: ('top' | 'bottom')[];
   contentStyle?: StyleProp<ViewStyle>;
   refreshControl?: ComponentProps<typeof ScrollView>['refreshControl'];
+  /** Receives the scroll position, for effects that follow scrolling (parallax). */
+  scrollY?: Animated.Value;
 }) {
   const theme = useTheme();
   const pad = padded ? { paddingHorizontal: space.lg } : null;
   return (
     <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: theme.bg }}>
-      {scroll ? (
+      {scroll && scrollY ? (
+        <Animated.ScrollView
+          contentContainerStyle={[pad, { paddingBottom: 120, gap: space.lg }, contentStyle]}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={refreshControl}
+          scrollEventThrottle={16}
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: useNative })}
+        >
+          {children}
+        </Animated.ScrollView>
+      ) : scroll ? (
         <ScrollView
           contentContainerStyle={[pad, { paddingBottom: 120, gap: space.lg }, contentStyle]}
           keyboardShouldPersistTaps="handled"
@@ -188,6 +207,7 @@ export function Card({
   tone?: 'surface' | 'alt' | 'accent';
 }) {
   const theme = useTheme();
+  const press = usePressSpring(0.975);
   const bg = tone === 'alt' ? theme.surfaceAlt : tone === 'accent' ? theme.accentSoft : theme.surface;
   const base: ViewStyle = {
     backgroundColor: bg,
@@ -199,13 +219,15 @@ export function Card({
   };
   if (!onPress) return <View style={[base, style]}>{children}</View>;
   return (
-    <Pressable
+    <AnimatedPressable
       onPress={onPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
       accessibilityRole="button"
-      style={({ pressed }) => [base, pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] }, style]}
+      style={[base, style, { transform: [{ scale: press.scale }] }]}
     >
       {children}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -238,6 +260,7 @@ export function Button({
   disabled,
   style,
   small,
+  shine,
 }: {
   label: string;
   onPress: () => void;
@@ -248,8 +271,11 @@ export function Button({
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   small?: boolean;
+  /** A band of light sweeps across (for the one main action on a screen). */
+  shine?: boolean;
 }) {
   const theme = useTheme();
+  const press = usePressSpring(0.95);
   const colors = {
     primary: { bg: theme.primary, fg: theme.onPrimary, border: theme.primary },
     gold: { bg: theme.accent, fg: '#1D1405', border: theme.accent },
@@ -260,16 +286,18 @@ export function Button({
   }[kind];
   const off = disabled || loading;
   return (
-    <Pressable
+    <AnimatedPressable
       onPress={() => {
         Haptics.selectionAsync().catch(() => {});
         onPress();
       }}
+      onPressIn={off ? undefined : press.onPressIn}
+      onPressOut={press.onPressOut}
       disabled={off}
       accessibilityRole="button"
       aria-disabled={!!off}
       aria-busy={!!loading}
-      style={({ pressed }) => [
+      style={[
         {
           backgroundColor: colors.bg,
           borderColor: colors.border,
@@ -281,19 +309,21 @@ export function Button({
           alignItems: 'center',
           justifyContent: 'center',
           gap: 8,
-          opacity: off ? 0.5 : pressed ? 0.88 : 1,
-          transform: [{ scale: pressed && !off ? 0.97 : 1 }],
+          opacity: off ? 0.5 : 1,
+          overflow: shine ? 'hidden' : undefined,
         },
         style,
+        { transform: [{ scale: press.scale }] },
       ]}
     >
+      {shine && !off ? <Shine times={1} delay={900} color={kind === 'gold' ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.28)'} /> : null}
       {loading ? (
         <ActivityIndicator color={colors.fg} />
       ) : icon ? (
         <Ionicons name={icon} size={small ? 16 : 19} color={colors.fg} />
       ) : null}
       <Text style={{ fontFamily: fonts.sansSemi, fontSize: small ? 13 : 15, color: colors.fg }}>{label}</Text>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -329,7 +359,7 @@ export function IconButton({
   );
 }
 
-/** Segmented control, e.g. วันนี้ / 7 วัน / 1 เดือน. */
+/** Segmented control, e.g. วันนี้ / 7 วัน / 1 เดือน. The white pill slides to the chosen one. */
 export function Segmented<K extends string>({
   options,
   value,
@@ -342,9 +372,23 @@ export function Segmented<K extends string>({
   disabled?: boolean;
 }) {
   const theme = useTheme();
+  const reduce = useReduceMotion();
+  const [width, setWidth] = useState(0);
+  const index = Math.max(0, options.findIndex((o) => o.key === value));
+  const [slide] = useState(() => new Animated.Value(index));
+  useEffect(() => {
+    if (reduce) {
+      slide.setValue(index);
+      return;
+    }
+    Animated.spring(slide, { toValue: index, speed: 16, bounciness: 8, useNativeDriver: useNative }).start();
+  }, [index, reduce, slide]);
+  const seg = width / Math.max(1, options.length);
+  const last = Math.max(1, options.length - 1);
   return (
     <View
       accessibilityRole="tablist"
+      onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width - 8)}
       style={{
         flexDirection: 'row',
         backgroundColor: theme.surfaceAlt,
@@ -353,6 +397,26 @@ export function Segmented<K extends string>({
         opacity: disabled ? 0.55 : 1,
       }}
     >
+      {width > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: 4,
+            top: 4,
+            bottom: 4,
+            width: seg,
+            borderRadius: radius.pill,
+            backgroundColor: theme.surface,
+            shadowColor: '#000',
+            shadowOpacity: 0.1,
+            shadowRadius: 6,
+            shadowOffset: { width: 0, height: 2 },
+            elevation: 2,
+            transform: [{ translateX: slide.interpolate({ inputRange: [0, last], outputRange: [0, seg * last] }) }],
+          }}
+        />
+      ) : null}
       {options.map((o) => {
         const active = o.key === value;
         return (
@@ -372,12 +436,8 @@ export function Segmented<K extends string>({
               paddingVertical: 8,
               borderRadius: radius.pill,
               alignItems: 'center',
-              backgroundColor: active ? theme.surface : 'transparent',
-              shadowColor: '#000',
-              shadowOpacity: active ? 0.08 : 0,
-              shadowRadius: 4,
-              shadowOffset: { width: 0, height: 1 },
-              elevation: active ? 1 : 0,
+              // Before the first layout the pill is not drawn yet: show the choice the plain way.
+              backgroundColor: active && width === 0 ? theme.surface : 'transparent',
             }}
           >
             <Text
@@ -409,9 +469,12 @@ export function Chip({
   glyph?: string;
 }) {
   const theme = useTheme();
+  const press = usePressSpring(0.93);
   return (
-    <Pressable
+    <AnimatedPressable
       onPress={onPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
       accessibilityRole="button"
       aria-selected={!!selected}
       style={{
@@ -424,11 +487,12 @@ export function Chip({
         borderWidth: 1.5,
         borderColor: selected ? theme.primary : theme.line,
         backgroundColor: selected ? (theme.dark ? '#153B2A' : '#E3F1E8') : theme.surface,
+        transform: [{ scale: press.scale }],
       }}
     >
       {glyph ? <Text style={{ fontSize: 14 }}>{glyph}</Text> : null}
       <Text style={{ fontFamily: selected ? fonts.sansSemi : fonts.sans, fontSize: 13, color: theme.ink }}>{label}</Text>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -467,14 +531,10 @@ export function Badge({
   );
 }
 
+/** A bar that grows smoothly to `value` (0..1). */
 export function ProgressBar({ value, color }: { value: number; color?: string }) {
   const theme = useTheme();
-  const pct = Math.max(0, Math.min(1, value));
-  return (
-    <View style={{ height: 8, borderRadius: 4, backgroundColor: theme.surfaceAlt, overflow: 'hidden' }}>
-      <View style={{ width: `${pct * 100}%`, height: '100%', borderRadius: 4, backgroundColor: color ?? theme.primary }} />
-    </View>
-  );
+  return <GrowBar value={value} color={color ?? theme.primary} track={theme.surfaceAlt} />;
 }
 
 export function EmptyState({
@@ -495,7 +555,7 @@ export function EmptyState({
 }) {
   const theme = useTheme();
   return (
-    <View style={{ alignItems: 'center', paddingVertical: space.xxl, gap: space.sm }}>
+    <Reveal zoom from={10} style={{ alignItems: 'center', paddingVertical: space.xxl, gap: space.sm }}>
       {art ?? (
         <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: theme.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name={icon} size={28} color={theme.primary} />
@@ -504,7 +564,7 @@ export function EmptyState({
       <T v="h3" center>{title}</T>
       <T v="small" center style={{ maxWidth: 300 }}>{body}</T>
       {action && onAction ? <Button label={action} onPress={onAction} small kind="soft" style={{ marginTop: space.sm }} /> : null}
-    </View>
+    </Reveal>
   );
 }
 

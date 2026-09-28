@@ -7,6 +7,7 @@
  *   - confirmation on:  type the 6-digit code from the email here, or tap the
  *     link in the email (handled in AppProvider) -> same dialog.
  */
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,6 +27,7 @@ import {
 } from '../domain/auth';
 import { ContourLines, MoneyTree } from '../ui/art';
 import { Button, Card, Ionicons, Row, Segmented, T } from '../ui/components';
+import { Aurora, Reveal, Shine, Sparkles } from '../ui/effects';
 import { useToast } from '../ui/feedback';
 import { StepDots } from '../ui/StepDots';
 import { Field, PasswordField } from '../ui/inputs';
@@ -210,25 +212,43 @@ export default function Welcome() {
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
         <View
           style={{
-            backgroundColor: palette.forest,
-            paddingTop: insets.top + space.xxl,
-            paddingBottom: space.xxxl + space.lg,
-            paddingHorizontal: space.xl,
             borderBottomLeftRadius: radius.xl,
             borderBottomRightRadius: radius.xl,
             overflow: 'hidden',
+          }}
+        >
+        <LinearGradient
+          colors={['#135A40', palette.forest, palette.forestDeep]}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0.2, y: 0 }}
+          end={{ x: 0.8, y: 1 }}
+          style={{
+            paddingTop: insets.top + space.xxl,
+            paddingBottom: space.xxxl + space.lg,
+            paddingHorizontal: space.xl,
             alignItems: 'center',
             gap: space.sm,
           }}
         >
+          <Aurora cycles={2} strength={0.4} seed={17} />
           <ContourLines width={420} height={320} color={palette.goldBright} />
-          <MoneyTree health={0.85} size={120} trunk="#E8E1CC" leaf={palette.goldBright} bare="#7FA491" />
-          <T v="display" color="#F4F1E6" style={{ marginTop: space.sm }}>MindPay</T>
-          <T v="body" color="#B9CEC2" center>รู้ก่อนจ่าย เห็นว่าเงินจะอยู่ได้อีกกี่วัน</T>
+          <Sparkles count={14} cycles={3} seed={41} area={{ top: 6, bottom: 70 }} />
+          <Reveal zoom from={10}>
+            <MoneyTree health={0.85} size={120} trunk="#E8E1CC" leaf={palette.goldBright} bare="#7FA491" glow={palette.goldBright} grow sway />
+          </Reveal>
+          <Reveal index={2} from={14}>
+            <View style={{ overflow: 'hidden', borderRadius: radius.md, marginTop: space.sm, paddingHorizontal: space.sm }}>
+              <T v="display" color="#F4F1E6">MindPay</T>
+              <Shine times={2} delay={700} color="rgba(255,236,170,0.35)" />
+            </View>
+          </Reveal>
+          <Reveal index={3} from={12}>
+            <T v="body" color="#B9CEC2" center>รู้ก่อนจ่าย เห็นว่าเงินจะอยู่ได้อีกกี่วัน</T>
+          </Reveal>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: space.sm }}>
-            {VALUE_POINTS.map((v) => (
+            {VALUE_POINTS.map((v, i) => (
+              <Reveal key={v.label} index={4 + i} from={10} zoom>
               <View
-                key={v.label}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -246,11 +266,14 @@ export default function Welcome() {
                   {v.label}
                 </T>
               </View>
+              </Reveal>
             ))}
           </View>
+        </LinearGradient>
         </View>
 
         <View style={{ padding: space.lg, gap: space.lg, marginTop: -space.xxl }}>
+          <Reveal index={5} from={28}>
           <Card style={{ gap: space.md }}>
             {!cloudAvailable ? (
               <>
@@ -357,8 +380,9 @@ export default function Welcome() {
               </>
             )}
           </Card>
+          </Reveal>
 
-          <View style={{ gap: space.sm }}>
+          <Reveal index={7} style={{ gap: space.sm }}>
             <Button
               label="ลองใช้ด้วยข้อมูลตัวอย่าง"
               kind="ghost"
@@ -368,7 +392,7 @@ export default function Welcome() {
             <T v="micro" center>
               โหมดทดลองเก็บข้อมูลไว้ในเครื่องนี้เท่านั้น อ่านสลิปและโค้ช AI ต้องใช้บัญชีจริง
             </T>
-          </View>
+          </Reveal>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

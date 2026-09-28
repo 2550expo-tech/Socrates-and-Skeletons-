@@ -2,13 +2,44 @@
  * Small charts drawn with react-native-svg. One scale per chart; every label
  * names a value the chart actually shows.
  */
-import { useState } from 'react';
-import { View, type LayoutChangeEvent } from 'react-native';
-import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
+import { useEffect, useState } from 'react';
+import { Animated, Easing, View, type LayoutChangeEvent } from 'react-native';
+import Svg, { Line, Text as SvgText } from 'react-native-svg';
 import { formatBaht } from '../domain/money';
 import type { CategoryTotal, DayTotal } from '../domain/summary';
 import { Row, T } from './components';
-import { fonts, radius, space, useTheme } from './theme';
+import { GrowBar } from './effects';
+import { useNative, useReduceMotion } from './motion';
+import { fonts, space, useTheme } from './theme';
+
+/** One bar of DayBars: it rises out of the baseline (its rounded top stays round). */
+function RisingBar({ x, top, width, height, color, opacity, delay }: { x: number; top: number; width: number; height: number; color: string; opacity: number; delay: number }) {
+  const reduce = useReduceMotion();
+  const [v] = useState(() => new Animated.Value(reduce ? 1 : 0));
+  useEffect(() => {
+    if (reduce) {
+      v.setValue(1);
+      return;
+    }
+    const anim = Animated.timing(v, { toValue: 1, duration: 650, delay, easing: Easing.out(Easing.back(1.4)), useNativeDriver: useNative });
+    anim.start();
+    return () => anim.stop();
+  }, [reduce, v, delay, height]);
+  if (height <= 0) return null;
+  return (
+    <View style={{ position: 'absolute', left: x, top, width, height, overflow: 'hidden', borderRadius: Math.min(6, width / 2) }}>
+      <Animated.View
+        style={{
+          flex: 1,
+          borderRadius: Math.min(6, width / 2),
+          backgroundColor: color,
+          opacity,
+          transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [height, 0] }) }],
+        }}
+      />
+    </View>
+  );
+}
 
 const WEEKDAY_SHORT = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
@@ -28,25 +59,33 @@ export function DayBars({ days, averageSatang, height = 140 }: { days: DayTotal[
 
   return (
     <View onLayout={onLayout} style={{ height }} accessibilityLabel={`รายจ่าย ${days.length} วันล่าสุด`}>
+      {/* Bars first, then the lines and labels drawn over them. */}
+      {width > 0
+        ? days.map((d, i) => {
+            const h = Math.max(d.expenseSatang > 0 ? 3 : 0, top + plotH - y(d.expenseSatang));
+            const isToday = i === days.length - 1;
+            return (
+              <RisingBar
+                key={d.day}
+                x={i * (barW + gap)}
+                top={top + plotH - h}
+                width={barW}
+                height={h}
+                color={isToday ? theme.accent : theme.primary}
+                opacity={isToday ? 1 : 0.85}
+                delay={120 + i * 55}
+              />
+            );
+          })
+        : null}
       {width > 0 ? (
-        <Svg width={width} height={height}>
+        <Svg width={width} height={height} style={{ position: 'absolute', left: 0, top: 0 }}>
           <Line x1={0} x2={width} y1={top + plotH} y2={top + plotH} stroke={theme.line} strokeWidth={1} />
           {days.map((d, i) => {
             const x = i * (barW + gap);
             const isToday = i === days.length - 1;
-            const h = Math.max(d.expenseSatang > 0 ? 3 : 0, top + plotH - y(d.expenseSatang));
             const dow = new Date(`${d.day}T00:00:00Z`).getUTCDay();
             return [
-              <Rect
-                key={`b${d.day}`}
-                x={x}
-                y={top + plotH - h}
-                width={barW}
-                height={h}
-                rx={Math.min(6, barW / 2)}
-                fill={isToday ? theme.accent : theme.primary}
-                opacity={isToday ? 1 : 0.85}
-              />,
               <SvgText
                 key={`l${d.day}`}
                 x={x + barW / 2}
@@ -112,17 +151,13 @@ export function CategoryBars({ items, limit = 5 }: { items: CategoryTotal[]; lim
               {Math.round(c.share * 100)}%
             </T>
           </Row>
-          <View style={{ height: 8, backgroundColor: theme.surfaceAlt, borderRadius: radius.sm, overflow: 'hidden' }}>
-            <View
-              style={{
-                width: `${(c.totalSatang / max) * 100}%`,
-                height: '100%',
-                borderRadius: radius.sm,
-                backgroundColor: i === 0 ? theme.accent : theme.primary,
-                opacity: i === 0 ? 1 : 0.75 - i * 0.08,
-              }}
-            />
-          </View>
+          <GrowBar
+            value={c.totalSatang / max}
+            color={i === 0 ? theme.accent : theme.primary}
+            opacity={i === 0 ? 1 : 0.75 - i * 0.08}
+            track={theme.surfaceAlt}
+            delay={100 + i * 90}
+          />
         </View>
       ))}
     </View>

@@ -27,7 +27,9 @@ import { useSlipScanner } from '../services/useSlipScanner';
 import { Buddy, BuddySays } from '../ui/Buddy';
 import { Button, Card, Divider, IconButton, Ionicons, ProgressBar, Row, T } from '../ui/components';
 import { useToast } from '../ui/feedback';
+import { useCelebrate, Reveal } from '../ui/effects';
 import { PeriodSummary } from '../ui/PeriodSummary';
+import { ScannerStage } from '../ui/ScannerStage';
 import { TxRow } from '../ui/TxRow';
 import { radius, space, useTheme } from '../ui/theme';
 import { WaitNotice } from '../ui/WaitNotice';
@@ -65,6 +67,14 @@ export default function Scan() {
   const drafts = recorded.filter((t) => t.status === 'draft');
   const readyIds = drafts.filter((t) => t.reviewFlags.length === 0).map((t) => t.id);
   const counted = recorded.filter((t) => t.status === 'confirmed').length;
+  const latest = recorded.length > 0 ? recorded.find((t) => t.id === s.runTxIds[s.runTxIds.length - 1]) ?? null : null;
+
+  // Confetti once per scan that found slips.
+  const celebrate = useCelebrate();
+  const foundSlips = done && recorded.length > 0;
+  useEffect(() => {
+    if (foundSlips) celebrate();
+  }, [foundSlips, state.runId, celebrate]);
 
   async function confirmReady() {
     try {
@@ -157,6 +167,7 @@ export default function Scan() {
         {/* Progress */}
         {state.items.length > 0 ? (
           <Card style={{ gap: space.md }}>
+            {running || (paused && recorded.length > 0) ? <ScannerStage active={running} latest={latest} /> : null}
             <Row gap={space.md}>
               <Buddy mood={done ? (counted > 0 ? 'cheer' : 'calm') : 'thinking'} size={52} />
               <View style={{ flex: 1, gap: 4 }}>
@@ -211,8 +222,9 @@ export default function Scan() {
             <PeriodSummary txs={txs} title="ยอดเงินเข้า–ออกตามช่วงเวลา" />
             <View style={{ gap: space.sm }}>
               <T v="h3">สลิปที่อ่านรอบนี้ แยกตามวันที่</T>
-              {byDay.map((g) => (
-                <Card key={g.day} style={{ paddingVertical: space.sm, gap: 0 }}>
+              {byDay.map((g, i) => (
+                <Reveal key={g.day} index={i}>
+                <Card style={{ paddingVertical: space.sm, gap: 0 }}>
                   <Row justify="space-between" style={{ paddingVertical: space.xs }}>
                     <T v="body" style={{ fontFamily: undefined }}>{relativeDayLabel(g.day)}</T>
                     <T v="small" color={g.netSatang >= 0 ? theme.income : theme.expense}>
@@ -226,6 +238,7 @@ export default function Scan() {
                     </View>
                   ))}
                 </Card>
+                </Reveal>
               ))}
             </View>
           </>

@@ -13,6 +13,7 @@ import * as Haptics from 'expo-haptics';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Image, Platform, StyleSheet, View } from 'react-native';
+import { Shine } from './effects';
 import { fonts, palette } from './theme';
 
 const useNative = Platform.OS !== 'web';
@@ -186,7 +187,10 @@ export function LaunchIntro({ ready, fontsReady, onDone }: { ready: boolean; fon
       >
         {fontsReady ? (
           <>
-            <Animated.Text style={{ fontFamily: fonts.serifBold, fontSize: 34, lineHeight: 48, color: '#F4F1E6' }}>MindPay</Animated.Text>
+            <View style={{ overflow: 'hidden', paddingHorizontal: 10 }}>
+              <Animated.Text style={{ fontFamily: fonts.serifBold, fontSize: 34, lineHeight: 48, color: '#F4F1E6' }}>MindPay</Animated.Text>
+              <Shine times={1} delay={620} duration={620} color="rgba(255,226,150,0.6)" />
+            </View>
             <Animated.Text
               style={{
                 fontFamily: fonts.sans,

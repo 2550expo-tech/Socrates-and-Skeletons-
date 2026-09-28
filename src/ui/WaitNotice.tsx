@@ -6,7 +6,8 @@ import { useEffect, useState } from 'react';
 import { waitMessage } from '../services/slips';
 import { T } from './components';
 
-const secondsLeft = (until: number) => Math.max(0, Math.ceil((until - Date.now()) / 1000));
+// Rounded, so a countdown that starts at 20 never flashes 21 because of a millisecond of drift.
+const secondsLeft = (until: number) => Math.max(0, Math.round((until - Date.now()) / 1000));
 
 export function WaitNotice({ until, micro }: { until: number; micro?: boolean }) {
   const [left, setLeft] = useState(() => secondsLeft(until));

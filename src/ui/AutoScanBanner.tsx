@@ -3,12 +3,14 @@
  * then what changed, with a way to review or undo.
  */
 import { router } from 'expo-router';
+import { useEffect } from 'react';
 import { View } from 'react-native';
 import { BUDDY_NAME } from '../domain/buddy';
 import { formatBaht } from '../domain/money';
 import { useAutoScan } from '../services/AutoScanProvider';
 import { Buddy } from './Buddy';
 import { Button, Card, IconButton, ProgressBar, Row, T } from './components';
+import { Reveal, ScanBeam, useCelebrate } from './effects';
 import { useToast } from './feedback';
 import { space, useTheme } from './theme';
 import { WaitNotice } from './WaitNotice';
@@ -17,13 +19,22 @@ export function AutoScanBanner() {
   const theme = useTheme();
   const toast = useToast();
   const { state, available, grantAndRun, undoLast, dismiss } = useAutoScan();
+  const celebrate = useCelebrate();
+  const counted = state.phase === 'done' ? state.confirmed.length : 0;
+  useEffect(() => {
+    if (counted > 0) celebrate();
+  }, [counted, celebrate]);
   if (!available || state.phase === 'idle') return null;
 
   if (state.phase === 'scanning') {
     return (
-      <Card tone="alt" style={{ paddingVertical: space.md }}>
+      <Reveal from={-10}>
+      <Card tone="alt" style={{ paddingVertical: space.md, overflow: 'hidden' }}>
         <Row gap={space.md}>
-          <Buddy mood="thinking" size={48} />
+          <View>
+            <Buddy mood="thinking" size={48} />
+            <ScanBeam height={48} active />
+          </View>
           <View style={{ flex: 1, gap: 6 }}>
             <T v="body">
               {state.total === 0 ? `${BUDDY_NAME}กำลังหาสลิปใหม่ในแกลเลอรี…` : `${BUDDY_NAME}กำลังอ่านสลิปใหม่ ${state.processed}/${state.total}`}
@@ -33,6 +44,7 @@ export function AutoScanBanner() {
           </View>
         </Row>
       </Card>
+      </Reveal>
     );
   }
 
@@ -78,6 +90,7 @@ export function AutoScanBanner() {
   // done
   const total = state.confirmed.reduce((s, t) => s + (t.kind === 'income' ? t.amountSatang : -t.amountSatang), 0);
   return (
+    <Reveal zoom>
     <Card style={{ borderColor: theme.primary, borderWidth: 1.5 }}>
       <Row gap={space.md} align="flex-start">
         <Buddy mood={state.confirmed.length > 0 ? 'cheer' : 'thinking'} size={52} />
@@ -118,5 +131,6 @@ export function AutoScanBanner() {
         ) : null}
       </Row>
     </Card>
+    </Reveal>
   );
 }
