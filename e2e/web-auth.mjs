@@ -731,6 +731,14 @@ try {
       return Math.round(Number(label.match(/฿([\d,]+\.\d{2})/)[1].replace(/,/g, '')) * 100);
     };
     const start = await balance();
+    // The companion and the money tree answer when tapped.
+    await button(page, 'แตะน้องกล้าเพื่อฟังเคล็ดลับ').click();
+    check('Tapping the companion: it gives a tip', await visible(page, 'เก็บสลิปไว้ในเครื่องได้เลย'));
+    await button(page, 'ต้นไม้เงิน แตะเพื่อดูความหมาย').click();
+    const treeSays = await visible(page, 'ใบทองคือวันที่เงินพอใช้');
+    await page.waitForTimeout(500);
+    await shot(page, '23-tree-tapped');
+    check('Tapping the money tree: the companion explains the gold leaves', treeSays);
     await button(page, 'จดด้วยเสียง').click();
     check('Voice: the mic on the home screen opens "พูดจดรายการ"', await visible(page, 'แตะไมค์แล้วพูด'));
     await button(page, 'แตะแล้วพูด').click();

@@ -5,8 +5,9 @@
  * that makes the app feel alive. It bobs a few times when it appears and
  * blinks now and then; both are off when the phone's "Reduce motion" is on.
  */
+import * as Haptics from 'expo-haptics';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Animated, Easing, Platform, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, Easing, Platform, Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, Ellipse, G, Path } from 'react-native-svg';
 import type { BuddyMood } from '../domain/buddy';
 import { T } from './components';
@@ -81,19 +82,34 @@ export function Buddy({
   size = 64,
   still,
   onDark,
+  hop = 0,
 }: {
   mood?: BuddyMood;
   size?: number;
   still?: boolean;
   onDark?: boolean;
+  /** Changes when the user taps it: a happy little jump. */
+  hop?: number;
 }) {
   const theme = useTheme();
   const reduce = useReduceMotion();
   // Cream trunk on dark surfaces, warm brown on light ones so it stays visible.
   const TRUNK = onDark || theme.dark ? '#E8E1CC' : '#A88F5E';
   const [bob] = useState(() => new Animated.Value(0));
+  const [jump] = useState(() => new Animated.Value(0));
   const [blink, setBlink] = useState(false);
   const animate = !still && !reduce;
+
+  useEffect(() => {
+    if (!hop || reduce) return;
+    jump.setValue(0);
+    const anim = Animated.sequence([
+      Animated.timing(jump, { toValue: 1, duration: 170, easing: Easing.out(Easing.quad), useNativeDriver: useNative }),
+      Animated.spring(jump, { toValue: 0, friction: 4, tension: 120, useNativeDriver: useNative }),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [hop, reduce, jump]);
 
   useEffect(() => {
     if (!animate) return;
@@ -128,7 +144,17 @@ export function Buddy({
     <Animated.View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={{ width: size, height: size, transform: [{ translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [0, -lift] }) }] }}
+      style={{
+        width: size,
+        height: size,
+        transformOrigin: 'bottom',
+        transform: [
+          { translateY: Animated.add(bob.interpolate({ inputRange: [0, 1], outputRange: [0, -lift] }), jump.interpolate({ inputRange: [0, 1], outputRange: [0, -size * 0.22] })) },
+          // Squashes a little as it takes off and lands.
+          { scaleY: jump.interpolate({ inputRange: [-0.3, 0, 0.3, 1], outputRange: [0.9, 1, 1.05, 1], extrapolate: 'clamp' }) },
+          { scaleX: jump.interpolate({ inputRange: [-0.3, 0, 0.3, 1], outputRange: [1.08, 1, 0.97, 1], extrapolate: 'clamp' }) },
+        ],
+      }}
     >
       <Svg width={size} height={size} viewBox="0 0 120 120">
         <Ellipse cx={60} cy={112} rx={24} ry={4} fill="#000" opacity={0.12} />
@@ -192,12 +218,17 @@ export function BuddySays({
   action,
   size = 60,
   style,
+  onPress,
+  hop,
 }: {
   mood: BuddyMood;
   children: ReactNode;
   action?: ReactNode;
   size?: number;
   style?: StyleProp<ViewStyle>;
+  /** Makes the companion tappable (it jumps; the screen decides what it says). */
+  onPress?: () => void;
+  hop?: number;
 }) {
   const theme = useTheme();
   const [enter] = useState(() => new Animated.Value(0));
@@ -208,7 +239,21 @@ export function BuddySays({
   }, [enter, key]);
   return (
     <View style={[{ flexDirection: 'row', alignItems: 'flex-end', gap: space.sm }, style]}>
-      <Buddy mood={mood} size={size} />
+      {onPress ? (
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            onPress();
+          }}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="แตะน้องกล้าเพื่อฟังเคล็ดลับ"
+        >
+          <Buddy mood={mood} size={size} hop={hop} />
+        </Pressable>
+      ) : (
+        <Buddy mood={mood} size={size} />
+      )}
       <Animated.View
         accessibilityLiveRegion="polite"
         style={{

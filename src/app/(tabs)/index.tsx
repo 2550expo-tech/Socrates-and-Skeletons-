@@ -6,10 +6,10 @@
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, RefreshControl, View } from 'react-native';
 import { useApp, useMoney } from '../../data/AppProvider';
-import { buddyLine, spentOnDay } from '../../domain/buddy';
+import { buddyLine, buddyPoke, spentOnDay, treeLine, type BuddyLine } from '../../domain/buddy';
 import { addDays, formatRangeSpan, formatThaiDay, formatThaiDayLong, RANGE_LABEL, RANGE_ORDER } from '../../domain/dates';
 import { formatBaht } from '../../domain/money';
 import { endOfMonthDay, safeDailySpend } from '../../domain/runway';
@@ -106,6 +106,27 @@ export default function Home() {
   const heroScale = reduce ? 1 : scrollY.interpolate({ inputRange: [-120, 0, 260], outputRange: [1.05, 1, 0.95], extrapolate: 'clamp' });
   const treeLift = reduce ? 0 : scrollY.interpolate({ inputRange: [-120, 0, 260], outputRange: [10, 0, -22], extrapolate: 'clamp' });
   const daysShown = useCountUp(runway.days ?? 0, !reduce && runway.days !== null && !runway.capped, 900);
+  // Tapping the companion or the tree: it answers for a few seconds, then goes back to its line.
+  const [said, setSaid] = useState<BuddyLine | null>(null);
+  const [hop, setHop] = useState(0);
+  const [treeTaps, setTreeTaps] = useState(0);
+  const pokes = useRef(0);
+  useEffect(() => {
+    if (!said) return;
+    const t = setTimeout(() => setSaid(null), 6000);
+    return () => clearTimeout(t);
+  }, [said]);
+  function pokeBuddy() {
+    pokes.current += 1;
+    setHop((h) => h + 1);
+    setSaid(buddyPoke(pokes.current, runway.status));
+  }
+  function tapTree() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setTreeTaps((n) => n + 1);
+    setHop((h) => h + 1);
+    setSaid(treeLine({ status: runway.status, days: runway.days, capped: runway.capped }));
+  }
   const buddy = buddyLine({
     status: runway.status,
     days: runway.days,
@@ -128,7 +149,9 @@ export default function Home() {
       </Row>
 
       <Reveal>
-        <BuddySays mood={buddy.mood}>{buddy.text}</BuddySays>
+        <BuddySays mood={(said ?? buddy).mood} onPress={pokeBuddy} hop={hop}>
+          {(said ?? buddy).text}
+        </BuddySays>
       </Reveal>
 
       {repo?.mode === 'demo' ? (
@@ -185,16 +208,20 @@ export default function Home() {
                 </View>
               </View>
               <Animated.View style={{ transform: [{ translateY: treeLift }] }}>
-                <MoneyTree
-                  health={treeHealth(runway.status, runway.days)}
-                  size={104}
-                  trunk="#E8E1CC"
-                  leaf={palette.goldBright}
-                  bare="#6F9483"
-                  glow={palette.goldBright}
-                  grow
-                  sway
-                />
+                <Pressable onPress={tapTree} accessibilityRole="button" accessibilityLabel="ต้นไม้เงิน แตะเพื่อดูความหมาย" hitSlop={6}>
+                  <MoneyTree
+                    health={treeHealth(runway.status, runway.days)}
+                    size={104}
+                    trunk="#E8E1CC"
+                    leaf={palette.goldBright}
+                    bare="#6F9483"
+                    glow={palette.goldBright}
+                    grow
+                    sway
+                    wiggle={treeTaps}
+                  />
+                  {treeTaps > 0 ? <Sparkles trigger={treeTaps} count={7} cycles={1} seed={treeTaps} area={{ top: 0, bottom: 70 }} /> : null}
+                </Pressable>
               </Animated.View>
             </Row>
             <View style={{ height: 1, backgroundColor: 'rgba(244,241,230,0.15)' }} />

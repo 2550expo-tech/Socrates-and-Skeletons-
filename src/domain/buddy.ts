@@ -92,6 +92,7 @@ export const BUDDY_TIPS: readonly string[] = [
   'สงสัยอะไรเรื่องเงิน ถามโค้ชได้เลย เช่น หมวดไหนควรลดก่อน',
   'เงินสำรองคือเงินที่ไม่นับเป็นเงินใช้ เผื่อไว้ยามฉุกเฉินนะ',
   'จดทุกวันนิดเดียว ต้นไม้เงินก็โตได้ทุกวัน',
+  'ขี้เกียจพิมพ์? แตะไมค์ทองแล้วพูดว่า "ข้าว 50 บาท" ก็จดให้แล้ว',
 ];
 
 /** After this many taps in a row the companion giggles instead of giving a tip. */
@@ -112,4 +113,25 @@ export function buddyPoke(n: number, status: RunwayStatus): BuddyLine {
   }
   const tip = BUDDY_TIPS[(n - 1) % BUDDY_TIPS.length];
   return { mood: n % 2 === 0 ? 'happy' : 'thinking', text: tip };
+}
+
+/**
+ * What the money tree means, said when the user taps the tree: gold leaves
+ * are the days the money lasts (a full tree = 45 days or more).
+ */
+export function treeLine(p: { status: RunwayStatus; days: number | null; capped: boolean }): BuddyLine {
+  if (p.status === 'no_spending' || p.days === null) {
+    return { mood: 'thinking', text: 'ใบทองบอกว่าเงินพอใช้อีกกี่วัน ตอนนี้ 7 วันล่าสุดยังไม่มีรายจ่าย ต้นไม้เลยยังนับไม่ได้' };
+  }
+  if (p.status === 'below_floor') {
+    return { mood: 'worried', text: 'ใบทองร่วงเกือบหมด เพราะเงินต่ำกว่าเงินสำรองแล้ว ลองใช้เท่าที่จำเป็นสักพัก ใบจะกลับมานะ' };
+  }
+  if (p.capped) return { mood: 'cheer', text: 'ใบทองเต็มต้น! เงินพอใช้เกิน 1 ปี ต้นไม้เงินแข็งแรงสุด ๆ' };
+  if (p.status === 'critical') {
+    return { mood: 'worried', text: `ใบทองเหลือน้อย เงินพอใช้อีก ${p.days} วัน ใช้น้อยลงวันละนิด ใบทองจะเพิ่มขึ้น` };
+  }
+  if (p.status === 'watch') {
+    return { mood: 'calm', text: `ใบทองคือวันที่เงินพอใช้ ตอนนี้ ${p.days} วัน ยิ่งใช้น้อยลง ใบทองยิ่งเต็มต้น` };
+  }
+  return { mood: 'happy', text: `ใบทองคือวันที่เงินพอใช้ ตอนนี้ ${p.days} วัน ต้นไม้เงินงามมาก รักษาไว้แบบนี้นะ` };
 }

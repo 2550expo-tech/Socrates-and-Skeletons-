@@ -65,6 +65,7 @@ export function MoneyTree({
   grow,
   sway,
   glow,
+  wiggle = 0,
 }: {
   /** 0..1 — share of leaves shown in gold */
   health: number;
@@ -78,6 +79,8 @@ export function MoneyTree({
   sway?: boolean;
   /** A soft glow of this color behind the canopy. */
   glow?: string;
+  /** Changes when the user taps the tree: it shakes its leaves. */
+  wiggle?: number;
 }) {
   const reduce = useReduceMotion();
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
@@ -98,11 +101,23 @@ export function MoneyTree({
     anim.start();
     return () => anim.stop();
   }, [sway, reduce, rock, target]);
+  const [shake] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    if (!wiggle || reduce) return;
+    shake.setValue(0);
+    const step = (to: number, duration: number) => Animated.timing(shake, { toValue: to, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: useNative });
+    const anim = Animated.sequence([step(1, 90), step(-0.8, 150), step(0.55, 140), step(-0.3, 130), step(0, 120)]);
+    anim.start();
+    return () => anim.stop();
+  }, [wiggle, reduce, shake]);
   return (
     <Animated.View
       style={{
         transformOrigin: 'bottom',
-        transform: [{ rotate: rock.interpolate({ inputRange: [-1, 1], outputRange: ['-2.5deg', '2.5deg'] }) }],
+        transform: [
+          { rotate: rock.interpolate({ inputRange: [-1, 1], outputRange: ['-2.5deg', '2.5deg'] }) },
+          { rotate: shake.interpolate({ inputRange: [-1, 1], outputRange: ['-7deg', '7deg'] }) },
+        ],
       }}
     >
       <Svg width={size} height={(size * 150) / 140} viewBox="0 0 140 150" accessibilityLabel="ต้นไม้เงิน">

@@ -1,9 +1,9 @@
 /**
- * TC-49..TC-51, TC-53, TC-58: the companion ("น้องกล้า"), the start of a new
+ * TC-49..TC-51, TC-53, TC-58, TC-66: the companion ("น้องกล้า"), the start of a new
  * day, and what it says when tapped.
  */
 import { describe, expect, it } from 'vitest';
-import { BUDDY_TICKLE_AFTER, BUDDY_TIPS, buddyLine, buddyPoke, isNewFromSlip, spentOnDay, spentToday } from '../buddy';
+import { BUDDY_TICKLE_AFTER, BUDDY_TIPS, buddyLine, buddyPoke, isNewFromSlip, spentOnDay, spentToday, treeLine } from '../buddy';
 import { bkkToIso, msUntilNextBkkMidnight } from '../dates';
 import type { Transaction } from '../types';
 
@@ -101,3 +101,18 @@ describe('Tapping the companion', () => {
   });
 });
 
+describe('Tapping the money tree', () => {
+  it('TC-66 explains what the gold leaves mean, kindly, for every money situation', () => {
+    expect(treeLine({ status: 'healthy', days: 27, capped: false }).text).toContain('27 วัน');
+    expect(treeLine({ status: 'healthy', days: 400, capped: true }).text).toContain('เกิน 1 ปี');
+    expect(treeLine({ status: 'watch', days: 12, capped: false }).text).toContain('12 วัน');
+    expect(treeLine({ status: 'critical', days: 3, capped: false }).mood).toBe('worried');
+    expect(treeLine({ status: 'below_floor', days: 0, capped: false }).text).toContain('เงินสำรอง');
+    expect(treeLine({ status: 'no_spending', days: null, capped: false }).text).toContain('ยังไม่มีรายจ่าย');
+    for (const status of ['healthy', 'watch', 'critical', 'below_floor', 'no_spending'] as const) {
+      const t = treeLine({ status, days: 5, capped: false }).text;
+      expect(t).toContain('ใบ');
+      expect(t).not.toMatch(/เกินไป!|ห้าม|แย่/);
+    }
+  });
+});
