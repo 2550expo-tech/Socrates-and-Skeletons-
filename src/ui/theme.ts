@@ -225,6 +225,26 @@ export function alpha(hex: string, a: number): string {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }
 
+function luminance(hex: string): number {
+  const n = parseInt(hex.replace('#', '').slice(0, 6), 16);
+  const ch = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * ch((n >> 16) & 255) + 0.7152 * ch((n >> 8) & 255) + 0.0722 * ch(n & 255);
+}
+
+/** WCAG contrast ratio between two hex colours (1 to 21). */
+export function contrast(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** The first colour that reads on `bg` at 4.5:1 or better (the last one otherwise). */
+export function readableOn(bg: string, ...colors: string[]): string {
+  return colors.find((c) => contrast(c, bg) >= 4.5) ?? colors[colors.length - 1];
+}
+
 const cache = new Map<string, Theme>();
 function themeFor(key: ColorThemeKey, dark: boolean): Theme {
   const id = `${key}:${dark ? 'd' : 'l'}`;

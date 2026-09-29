@@ -82,6 +82,7 @@ const SPARKS = Array.from({ length: 10 }, (_, i) => {
 
 /** Gold badge with a check that pops, a ring and sparks that burst outward. */
 function Celebration() {
+  const theme = useTheme();
   const reduce = useReduceMotion();
   const [pop] = useState(() => new Animated.Value(0));
   const [burst] = useState(() => new Animated.Value(0));
@@ -123,7 +124,8 @@ function Celebration() {
             width: s.gold ? 9 : 6,
             height: s.gold ? 9 : 6,
             borderRadius: 5,
-            backgroundColor: s.gold ? palette.goldBright : palette.leaf,
+            // Gold sparks plus the colour theme's own colour.
+            backgroundColor: s.gold ? palette.goldBright : theme.primary,
             opacity: burst.interpolate({ inputRange: [0, 0.15, 0.8, 1], outputRange: [0, 1, 1, 0] }),
             transform: [
               { translateX: burst.interpolate({ inputRange: [0, 1], outputRange: [0, s.x] }) },

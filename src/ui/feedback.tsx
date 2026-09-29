@@ -7,7 +7,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { Animated, Modal, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, T } from './components';
-import { fonts, radius, space, useTheme } from './theme';
+import { buildTheme, fonts, radius, readableOn, space, useTheme } from './theme';
 
 interface ToastOptions {
   message: string;
@@ -23,6 +23,10 @@ export function useToast() {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const theme = useTheme();
+  // The message sits on the theme's ink; its button uses the theme's accent (light mode) or the
+  // light-mode main colour (dark mode), falling back to plain text colour if that would be faint.
+  const light = buildTheme(theme.colorTheme, false);
+  const actionColor = readableOn(theme.ink, theme.dark ? light.primary : theme.accent, theme.bg);
   const insets = useSafeAreaInsets();
   const [toast, setToast] = useState<ToastOptions | null>(null);
   const [anim] = useState(() => new Animated.Value(0));
@@ -62,7 +66,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         >
           <View
             style={{
-              backgroundColor: toast.tone === 'error' ? theme.critical : theme.dark ? '#E7EFE9' : '#11231B',
+              // The colour theme's own ink, so the message matches every theme (not only the green one).
+              backgroundColor: toast.tone === 'error' ? theme.critical : theme.ink,
               borderRadius: radius.md,
               paddingVertical: 12,
               paddingHorizontal: 16,
@@ -71,7 +76,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               gap: 12,
             }}
           >
-            <Text style={{ flex: 1, fontFamily: fonts.sansMedium, fontSize: 14, color: toast.tone === 'error' ? '#fff' : theme.dark ? '#11231B' : '#F2F5F1' }}>
+            <Text style={{ flex: 1, fontFamily: fonts.sansMedium, fontSize: 14, color: toast.tone === 'error' ? '#fff' : theme.bg }}>
               {toast.message}
             </Text>
             {toast.action ? (
@@ -83,7 +88,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 hitSlop={10}
                 accessibilityRole="button"
               >
-                <Text style={{ fontFamily: fonts.sansBold, fontSize: 14, color: theme.accent }}>{toast.action.label}</Text>
+                <Text style={{ fontFamily: fonts.sansBold, fontSize: 14, color: actionColor }}>{toast.action.label}</Text>
               </Pressable>
             ) : null}
           </View>
