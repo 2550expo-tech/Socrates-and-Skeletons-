@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BUDDY_NAME } from '../domain/buddy';
 import { Buddy } from './Buddy';
 import { IconButton, T } from './components';
-import { palette, radius, space } from './theme';
+import { radius, space, useTheme } from './theme';
 
 const CHECK_EVERY_MS = 30 * 60 * 1000;
 
@@ -23,6 +23,7 @@ export function UpdateBanner() {
 }
 
 function UpdateBannerInner() {
+  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { isUpdatePending } = Updates.useUpdates();
   const [hidden, setHidden] = useState(false);
@@ -57,7 +58,7 @@ function UpdateBannerInner() {
           flexDirection: 'row',
           alignItems: 'center',
           gap: space.sm,
-          backgroundColor: palette.forest,
+          backgroundColor: theme.hero,
           borderRadius: radius.lg,
           paddingVertical: space.sm,
           paddingLeft: space.sm,
@@ -73,9 +74,9 @@ function UpdateBannerInner() {
         <Buddy mood="cheer" size={40} still onDark />
         <View style={{ flex: 1 }}>
           <T v="small" color="#F4F1E6">{BUDDY_NAME}มีเวอร์ชันใหม่มาแล้ว</T>
-          <T v="micro" color={palette.goldBright}>แตะเพื่อเปิดใหม่ (ใช้เวลา 2–3 วินาที)</T>
+          <T v="micro" color={theme.heroAccent}>แตะเพื่อเปิดใหม่ (ใช้เวลา 2–3 วินาที)</T>
         </View>
-        <IconButton icon="close" label="ไว้ทีหลัง" color="#B9CEC2" onPress={() => setHidden(true)} />
+        <IconButton icon="close" label="ไว้ทีหลัง" color={theme.heroInkSoft} onPress={() => setHidden(true)} />
       </Pressable>
     </View>
   );

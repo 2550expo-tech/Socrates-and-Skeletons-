@@ -14,7 +14,7 @@ import { Aurora, PulseRing, Reveal, Sparkles } from '../ui/effects';
 import { Medal } from '../ui/Medal';
 import { useCountUp, useReduceMotion } from '../ui/motion';
 import { goBack } from '../ui/nav';
-import { palette, radius, space, useTheme } from '../ui/theme';
+import { radius, space, useTheme } from '../ui/theme';
 
 const WEEKDAY = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
@@ -49,7 +49,7 @@ export default function Achievements() {
         <Reveal zoom>
           <View style={{ borderRadius: radius.xl, overflow: 'hidden' }}>
             <LinearGradient
-              colors={['#135A40', palette.forest, palette.forestDeep]}
+              colors={[theme.heroTop, theme.hero, theme.heroDeep]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={{ padding: space.xl, gap: space.md }}
@@ -58,7 +58,7 @@ export default function Achievements() {
               {streak.today ? <Sparkles count={8} cycles={1} area={{ top: 6, bottom: 50 }} /> : null}
               <Row gap={space.lg}>
                 <View style={{ width: 76, height: 76, alignItems: 'center', justifyContent: 'center' }}>
-                  <PulseRing size={76} active={streak.today} times={2} color={palette.goldBright} />
+                  <PulseRing size={76} active={streak.today} times={2} color={theme.heroAccent} />
                   <View
                     style={{
                       width: 68,
@@ -66,7 +66,7 @@ export default function Achievements() {
                       borderRadius: 34,
                       backgroundColor: 'rgba(226,182,74,0.14)',
                       borderWidth: 2,
-                      borderColor: streak.today ? palette.goldBright : 'rgba(244,241,230,0.35)',
+                      borderColor: streak.today ? theme.heroAccent : 'rgba(244,241,230,0.35)',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
@@ -75,11 +75,11 @@ export default function Achievements() {
                   </View>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <T v="small" color="#B9CEC2">จดต่อเนื่อง</T>
-                  <T v="h1" color={palette.goldBright}>
+                  <T v="small" color={theme.heroInkSoft}>จดต่อเนื่อง</T>
+                  <T v="h1" color={theme.heroAccent}>
                     {shown} <T v="body" color="#F4F1E6">วัน</T>
                   </T>
-                  <T v="small" color="#B9CEC2">สถิติสูงสุด {streak.best} วัน</T>
+                  <T v="small" color={theme.heroInkSoft}>สถิติสูงสุด {streak.best} วัน</T>
                 </View>
               </Row>
               <View
@@ -97,9 +97,9 @@ export default function Achievements() {
                           width: 16,
                           height: 16,
                           borderRadius: 8,
-                          backgroundColor: d.active ? palette.goldBright : 'transparent',
+                          backgroundColor: d.active ? theme.heroAccent : 'transparent',
                           borderWidth: isToday ? 2 : 1.5,
-                          borderColor: d.active ? palette.goldBright : isToday ? '#F4F1E6' : 'rgba(244,241,230,0.3)',
+                          borderColor: d.active ? theme.heroAccent : isToday ? '#F4F1E6' : 'rgba(244,241,230,0.3)',
                         }}
                       />
                       <T v="micro" color={isToday ? '#F4F1E6' : 'rgba(244,241,230,0.55)'}>

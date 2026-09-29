@@ -57,23 +57,23 @@ export default function RunwayScreen() {
       <Reveal zoom>
         <View style={{ borderRadius: radius.xl, overflow: 'hidden' }}>
           <LinearGradient
-            colors={[theme.dark ? '#124232' : '#135A40', palette.forest, palette.forestDeep]}
+            colors={[theme.heroTop, theme.hero, theme.heroDeep]}
             locations={[0, 0.55, 1]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{ padding: space.xl, alignItems: 'center', gap: space.sm }}
           >
             <Aurora seed={9} />
-            <ContourLines width={420} height={340} color={palette.goldBright} />
+            <ContourLines width={420} height={340} color={theme.heroAccent} />
             <Sparkles count={12} area={{ top: 4, bottom: 60 }} seed={29} />
-            <ProgressRing value={fullness} size={206} color={palette.goldBright} track="rgba(244,241,230,0.14)" width={5}>
+            <ProgressRing value={fullness} size={206} color={theme.heroAccent} track="rgba(244,241,230,0.14)" width={5}>
               <MoneyTree
                 health={treeHealth(runway.status, runway.days)}
                 size={150}
                 trunk="#E8E1CC"
-                leaf={palette.goldBright}
-                bare="#6F9483"
-                glow={palette.goldBright}
+                leaf={theme.heroAccent}
+                bare={theme.heroBare}
+                glow={theme.heroAccent}
                 grow
                 sway
               />
@@ -81,16 +81,16 @@ export default function RunwayScreen() {
             {runway.status === 'no_spending' ? (
               <>
                 <T v="h2" color="#F4F1E6" center>ยังคำนวณไม่ได้</T>
-                <T v="small" color="#B9CEC2" center>ไม่มีรายจ่ายที่ยืนยันใน {RUNWAY_WINDOW_DAYS} วันล่าสุด จึงยังหาค่าเฉลี่ยไม่ได้</T>
+                <T v="small" color={theme.heroInkSoft} center>ไม่มีรายจ่ายที่ยืนยันใน {RUNWAY_WINDOW_DAYS} วันล่าสุด จึงยังหาค่าเฉลี่ยไม่ได้</T>
               </>
             ) : runway.status === 'below_floor' ? (
               <>
                 <T v="h2" color="#F4F1E6" center>ยอดเงินแตะเส้นสำรองแล้ว</T>
-                <T v="small" color="#B9CEC2" center>คงเหลือ {formatBaht(balance)} · เส้นสำรอง {formatBaht(runway.floorSatang, { decimals: false })}</T>
+                <T v="small" color={theme.heroInkSoft} center>คงเหลือ {formatBaht(balance)} · เส้นสำรอง {formatBaht(runway.floorSatang, { decimals: false })}</T>
               </>
             ) : (
               <>
-                <T v="display" color={palette.goldBright}>{runway.capped ? '365+' : daysShown}</T>
+                <T v="display" color={theme.heroAccent}>{runway.capped ? '365+' : daysShown}</T>
                 <T v="h3" color="#F4F1E6" center>วัน · ถึงประมาณ {formatThaiDay(runway.depletionDay!)}</T>
               </>
             )}

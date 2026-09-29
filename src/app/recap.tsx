@@ -20,28 +20,28 @@ import { Button, Ionicons, Row, T } from '../ui/components';
 import { Aurora, GrowBar, Reveal, Sparkles, useCelebrate } from '../ui/effects';
 import { useCountUp, useNative, useReduceMotion } from '../ui/motion';
 import { goBack } from '../ui/nav';
-import { fonts, palette, space } from '../ui/theme';
+import { fonts, space, useTheme } from '../ui/theme';
 
 const SLIDE_MS = 6500;
 const INK = '#F4F1E6';
 const SOFT = '#C9D8CF';
 
+/** Colours of the story screens in between (the first and last use the theme's own). */
 const GRADIENTS: [string, string, string][] = [
-  ['#135A40', palette.forest, palette.forestDeep],
   ['#6B4A0E', '#3B2A0B', '#1D1405'],
   ['#0F3D4A', '#0A2A33', '#061A20'],
   ['#4A1F3D', '#2E1327', '#1A0A16'],
   ['#123A6B', '#0B2547', '#061528'],
   ['#1F5A3A', '#123A27', '#08201A'],
-  ['#135A40', palette.forest, palette.forestDeep],
 ];
 
 /** A baht amount that counts up when the screen appears. */
-function BigBaht({ satang, color = palette.goldBright }: { satang: number; color?: string }) {
+function BigBaht({ satang, color }: { satang: number; color?: string }) {
+  const theme = useTheme();
   const reduce = useReduceMotion();
   const baht = useCountUp(Math.round(satang / 100), !reduce, 1200);
   return (
-    <T v="display" color={color} style={{ fontFamily: fonts.serifBold }}>
+    <T v="display" color={color ?? theme.heroAccent} style={{ fontFamily: fonts.serifBold }}>
       {formatBaht(baht * 100, { decimals: false })}
     </T>
   );
@@ -59,6 +59,7 @@ function Line({ children, index = 0, big }: { children: ReactNode; index?: numbe
 
 export default function Recap() {
   const params = useLocalSearchParams<{ month?: string }>();
+  const theme = useTheme();
   const { txs, today, profile } = useApp();
   const { runway } = useMoney();
   const { streak, badges } = useAchievements();
@@ -87,7 +88,7 @@ export default function Recap() {
           </Reveal>
           <Line index={1}>สรุปเดือน</Line>
           <Reveal index={2} zoom>
-            <T v="display" color={palette.goldBright} center style={{ fontFamily: fonts.serifBold }}>
+            <T v="display" color={theme.heroAccent} center style={{ fontFamily: fonts.serifBold }}>
               {r.label}
             </T>
           </Reveal>
@@ -136,7 +137,7 @@ export default function Recap() {
                     <T v="small" color={INK}>{`${c.glyph} ${c.label}`}</T>
                     <T v="small" color={SOFT}>{formatBaht(c.amountSatang, { decimals: false })}</T>
                   </Row>
-                  <GrowBar value={c.share} color={i === 0 ? palette.goldBright : '#7FD1A8'} track="rgba(244,241,230,0.12)" height={10} delay={500 + i * 150} />
+                  <GrowBar value={c.share} color={i === 0 ? theme.heroAccent : '#7FD1A8'} track="rgba(244,241,230,0.12)" height={10} delay={500 + i * 150} />
                 </View>
               </Reveal>
             ))}
@@ -190,7 +191,7 @@ export default function Recap() {
               <Reveal key={h.label} index={1 + i} zoom>
                 <View style={{ alignItems: 'center', gap: space.xs, width: 92 }}>
                   <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(244,241,230,0.10)', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name={h.icon} size={30} color={palette.goldBright} />
+                    <Ionicons name={h.icon} size={30} color={theme.heroAccent} />
                   </View>
                   <T v="h1" color={INK}>
                     {h.n}
@@ -255,7 +256,7 @@ export default function Recap() {
       body: (
         <View style={{ alignItems: 'center', gap: space.md }}>
           <Reveal zoom>
-            <MoneyTree health={treeHealth(runway.status, runway.days)} size={150} trunk="#E8E1CC" leaf={palette.goldBright} bare="#6F9483" glow={palette.goldBright} grow sway />
+            <MoneyTree health={treeHealth(runway.status, runway.days)} size={150} trunk="#E8E1CC" leaf={theme.heroAccent} bare={theme.heroBare} glow={theme.heroAccent} grow sway />
           </Reveal>
           <Line index={1} big>
             {runway.days !== null && runway.status !== 'below_floor'
@@ -310,7 +311,8 @@ export default function Recap() {
     }
   }, [index, last, celebrate]);
 
-  const colors = GRADIENTS[index % GRADIENTS.length];
+  const heroColors: [string, string, string] = [theme.heroTop, theme.hero, theme.heroDeep];
+  const colors = index === 0 || index === last ? heroColors : GRADIENTS[(index - 1) % GRADIENTS.length];
   const slide = slides[index];
   return (
     <View style={{ flex: 1, backgroundColor: colors[2] }}>

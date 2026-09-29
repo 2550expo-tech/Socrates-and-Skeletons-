@@ -69,3 +69,42 @@ export function useSchemeChoice(): 'light' | 'dark' {
   if (m !== 'system') return m;
   return system === 'dark' ? 'dark' : 'light';
 }
+
+// ---------------------------------------------------------------------------
+// Colour theme (ธีมสี)
+// ---------------------------------------------------------------------------
+
+const COLOR_KEY = 'mindpay.colorTheme';
+const COLOR_KEYS = ['forest', 'redvelvet', 'purple', 'sapphire', 'amber', 'sunset', 'rose', 'onyx'] as const;
+export type ColorThemeChoice = (typeof COLOR_KEYS)[number];
+let color: ColorThemeChoice = 'forest';
+let colorLoaded = false;
+const colorSnapshot = () => color;
+
+async function loadColor() {
+  if (colorLoaded) return;
+  colorLoaded = true;
+  try {
+    const saved = await Storage.getItem(COLOR_KEY);
+    if (saved && (COLOR_KEYS as readonly string[]).includes(saved)) {
+      color = saved as ColorThemeChoice;
+      emit();
+    }
+  } catch {
+    // Keep the default theme.
+  }
+}
+
+export function setColorTheme(key: ColorThemeChoice) {
+  color = key;
+  emit();
+  Storage.setItem(COLOR_KEY, key).catch(() => {});
+}
+
+export function useColorThemeKey(): ColorThemeChoice {
+  const c = useSyncExternalStore(subscribe, colorSnapshot, colorSnapshot);
+  useEffect(() => {
+    loadColor();
+  }, []);
+  return c;
+}

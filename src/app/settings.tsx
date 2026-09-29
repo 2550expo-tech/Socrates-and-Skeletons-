@@ -14,6 +14,7 @@ import { forgetScanned } from '../services/slips';
 import { PERSONAS } from '../domain/insights';
 import { formatSatang, parseBahtToSatang } from '../domain/money';
 import { Button, Card, Chip, IconButton, Ionicons, Row, Segmented, T } from '../ui/components';
+import { ThemePicker } from '../ui/ThemePicker';
 import { setThemeMode, useThemeMode, type ThemeMode } from '../ui/themeMode';
 import { ConfirmSheet, useToast } from '../ui/feedback';
 import { Field } from '../ui/inputs';
@@ -156,6 +157,10 @@ export default function Settings() {
               onChange={setThemeMode}
             />
             <T v="micro">โหมดมืดช่วยถนอมสายตาตอนกลางคืน และประหยัดแบตบนจอ OLED</T>
+            <T v="small" color={theme.ink} style={{ marginTop: space.sm }}>
+              ธีมสี
+            </T>
+            <ThemePicker />
           </Card>
 
           <Card>

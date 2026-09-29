@@ -182,7 +182,7 @@ export default function VoiceEntry() {
           <Reveal zoom>
             <View style={{ borderRadius: radius.xl, overflow: 'hidden' }}>
               <LinearGradient
-                colors={['#135A40', palette.forest, palette.forestDeep]}
+                colors={[theme.heroTop, theme.hero, theme.heroDeep]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={{ paddingVertical: space.xl, paddingHorizontal: space.lg, alignItems: 'center', gap: space.md }}
@@ -191,7 +191,7 @@ export default function VoiceEntry() {
                 {canListen ? (
                   <>
                     <View style={{ width: 104, height: 104, alignItems: 'center', justifyContent: 'center' }}>
-                      <PulseRing size={104} active={listening} times="always" color={palette.goldBright} />
+                      <PulseRing size={104} active={listening} times="always" color={theme.heroAccent} />
                       <Animated.View style={{ transform: [{ scale: mic.scale }] }}>
                         <Pressable
                           onPress={toggleListening}
@@ -203,19 +203,19 @@ export default function VoiceEntry() {
                             width: 96,
                             height: 96,
                             borderRadius: 48,
-                            backgroundColor: listening ? palette.gold : palette.forestDeep,
+                            backgroundColor: listening ? theme.accent : theme.heroDeep,
                             borderWidth: 3,
-                            borderColor: palette.goldBright,
+                            borderColor: theme.heroAccent,
                             alignItems: 'center',
                             justifyContent: 'center',
-                            shadowColor: palette.gold,
+                            shadowColor: theme.accent,
                             shadowOpacity: 0.5,
                             shadowRadius: 16,
                             shadowOffset: { width: 0, height: 4 },
                             elevation: 10,
                           }}
                         >
-                          <Ionicons name={listening ? 'stop' : 'mic'} size={42} color={listening ? palette.forestDeep : palette.goldBright} />
+                          <Ionicons name={listening ? 'stop' : 'mic'} size={42} color={listening ? theme.heroDeep : theme.heroAccent} />
                         </Pressable>
                       </Animated.View>
                     </View>
@@ -226,14 +226,14 @@ export default function VoiceEntry() {
                   </>
                 ) : (
                   <>
-                    <Ionicons name="mic-outline" size={40} color={palette.goldBright} />
+                    <Ionicons name="mic-outline" size={40} color={theme.heroAccent} />
                     <T v="body" color="#F4F1E6" center>
                       เครื่องนี้ยังฟังเสียงในแอปไม่ได้ พิมพ์แบบที่พูดด้านล่างได้เลย หรือกดไมค์บนคีย์บอร์ดแล้วพูด
                     </T>
                   </>
                 )}
                 {text ? (
-                  <T v="h3" color={palette.goldBright} center accessibilityRole="text">
+                  <T v="h3" color={theme.heroAccent} center accessibilityRole="text">
                     “{parsed.heard || text}”
                   </T>
                 ) : null}

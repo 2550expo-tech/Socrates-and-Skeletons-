@@ -9,7 +9,7 @@ import Svg, { G, Rect } from 'react-native-svg';
 import { formatBaht } from '../domain/money';
 import type { Transaction } from '../domain/types';
 import { Aurora, Reveal, ScanBeam, Sparkles } from './effects';
-import { fonts, palette, radius, space } from './theme';
+import { fonts, palette, radius, space, useTheme } from './theme';
 
 const PAPER_W = 84;
 const PAPER_H = 116;
@@ -39,10 +39,11 @@ function SlipPaper() {
 }
 
 export function ScannerStage({ active, latest }: { active: boolean; latest: Transaction | null }) {
+  const theme = useTheme();
   const sign = latest ? (latest.kind === 'income' ? 1 : -1) : 1;
   return (
     <View style={{ height: 152, borderRadius: radius.lg, overflow: 'hidden' }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <LinearGradient colors={[palette.forest, palette.forestDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={[theme.hero, theme.heroDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
       <Aurora cycles={0} strength={0.28} seed={21} />
       <View style={{ position: 'absolute', left: space.xl, top: 18, width: PAPER_W, height: PAPER_H, transform: [{ rotate: '-4deg' }] }}>
         <SlipPaper />
@@ -53,7 +54,7 @@ export function ScannerStage({ active, latest }: { active: boolean; latest: Tran
         {latest ? (
           <Reveal key={latest.id} zoom from={14}>
             <View style={{ backgroundColor: 'rgba(244,241,230,0.12)', borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(226,182,74,0.45)', padding: space.md, gap: 2 }}>
-              <Text style={{ fontFamily: fonts.serif, fontSize: 22, lineHeight: 32, color: sign > 0 ? '#9BE8BF' : palette.goldBright }}>
+              <Text style={{ fontFamily: fonts.serif, fontSize: 22, lineHeight: 32, color: sign > 0 ? '#9BE8BF' : theme.heroAccent }}>
                 {formatBaht(sign * latest.amountSatang, { sign: true, decimals: false })}
               </Text>
               <Text numberOfLines={1} style={{ fontFamily: fonts.sansMedium, fontSize: 13, lineHeight: 20, color: '#E8E1CC' }}>
@@ -62,7 +63,7 @@ export function ScannerStage({ active, latest }: { active: boolean; latest: Tran
             </View>
           </Reveal>
         ) : (
-          <Text style={{ fontFamily: fonts.sansMedium, fontSize: 14, lineHeight: 22, color: '#B9CEC2' }}>
+          <Text style={{ fontFamily: fonts.sansMedium, fontSize: 14, lineHeight: 22, color: theme.heroInkSoft }}>
             {active ? 'กำลังส่องหาสลิป…' : 'พร้อมอ่านสลิป'}
           </Text>
         )}

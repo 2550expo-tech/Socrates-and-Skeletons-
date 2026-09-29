@@ -37,14 +37,14 @@ export function Medal({ badge, size = 68, shine }: { badge: Badge; size?: number
             </LinearGradient>
             <LinearGradient id={`${id}face`} x1="0" y1="0" x2="1" y2="1">
               <Stop offset="0" stopColor="#1A6B4B" />
-              <Stop offset="1" stopColor={palette.forestDeep} />
+              <Stop offset="1" stopColor={theme.heroDeep} />
             </LinearGradient>
           </Defs>
           {earned ? (
             <>
               {/* ribbon tails */}
-              <Path d={`M${r - 14} ${size - 10} L${r - 20} ${size + 9} L${r - 11} ${size + 4} L${r - 5} ${size + 10} L${r - 2} ${size - 6} Z`} fill={palette.leaf} />
-              <Path d={`M${r + 14} ${size - 10} L${r + 20} ${size + 9} L${r + 11} ${size + 4} L${r + 5} ${size + 10} L${r + 2} ${size - 6} Z`} fill="#17603F" />
+              <Path d={`M${r - 14} ${size - 10} L${r - 20} ${size + 9} L${r - 11} ${size + 4} L${r - 5} ${size + 10} L${r - 2} ${size - 6} Z`} fill={theme.primary} />
+              <Path d={`M${r + 14} ${size - 10} L${r + 20} ${size + 9} L${r + 11} ${size + 4} L${r + 5} ${size + 10} L${r + 2} ${size - 6} Z`} fill={theme.hero} />
               <Circle cx={r} cy={r} r={r - 1} fill={`url(#${id}rim)`} />
               <Circle cx={r} cy={r} r={r - ring - 2} fill={`url(#${id}face)`} />
               <Circle cx={r} cy={r} r={r - ring - 2} stroke="rgba(247,220,134,0.55)" strokeWidth={1} fill="none" />

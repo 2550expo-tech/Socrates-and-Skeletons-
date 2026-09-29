@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import { T } from './components';
 import { useNative } from './motion';
-import { palette, space, useTheme } from './theme';
+import { space, useTheme } from './theme';
 
 const THUMB = 30;
 
@@ -100,7 +100,7 @@ export function Slider({
             height: 8,
             width: travel,
             borderRadius: 4,
-            backgroundColor: palette.gold,
+            backgroundColor: theme.accent,
             transformOrigin: 'left',
             transform: [{ scaleX: travel ? pos.interpolate({ inputRange: [0, travel], outputRange: [0.0001, 1], extrapolate: 'clamp' }) : 0.0001 }],
           }}
@@ -113,7 +113,7 @@ export function Slider({
             width: THUMB,
             height: THUMB,
             borderRadius: THUMB / 2,
-            backgroundColor: palette.goldBright,
+            backgroundColor: theme.heroAccent,
             borderWidth: 3,
             borderColor: theme.surface,
             shadowColor: '#000',

@@ -310,7 +310,7 @@ export default function Home() {
           style={{
             borderRadius: radius.xl,
             overflow: 'hidden',
-            shadowColor: palette.forestDeep,
+            shadowColor: theme.heroDeep,
             shadowOpacity: theme.dark ? 0 : 0.28,
             shadowRadius: 18,
             shadowOffset: { width: 0, height: 10 },
@@ -320,19 +320,19 @@ export default function Home() {
           accessibilityLabel={`ยอดคงเหลือ ${formatBaht(balance)} ${runway.days !== null ? `เงินพอใช้อีก ${runway.days} วัน` : ''}`}
         >
           <LinearGradient
-            colors={[theme.dark ? '#124232' : '#135A40', palette.forest, palette.forestDeep]}
+            colors={[theme.heroTop, theme.hero, theme.heroDeep]}
             locations={[0, 0.55, 1]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{ padding: space.xl, gap: space.md }}
           >
             <Aurora />
-            <ContourLines width={420} height={260} color={palette.goldBright} />
+            <ContourLines width={420} height={260} color={theme.heroAccent} />
             <Sparkles trigger={balance} count={9} area={{ top: 4, bottom: 55 }} />
             <Shine trigger={balance} />
             <Row align="flex-start" justify="space-between">
               <View style={{ flex: 1, gap: 2 }}>
-                <T v="label" color="#B9CEC2">ยอดคงเหลือ</T>
+                <T v="label" color={theme.heroInkSoft}>ยอดคงเหลือ</T>
                 <Money satang={balance} size="display" color="#F4F1E6" countUp />
                 <View style={{ marginTop: space.sm }}>
                   <Badge label={badge.label} tone={badge.tone} onDark />
@@ -344,9 +344,9 @@ export default function Home() {
                     health={treeHealth(runway.status, runway.days)}
                     size={104}
                     trunk="#E8E1CC"
-                    leaf={palette.goldBright}
-                    bare="#6F9483"
-                    glow={palette.goldBright}
+                    leaf={theme.heroAccent}
+                    bare={theme.heroBare}
+                    glow={theme.heroAccent}
                     grow
                     sway
                     wiggle={treeTaps}
@@ -358,9 +358,9 @@ export default function Home() {
             <View style={{ height: 1, backgroundColor: 'rgba(244,241,230,0.15)' }} />
             <Row justify="space-between" align="flex-end">
               <View style={{ flex: 1 }}>
-                <T v="small" color="#B9CEC2">เงินพอใช้อีก</T>
+                <T v="small" color={theme.heroInkSoft}>เงินพอใช้อีก</T>
                 {runway.days !== null && runway.status !== 'below_floor' ? (
-                  <T v="h1" color={palette.goldBright}>
+                  <T v="h1" color={theme.heroAccent}>
                     {runway.capped ? '365+ ' : `${daysShown} `}
                     <T v="body" color="#F4F1E6">วัน · ถึง {formatThaiDay(runway.depletionDay!, { year: false })}</T>
                   </T>
@@ -424,7 +424,7 @@ export default function Home() {
             accessibilityLabel={`ดูสรุปเดือน${formatThaiMonth(recapMonth)}`}
             style={{ borderRadius: radius.lg, overflow: 'hidden' }}
           >
-            <LinearGradient colors={['#4A1F3D', '#2E1327', palette.forestDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: space.lg }}>
+            <LinearGradient colors={['#4A1F3D', '#2E1327', theme.heroDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: space.lg }}>
               <Shine times={1} delay={1400} color="rgba(255,255,255,0.18)" />
               <Row gap={space.md}>
                 <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(226,182,74,0.16)', alignItems: 'center', justifyContent: 'center' }}>

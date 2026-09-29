@@ -25,7 +25,7 @@ import {
 import { Animated, Easing, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useNative, useReduceMotion } from './motion';
-import { palette } from './theme';
+import { palette, useTheme } from './theme';
 
 const hidden = { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants' as const };
 
@@ -174,10 +174,8 @@ export function Shine({
  * Soft glowing clouds of color behind a surface. They drift gently a few times
  * after appearing, then rest. Put it inside a container with overflow: 'hidden'.
  */
-const AURORA_COLORS = [palette.goldBright, '#3FAE7A', '#7FD1A8'];
-
 export function Aurora({
-  colors = AURORA_COLORS,
+  colors: given,
   strength = 0.34,
   cycles = 1,
   seed = 3,
@@ -189,6 +187,10 @@ export function Aurora({
   seed?: number;
 }) {
   const reduce = useReduceMotion();
+  const theme = useTheme();
+  // Clouds in the colour theme: its bright accent, its main colour and a soft tint.
+  const colorsKey = given ? given.join(',') : `${theme.heroAccent},${theme.primary},${theme.heroInkSoft}`;
+  const colors = useMemo(() => colorsKey.split(','), [colorsKey]);
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [v] = useState(() => new Animated.Value(0));
@@ -561,7 +563,7 @@ export function ScanBeam({ height, color = '#5CE0A0', active }: { height: number
 // Celebration: confetti of gold coins, leaves and ribbons
 // ---------------------------------------------------------------------------
 
-const CONFETTI_COLORS = [palette.goldBright, palette.gold, '#3FAE7A', '#7FD1A8', '#F4F1E6', '#2E9A68'];
+const CONFETTI_BASE = [palette.goldBright, palette.gold, '#F4F1E6'];
 const SAMPLES = 10;
 
 interface Piece {
@@ -575,7 +577,8 @@ interface Piece {
   delay: number;
 }
 
-function makePieces(count: number, width: number, height: number, origin: { x: number; y: number }, seed: number): Piece[] {
+function makePieces(count: number, width: number, height: number, origin: { x: number; y: number }, seed: number, tints: string[]): Piece[] {
+  const CONFETTI_COLORS = [...CONFETTI_BASE, ...tints];
   const rnd = seeded(seed);
   const g = height * 1.9; // gravity, points per second²
   const duration = 1.9;
@@ -612,17 +615,21 @@ function ConfettiBurst({
   height,
   origin,
   onDone,
+  tints,
 }: {
   id: number;
   width: number;
   height: number;
   origin?: { x: number; y: number };
   onDone: (id: number) => void;
+  /** Colours of the colour theme mixed in with the gold. */
+  tints: string[];
 }) {
   const [p] = useState(() => new Animated.Value(0));
+  const tintKey = tints.join(',');
   const pieces = useMemo(
-    () => makePieces(44, width, height, origin ?? { x: width / 2, y: height * 0.42 }, Math.floor(id) % 100000),
-    [width, height, origin, id],
+    () => makePieces(44, width, height, origin ?? { x: width / 2, y: height * 0.42 }, Math.floor(id) % 100000, tintKey.split(',')),
+    [width, height, origin, id, tintKey],
   );
   useEffect(() => {
     const anim = Animated.timing(p, { toValue: 1, duration: 1900, easing: Easing.linear, useNativeDriver: useNative });
@@ -669,6 +676,7 @@ export function useCelebrate() {
 
 export function CelebrationProvider({ children }: { children: ReactNode }) {
   const reduce = useReduceMotion();
+  const theme = useTheme();
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [bursts, setBursts] = useState<{ id: number; origin?: { x: number; y: number } }[]>([]);
   const celebrate = useCallback<Celebrate>(
@@ -691,7 +699,7 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
       >
         {size.w
           ? bursts.map((b) => (
-              <ConfettiBurst key={b.id} id={b.id} width={size.w} height={size.h} origin={b.origin} onDone={remove} />
+              <ConfettiBurst key={b.id} id={b.id} width={size.w} height={size.h} origin={b.origin} onDone={remove} tints={[theme.primary, theme.heroAccent, theme.heroInkSoft]} />
             ))
           : null}
       </View>

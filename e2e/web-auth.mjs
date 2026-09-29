@@ -279,6 +279,16 @@ try {
     check('Settings: change password opens the new-password dialog', await visible(page, 'บันทึกรหัสผ่านใหม่'));
     await button(page, 'ไว้ทีหลัง').click();
     await page.waitForTimeout(300);
+    // Colour themes: Red Velvet paints the buttons burgundy, and the choice is kept after reopening.
+    await page.getByRole('button', { name: 'ธีม เรดเวลเวท' }).click();
+    const saveBg = await page.getByRole('button', { name: 'บันทึก', exact: true }).first().evaluate((el) => getComputedStyle(el).backgroundColor);
+    await page.getByRole('button', { name: 'ธีม เรดเวลเวท' }).scrollIntoViewIfNeeded();
+    await shot(page, '32-theme-red-velvet');
+    await page.reload();
+    await introGone(page);
+    const kept = await page.getByRole('button', { name: 'ธีม เรดเวลเวท' }).getAttribute('aria-selected');
+    check('Colour theme: Red Velvet colours the app and is remembered', saveBg === 'rgb(142, 36, 54)' && kept === 'true', `${saveBg} selected=${kept}`);
+    await page.getByRole('button', { name: 'ธีม ป่าทอง' }).click();
     await button(page, 'กลับ').click();
     check('Back from settings opened directly goes home', await visible(page, 'สวัสดี', 8000));
     await page.goto(`${APP}settings`);

@@ -31,7 +31,7 @@ import { Aurora, Reveal, Shine, Sparkles } from '../ui/effects';
 import { useToast } from '../ui/feedback';
 import { StepDots } from '../ui/StepDots';
 import { Field, PasswordField } from '../ui/inputs';
-import { fonts, palette, radius, space, useTheme } from '../ui/theme';
+import { fonts, radius, space, useTheme } from '../ui/theme';
 
 type Mode = 'signin' | 'signup' | 'forgot';
 type Notice = { text: string; tone: 'error' | 'info'; action?: 'resend' | 'forgot' };
@@ -218,7 +218,7 @@ export default function Welcome() {
           }}
         >
         <LinearGradient
-          colors={['#135A40', palette.forest, palette.forestDeep]}
+          colors={[theme.heroTop, theme.hero, theme.heroDeep]}
           locations={[0, 0.5, 1]}
           start={{ x: 0.2, y: 0 }}
           end={{ x: 0.8, y: 1 }}
@@ -231,10 +231,10 @@ export default function Welcome() {
           }}
         >
           <Aurora cycles={2} strength={0.4} seed={17} />
-          <ContourLines width={420} height={320} color={palette.goldBright} />
+          <ContourLines width={420} height={320} color={theme.heroAccent} />
           <Sparkles count={14} cycles={3} seed={41} area={{ top: 6, bottom: 70 }} />
           <Reveal zoom from={10}>
-            <MoneyTree health={0.85} size={120} trunk="#E8E1CC" leaf={palette.goldBright} bare="#7FA491" glow={palette.goldBright} grow sway />
+            <MoneyTree health={0.85} size={120} trunk="#E8E1CC" leaf={theme.heroAccent} bare={theme.heroBare} glow={theme.heroAccent} grow sway />
           </Reveal>
           <Reveal index={2} from={14}>
             <View style={{ overflow: 'hidden', borderRadius: radius.md, marginTop: space.sm, paddingHorizontal: space.sm }}>
@@ -243,7 +243,7 @@ export default function Welcome() {
             </View>
           </Reveal>
           <Reveal index={3} from={12}>
-            <T v="body" color="#B9CEC2" center>รู้ก่อนจ่าย เห็นว่าเงินจะอยู่ได้อีกกี่วัน</T>
+            <T v="body" color={theme.heroInkSoft} center>รู้ก่อนจ่าย เห็นว่าเงินจะอยู่ได้อีกกี่วัน</T>
           </Reveal>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: space.sm }}>
             {VALUE_POINTS.map((v, i) => (
@@ -261,7 +261,7 @@ export default function Welcome() {
                   borderColor: 'rgba(244,241,230,0.18)',
                 }}
               >
-                <Ionicons name={v.icon} size={14} color={palette.goldBright} />
+                <Ionicons name={v.icon} size={14} color={theme.heroAccent} />
                 <T v="micro" color="#E8E1CC">
                   {v.label}
                 </T>

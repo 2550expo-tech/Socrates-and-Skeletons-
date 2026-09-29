@@ -17,7 +17,7 @@ import { useAutoScan } from '../../services/AutoScanProvider';
 import { Ionicons, type IconName } from '../../ui/components';
 import { PulseRing, usePressSpring } from '../../ui/effects';
 import { useNative, useReduceMotion } from '../../ui/motion';
-import { fonts, palette, useTheme } from '../../ui/theme';
+import { fonts, useTheme } from '../../ui/theme';
 
 const TABS: Record<string, { label: string; icon: IconName; iconActive: IconName }> = {
   index: { label: 'หน้าหลัก', icon: 'home-outline', iconActive: 'home' },
@@ -147,19 +147,19 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
                 width: 60,
                 height: 60,
                 borderRadius: 30,
-                backgroundColor: palette.forest,
+                backgroundColor: theme.hero,
                 borderWidth: 3,
                 borderColor: theme.accent,
                 alignItems: 'center',
                 justifyContent: 'center',
-                shadowColor: palette.gold,
+                shadowColor: theme.accent,
                 shadowOpacity: 0.35,
                 shadowRadius: 10,
                 shadowOffset: { width: 0, height: 4 },
                 elevation: 8,
               }}
             >
-              <Ionicons name="scan" size={26} color={palette.goldBright} />
+              <Ionicons name="scan" size={26} color={theme.heroAccent} />
             </Pressable>
           </Animated.View>
         </View>
