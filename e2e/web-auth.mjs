@@ -582,7 +582,21 @@ try {
     // What-if slider: drag the gold thumb to spend 30% less a day.
     const slider = page.getByRole('slider', { name: 'ใช้น้อยลงวันละกี่เปอร์เซ็นต์' }).first();
     await slider.scrollIntoViewIfNeeded();
-    const box = await slider.boundingBox();
+    // Wait until the page stops moving (cards slide in), so the drag starts on the thumb.
+    let box = await slider.boundingBox();
+    for (let i = 0; i < 12; i++) {
+      await page.waitForTimeout(250);
+      const again = await slider.boundingBox();
+      const still = box && again && Math.abs(again.y - box.y) < 0.5 && Math.abs(again.x - box.x) < 0.5;
+      box = again;
+      if (still) break;
+    }
+    const under = box
+      ? await page.evaluate(({ x, y }) => {
+          const el = document.elementFromPoint(x, y);
+          return el ? `${el.tagName} role=${el.getAttribute('role')} label=${el.getAttribute('aria-label')}` : 'nothing';
+        }, { x: box.x + 15, y: box.y + box.height / 2 })
+      : 'no box';
     if (box) {
       await page.mouse.move(box.x + 15, box.y + box.height / 2);
       await page.mouse.down();
@@ -593,7 +607,13 @@ try {
     const slid = (await slider.getAttribute('aria-valuenow').catch(() => null)) ?? '';
     await page.waitForTimeout(900);
     await shot(page, '28-runway-slider');
-    check('Runway: dragging the slider to 30% less a day shows the extra days', slid === '30' && (await visible(page, 'เพิ่มขึ้น')), `value=${slid}`);
+    check('Runway: dragging the slider to 30% less a day shows the extra days', slid === '30' && (await visible(page, 'เพิ่มขึ้น')), `value=${slid} box=${JSON.stringify(box)} under=${under}`);
+    // The arrow keys move it too (keyboard users on the web).
+    await slider.focus();
+    await page.keyboard.press('ArrowRight');
+    const keyed = (await slider.getAttribute('aria-valuenow').catch(() => null)) ?? '';
+    check('Runway: the slider also moves with the arrow keys', keyed === String(Number(slid || 0) + 5), `value=${keyed}`);
+    await page.keyboard.press('Home');
     await page.fill('#runway-price', '2000');
     check('Runway: buying ฿2,000 shows the days before and after', (await visible(page, 'ถ้าซื้อ ฿2,000')) && (await visible(page, 'ตอนนี้')));
     await button(page, 'ถามโค้ชเรื่องนี้').click();

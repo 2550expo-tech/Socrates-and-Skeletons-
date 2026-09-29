@@ -1,11 +1,12 @@
 /**
  * A slider drawn in JS (no native module, so installed apps get it over the
  * air): drag the gold thumb or tap the track; it snaps to `step` and gives a
- * light tick on the phone at each step. Screen readers can adjust it too.
+ * light tick on the phone at each step. Screen readers can adjust it too, and
+ * on the web the arrow keys move it.
  */
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
+import { Animated, Platform, View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import { T } from './components';
 import { useNative } from './motion';
 import { space, useTheme } from './theme';
@@ -88,6 +89,29 @@ export function Slider({
         onResponderMove={(e: GestureResponderEvent) => pick(e.nativeEvent.pageX)}
         onResponderRelease={() => lift(0)}
         onResponderTerminate={() => lift(0)}
+        // Web: arrow keys (and Home/End) move it too, like a built-in slider.
+        {...(Platform.OS === 'web'
+          ? {
+              focusable: true,
+              onKeyDown: (e: { key?: string; nativeEvent?: { key?: string }; preventDefault?: () => void }) => {
+                const key = e.key ?? e.nativeEvent?.key;
+                const next =
+                  key === 'ArrowRight' || key === 'ArrowUp'
+                    ? value + step
+                    : key === 'ArrowLeft' || key === 'ArrowDown'
+                      ? value - step
+                      : key === 'Home'
+                        ? min
+                        : key === 'End'
+                          ? max
+                          : null;
+                if (next === null) return;
+                e.preventDefault?.();
+                const v = clamp(next);
+                if (v !== value) onChange(v);
+              },
+            }
+          : {})}
         style={{ height: THUMB + 12, justifyContent: 'center' }}
       >
         {/* track and the filled part up to the thumb */}
