@@ -82,7 +82,8 @@ export function say(text: string, h: SayHandlers): () => void {
   thaiVoice()
     .then((voice) => {
       if (finished) return;
-      return Tts.speak(id, text, { language: 'th-TH', rate: RATE, pitch: PITCH, ...(voice ? { voice } : {}) });
+      // "th", not "th-TH": Android builds its Locale from the whole string, and "th-TH" is not a language code there.
+      return Tts.speak(id, text, { language: 'th', rate: RATE, pitch: PITCH, ...(voice ? { voice } : {}) });
     })
     .catch(finish);
   return () => {

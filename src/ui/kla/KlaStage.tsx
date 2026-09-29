@@ -138,16 +138,17 @@ export function KlaStage({
   }, [hop, reduce, v]);
 
   const t = useMemo(() => {
-    const px = (p: { x: number; y: number }) => `${p.x * k}px ${p.y * k}px`;
+    // Joints in points, as [x, y, z]: phones read a "12.5px" string wrongly (whole numbers only), numbers work everywhere.
+    const at = (x: number, y: number): [number, number, number] => [x * k, y * k, 0];
     const cheer = mood === 'cheer';
     return {
-      groundOrigin: `${100 * k}px ${231 * k}px`,
-      bodyOrigin: `${100 * k}px ${228 * k}px`,
-      neck: px(PIVOT.neck),
-      shoulderL: px(PIVOT.shoulderL),
-      shoulderR: px(PIVOT.shoulderR),
-      eyesAt: px(PIVOT.eyes),
-      mouthAt: `${100 * k}px ${141 * k}px`,
+      groundOrigin: at(100, 231),
+      bodyOrigin: at(100, 228),
+      neck: at(PIVOT.neck.x, PIVOT.neck.y),
+      shoulderL: at(PIVOT.shoulderL.x, PIVOT.shoulderL.y),
+      shoulderR: at(PIVOT.shoulderR.x, PIVOT.shoulderR.y),
+      eyesAt: at(PIVOT.eyes.x, PIVOT.eyes.y),
+      mouthAt: at(100, 141),
       body: [
         { translateY: Animated.add(v.breathe.interpolate({ inputRange: [0, 1], outputRange: [0, -1.2 * k] }), v.jump.interpolate({ inputRange: [0, 1], outputRange: [0, -26 * k] })) },
         { rotate: deg(v.sway.interpolate({ inputRange: [-1, 1], outputRange: [-1.1, 1.1] })) },
