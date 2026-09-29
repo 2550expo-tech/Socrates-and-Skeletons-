@@ -19,13 +19,14 @@ import { buildCoachContext, buildInsights } from '../../domain/insights';
 import { KLA_AFTER, KLA_GREETING, KLA_THINKING, REPEAT_MAX } from '../../domain/klaTalk';
 import { formatBaht, parseBahtToSatang } from '../../domain/money';
 import { runwayAfterPurchase } from '../../domain/runway';
-import { skinById } from '../../domain/skins';
+import { SKINS, skinById, type SkinId } from '../../domain/skins';
 import { askCoach, CoachError } from '../../services/coach';
-import { useEquippedSkin } from '../../services/kla';
+import { useEquippedSkin, useKla } from '../../services/kla';
 import { Buddy } from '../../ui/Buddy';
 import { Card, Chip, Ionicons, Row, T, type IconName } from '../../ui/components';
 import { Reveal, TypingDots } from '../../ui/effects';
 import { KlaBackdrop } from '../../ui/kla/KlaBackdrop';
+import { KlaPicture } from '../../ui/kla/KlaPicture';
 import { KlaStage } from '../../ui/kla/KlaStage';
 import { setKlaSound, useKlaTalk } from '../../ui/kla/useKlaTalk';
 import { fonts, radius, space, useTheme } from '../../ui/theme';
@@ -56,6 +57,8 @@ export default function Coach() {
   const { profile, txs, repo } = useApp();
   const { balance, runway } = useMoney();
   const skin = useEquippedSkin();
+  const kla = useKla();
+  const [picking, setPicking] = useState(false);
   const { subtitle, talking, said, speak, stop, sound, voice } = useKlaTalk();
   const [input, setInput] = useState(params.ask ?? '');
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -155,6 +158,16 @@ export default function Coach() {
     tell(line.text, { mood: line.mood });
   }
 
+  /** Change น้องกล้า's skin right here on the stage. */
+  function wear(id: SkinId) {
+    Haptics.selectionAsync().catch(() => {});
+    if (id === skin) return;
+    kla.equip(id);
+    setHop((h) => h + 1);
+    tell(`ใส่ชุด${skinById(id).name}แล้ว เข้ากับ${BUDDY_NAME}ไหม`, { mood: 'cheer', after: IDLE });
+  }
+  const mine = SKINS.filter((s) => kla.owned.has(s.id));
+
   const mood: BuddyMood = busy ? 'thinking' : talking ? (rest.mood === 'worried' ? 'calm' : rest.mood) : rest.mood;
   const kW = Math.round(Math.min(214, Math.min(screenW, 440) * 0.52));
 
@@ -214,8 +227,62 @@ export default function Coach() {
                 ) : said ? (
                   <StageButton icon="refresh" label="ฟังอีกครั้ง" a11y={`ให้น้อง${BUDDY_NAME}พูดอีกครั้ง`} onPress={() => tell(said, { mood: rest.mood === 'worried' ? 'calm' : rest.mood })} />
                 ) : null}
-                <StageButton icon="shirt" label="เปลี่ยนชุด" a11y={`เปลี่ยนชุดน้อง${BUDDY_NAME}`} onPress={() => router.push('/skins')} />
+                <StageButton icon="shirt" label="เปลี่ยนชุด" a11y={`เปลี่ยนชุดน้อง${BUDDY_NAME}`} onPress={() => setPicking((p) => !p)} />
               </Row>
+              {picking ? (
+                <Reveal from={8} style={{ alignSelf: 'stretch', marginTop: space.md }}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm, paddingHorizontal: 2 }}>
+                    {mine.map((s) => {
+                      const on = s.id === skin;
+                      return (
+                        <Pressable
+                          key={s.id}
+                          onPress={() => wear(s.id)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`ใส่ชุด${s.name}`}
+                          aria-selected={on}
+                          style={({ pressed }) => ({
+                            width: 70,
+                            alignItems: 'center',
+                            paddingTop: 2,
+                            paddingBottom: 6,
+                            borderRadius: radius.md,
+                            borderWidth: on ? 2 : 1,
+                            borderColor: on ? theme.heroAccent : 'rgba(255,255,255,0.18)',
+                            backgroundColor: pressed ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)',
+                          })}
+                        >
+                          <KlaPicture skin={s.id} mood="happy" width={50} onDark extras={false} ground={false} />
+                          <T v="micro" color="#F4F1E6" numberOfLines={1} style={{ fontSize: 11 }}>
+                            {s.name}
+                          </T>
+                        </Pressable>
+                      );
+                    })}
+                    <Pressable
+                      onPress={() => router.push('/skins')}
+                      accessibilityRole="button"
+                      accessibilityLabel="ดูตู้สกินทั้งหมดและวิธีปลดล็อก"
+                      style={({ pressed }) => ({
+                        width: 70,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 4,
+                        borderRadius: radius.md,
+                        borderWidth: 1,
+                        borderStyle: 'dashed',
+                        borderColor: 'rgba(255,255,255,0.35)',
+                        backgroundColor: pressed ? 'rgba(255,255,255,0.2)' : 'transparent',
+                      })}
+                    >
+                      <Ionicons name="grid" size={20} color={theme.heroAccent} />
+                      <T v="micro" color="#F4F1E6" center style={{ fontSize: 11 }}>
+                        ตู้สกิน{'\n'}ทั้งหมด
+                      </T>
+                    </Pressable>
+                  </ScrollView>
+                </Reveal>
+              ) : null}
               {sound && voice === null ? (
                 <T v="micro" color={theme.heroInkSoft} center style={{ marginTop: space.sm }}>
                   เครื่องนี้ยังไม่มีเสียงอ่านภาษาไทย {BUDDY_NAME}จะพูดเป็นตัวหนังสือแทนนะ

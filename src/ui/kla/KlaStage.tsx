@@ -162,8 +162,9 @@ export function KlaStage({
         { rotate: deg(Animated.add(v.tilt.interpolate({ inputRange: [-1, 1], outputRange: [-2.2, 2.2] }), v.gesture.interpolate({ inputRange: [0, 1], outputRange: [0, 2.6] }))) },
       ],
       // Left hand rises with a clockwise turn, the right with an anticlockwise one.
-      armL: [{ rotate: deg(Animated.add(v.arms.interpolate({ inputRange: [-1, 1], outputRange: [-3, 3] }), v.gesture.interpolate({ inputRange: [0, 1], outputRange: [0, cheer ? 14 : 7] }))) }],
-      armR: [{ rotate: deg(Animated.add(v.arms.interpolate({ inputRange: [-1, 1], outputRange: [3, -3] }), v.gesture.interpolate({ inputRange: [0, 1], outputRange: [0, cheer ? -14 : -26] }))) }],
+      // Raised arms (cheer) wave outwards, away from the leaves, so the hands stay in sight.
+      armL: [{ rotate: deg(Animated.add(v.arms.interpolate({ inputRange: [-1, 1], outputRange: [-3, 3] }), v.gesture.interpolate({ inputRange: [0, 1], outputRange: [0, cheer ? -9 : 7] }))) }],
+      armR: [{ rotate: deg(Animated.add(v.arms.interpolate({ inputRange: [-1, 1], outputRange: [3, -3] }), v.gesture.interpolate({ inputRange: [0, 1], outputRange: [0, cheer ? 9 : -26] }))) }],
       blink: [{ scaleY: v.blink }],
       closed: v.mouth.interpolate({ inputRange: [0, 0.18], outputRange: [1, 0], extrapolate: 'clamp' }),
       open: v.mouth.interpolate({ inputRange: [0, 0.18], outputRange: [0, 1], extrapolate: 'clamp' }),

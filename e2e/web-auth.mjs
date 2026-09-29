@@ -582,6 +582,10 @@ try {
     // What-if slider: drag the gold thumb to spend 30% less a day.
     const slider = page.getByRole('slider', { name: 'ใช้น้อยลงวันละกี่เปอร์เซ็นต์' }).first();
     await slider.scrollIntoViewIfNeeded();
+    // A raw mouse drag does not wait like click() does: make sure the opening animation has fully gone.
+    const introWait = Date.now();
+    await page.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'detached', timeout: 20000 }).catch(() => {});
+    const introMs = Date.now() - introWait;
     // Wait until the page stops moving (cards slide in), so the drag starts on the thumb.
     let box = await slider.boundingBox();
     for (let i = 0; i < 12; i++) {
@@ -598,7 +602,8 @@ try {
         }, { x: box.x + 15, y: box.y + box.height / 2 })
       : 'no box';
     if (box) {
-      await page.mouse.move(box.x + 15, box.y + box.height / 2);
+      // hover() waits until the slider itself receives the pointer (nothing on top of it).
+      await slider.hover({ position: { x: 15, y: box.height / 2 } }).catch(() => {});
       await page.mouse.down();
       await page.mouse.move(box.x + 15 + (box.width - 30) * 0.3, box.y + box.height / 2, { steps: 8 });
       await page.mouse.move(box.x + 15 + (box.width - 30) * 0.6, box.y + box.height / 2, { steps: 8 });
@@ -607,7 +612,7 @@ try {
     const slid = (await slider.getAttribute('aria-valuenow').catch(() => null)) ?? '';
     await page.waitForTimeout(900);
     await shot(page, '28-runway-slider');
-    check('Runway: dragging the slider to 30% less a day shows the extra days', slid === '30' && (await visible(page, 'เพิ่มขึ้น')), `value=${slid} box=${JSON.stringify(box)} under=${under}`);
+    check('Runway: dragging the slider to 30% less a day shows the extra days', slid === '30' && (await visible(page, 'เพิ่มขึ้น')), `value=${slid} box=${JSON.stringify(box)} under=${under} introWaitMs=${introMs}`);
     // The arrow keys move it too (keyboard users on the web).
     await slider.focus();
     await page.keyboard.press('ArrowRight');
@@ -970,6 +975,13 @@ try {
     await button(page, 'ปิดเสียงน้องกล้า').click();
     check('Coach: the sound can be turned off', await shown(button(page, 'เปิดเสียงน้องกล้า')));
     await button(page, 'เปิดเสียงน้องกล้า').click();
+    // Change the skin right on the stage, from the skins the user owns.
+    await button(page, 'เปลี่ยนชุดน้องกล้า').click();
+    await button(page, 'ใส่ชุดต้นกล้า').click();
+    const changed = (await shown(button(page, 'น้องกล้าในชุดต้นกล้า'))) && (await visible(page, 'ใส่ชุดต้นกล้าแล้ว'));
+    await page.waitForTimeout(600);
+    await shot(page, '36-coach-skin-picker');
+    check('Coach: the skin can be changed on the stage (owned skins only), and น้องกล้า says so', changed && (await page.getByRole('button', { name: 'ใส่ชุดชุดไทย' }).count()) === 0);
     await page.getByText('สรุปสัปดาห์นี้ให้หน่อย').first().click();
     check('Coach (demo): explains that the AI needs a real account', await visible(page, 'โหมดทดลองยังถาม AI ไม่ได้'));
     await ctx.close();

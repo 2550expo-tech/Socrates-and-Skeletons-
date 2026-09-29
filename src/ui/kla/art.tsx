@@ -164,8 +164,9 @@ export function KlaBack({ id, skin }: { id: string; skin: SkinId }): ReactNode {
 export function KlaArm({ id, skin, side, mood }: { id: string; skin: SkinId; side: 'L' | 'R'; mood: BuddyMood }): ReactNode {
   const s = side === 'L' ? -1 : 1;
   const up = mood === 'cheer';
-  const hand = up ? { x: 100 + s * 40, y: 164 } : { x: 100 + s * 38, y: 186 };
-  const elbow = up ? { x: 100 + s * 24, y: 180 } : { x: 100 + s * 22, y: 196 };
+  // Cheering: arms up and out, hands clear of the leaves so they can be seen.
+  const hand = up ? { x: 100 + s * 66, y: 158 } : { x: 100 + s * 38, y: 186 };
+  const elbow = up ? { x: 100 + s * 34, y: 192 } : { x: 100 + s * 22, y: 196 };
   return (
     <G>
       <Path
