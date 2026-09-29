@@ -23,16 +23,18 @@ import { fonts, radius, space, useTheme } from '../ui/theme';
 export default function TransactionForm() {
   const theme = useTheme();
   const toast = useToast();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, kind: kindParam } = useLocalSearchParams<{ id?: string; kind?: string }>();
   const { txs, addTx, updateTx, removeTx } = useApp();
   const existing = useMemo(() => txs.find((t) => t.id === id), [txs, id]);
   const isDraft = existing?.status === 'draft';
   const flags = (existing?.reviewFlags ?? []) as ReviewFlag[];
 
-  const [kind, setKind] = useState<TxKind>(existing?.kind ?? 'expense');
+  // "เพิ่มเงินเข้า" opens the form as income (money that comes in without a slip).
+  const startKind: TxKind = existing?.kind ?? (kindParam === 'income' ? 'income' : 'expense');
+  const [kind, setKind] = useState<TxKind>(startKind);
   const [amount, setAmount] = useState(existing ? satangToInput(existing.amountSatang) : '');
   const [title, setTitle] = useState(existing?.title ?? '');
-  const [category, setCategory] = useState(existing?.categoryKey ?? defaultCategory('expense'));
+  const [category, setCategory] = useState(existing?.categoryKey ?? defaultCategory(startKind));
   const [categoryTouched, setCategoryTouched] = useState(!!existing);
   const [day, setDay] = useState(existing ? bkkDayKey(existing.occurredAt) : bkkDayKey(new Date()));
   const [time, setTime] = useState(existing ? bkkTime(existing.occurredAt) : bkkTime(new Date()));
@@ -108,7 +110,7 @@ export default function TransactionForm() {
           ocrConfidence: null,
           reviewFlags: [],
         });
-        toast({ message: 'บันทึกรายการแล้ว' });
+        toast({ message: kind === 'income' ? 'เพิ่มเงินเข้าแล้ว' : 'บันทึกรายการแล้ว' });
       }
       goBack();
     } catch (e) {
@@ -171,7 +173,7 @@ export default function TransactionForm() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
           <IconButton icon="close" label="ปิด" onPress={() => goBack()} />
-          <T v="h3">{!existing ? 'จดรายการ' : isDraft ? 'ตรวจสลิป' : 'แก้ไขรายการ'}</T>
+          <T v="h3">{!existing ? (kind === 'income' ? 'เพิ่มเงินเข้า' : 'จดรายการ') : isDraft ? 'ตรวจสลิป' : 'แก้ไขรายการ'}</T>
           {existing ? (
             <IconButton icon="trash-outline" label="ลบรายการ" color={theme.critical} onPress={() => setAskDelete(true)} />
           ) : (
@@ -228,6 +230,21 @@ export default function TransactionForm() {
           />
 
           <AmountField id="tx-amount" value={amount} onChangeText={setAmount} error={amountError} flagged={flagged('amount')} color={kind === 'income' ? theme.income : theme.ink} />
+          {!existing && kind === 'income' ? (
+            <Row gap={space.sm} style={{ flexWrap: 'wrap', justifyContent: 'center', marginTop: -space.sm }}>
+              {[10_000, 50_000, 100_000, 500_000].map((q) => (
+                <Chip
+                  key={q}
+                  label={`+${formatBaht(q, { decimals: false })}`}
+                  selected={parseBahtToSatang(amount) === q}
+                  onPress={() => {
+                    setAmount(satangToInput(q));
+                    setAmountError(null);
+                  }}
+                />
+              ))}
+            </Row>
+          ) : null}
 
           <Field
             id="tx-title"

@@ -6,7 +6,7 @@
  * for the single most important thing on a screen (the balance, the main action).
  * Never paint a whole screen green.
  */
-import { useColorScheme } from 'react-native';
+import { useSchemeChoice } from './themeMode';
 
 export const palette = {
   forest: '#0E3B2C', // hero surfaces, brand
@@ -93,7 +93,7 @@ export const darkTheme: Theme = {
 };
 
 export function useTheme(): Theme {
-  return useColorScheme() === 'dark' ? darkTheme : lightTheme;
+  return useSchemeChoice() === 'dark' ? darkTheme : lightTheme;
 }
 
 /**

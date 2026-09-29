@@ -460,6 +460,20 @@ try {
     await button(page, 'เลิกทำ').click();
     await page.waitForTimeout(500);
     check('Undo: the item is back', await visible(page, 'ทดสอบกาแฟ'));
+    // Money in without a slip: one tile on home opens the form as income.
+    await page.goto(APP);
+    await introGone(page);
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    const beforeIncome = await balance();
+    await button(page, 'เพิ่มเงินเข้า').click();
+    const incomeForm = (await visible(page, 'ได้รับจาก')) && (await page.getByRole('tab', { name: 'รายรับ', exact: true }).first().getAttribute('aria-selected')) === 'true';
+    await page.getByRole('button', { name: '+฿1,000', exact: true }).first().click();
+    await page.fill('#tx-title', 'ค่าสอนพิเศษ');
+    await shot(page, '31-add-income');
+    await button(page, 'บันทึกรายการ').click();
+    check('Add money in: the form opens as income with quick amounts, and saves', incomeForm && (await visible(page, 'เพิ่มเงินเข้าแล้ว')));
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    check('Add money in: the balance goes up by ฿1,000', (await balance()) === beforeIncome + 100_000);
     await ctx.close();
   }
 

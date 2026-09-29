@@ -54,36 +54,76 @@ const RUNWAY_BADGE = {
   no_spending: { label: 'ยังไม่มีรายจ่าย 7 วัน', tone: 'neutral' },
 } as const;
 
-/** "พูดจด": a round gold mic next to the quick actions; it ripples twice to be noticed. */
-function MicButton() {
+type TileTone = 'primary' | 'gold' | 'plain' | 'income';
+
+/**
+ * One of the four quick actions on home: scan slips, speak, write an expense,
+ * add money in (money that arrives without a slip has to be added by hand).
+ */
+function ActionTile({
+  icon,
+  label,
+  sub,
+  tone,
+  onPress,
+  pulse,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  sub: string;
+  tone: TileTone;
+  onPress: () => void;
+  pulse?: boolean;
+}) {
   const theme = useTheme();
-  const press = usePressSpring(0.9);
+  const press = usePressSpring(0.95);
+  const look = {
+    primary: { bg: theme.primary, border: theme.primary, ink: theme.onPrimary, soft: 'rgba(255,255,255,0.78)', dot: 'rgba(255,255,255,0.18)', icon: theme.onPrimary },
+    gold: { bg: theme.accent, border: theme.accent, ink: '#1D1405', soft: 'rgba(29,20,5,0.7)', dot: 'rgba(255,255,255,0.35)', icon: '#1D1405' },
+    plain: { bg: theme.surface, border: theme.line, ink: theme.ink, soft: theme.inkSoft, dot: theme.surfaceAlt, icon: theme.ink },
+    income: { bg: theme.dark ? 'rgba(92,192,142,0.12)' : '#E4F3EA', border: theme.dark ? 'rgba(92,192,142,0.35)' : '#BFE3CD', ink: theme.ink, soft: theme.inkSoft, dot: theme.income, icon: '#FFFFFF' },
+  }[tone];
   return (
-    <View style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center' }}>
-      <PulseRing size={52} times={2} color={theme.accent} />
-      <Animated.View style={{ transform: [{ scale: press.scale }] }}>
-        <Pressable
-          onPress={() => {
-            Haptics.selectionAsync().catch(() => {});
-            router.push('/voice');
-          }}
-          onPressIn={press.onPressIn}
-          onPressOut={press.onPressOut}
-          accessibilityRole="button"
-          accessibilityLabel="จดด้วยเสียง"
-          style={{
-            width: 52,
-            height: 52,
-            borderRadius: 26,
-            backgroundColor: theme.accent,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Ionicons name="mic" size={24} color="#1D1405" />
-        </Pressable>
-      </Animated.View>
-    </View>
+    <Animated.View style={{ flex: 1, transform: [{ scale: press.scale }] }}>
+      <Pressable
+        onPress={() => {
+          Haptics.selectionAsync().catch(() => {});
+          onPress();
+        }}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: space.sm,
+          padding: space.md,
+          minHeight: 70,
+          borderRadius: radius.lg,
+          backgroundColor: look.bg,
+          borderWidth: 1,
+          borderColor: look.border,
+          overflow: 'hidden',
+        }}
+      >
+        {tone === 'primary' ? <Shine times={1} delay={900} color="rgba(255,255,255,0.25)" /> : null}
+        <View style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+          {pulse ? <PulseRing size={40} times={2} color={tone === 'gold' ? '#FFF4D6' : theme.accent} /> : null}
+          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: look.dot, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name={icon} size={21} color={look.icon} />
+          </View>
+        </View>
+        <View style={{ flex: 1 }}>
+          <T v="body" color={look.ink} style={{ fontFamily: fonts.sansSemi }} numberOfLines={1}>
+            {label}
+          </T>
+          <T v="micro" color={look.soft} numberOfLines={1}>
+            {sub}
+          </T>
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -364,11 +404,16 @@ export default function Home() {
       ) : null}
 
       <Reveal index={3}>
-        <Row gap={space.sm}>
-          <Button label="สแกนสลิป" icon="scan-outline" shine onPress={() => router.push('/scan')} style={{ flex: 1, paddingHorizontal: 12 }} />
-          <Button label="จดรายการ" icon="add" kind="soft" onPress={() => router.push('/transaction')} style={{ flex: 1, paddingHorizontal: 12 }} />
-          <MicButton />
-        </Row>
+        <View style={{ gap: space.sm }}>
+          <Row gap={space.sm} align="stretch">
+            <ActionTile icon="scan-outline" label="สแกนสลิป" sub="อ่านจากรูปในเครื่อง" tone="primary" onPress={() => router.push('/scan')} />
+            <ActionTile icon="mic" label="จดด้วยเสียง" sub="พูดว่า “ข้าว 50 บาท”" tone="gold" pulse onPress={() => router.push('/voice')} />
+          </Row>
+          <Row gap={space.sm} align="stretch">
+            <ActionTile icon="remove" label="จดรายการ" sub="รายจ่ายเงินสด ฯลฯ" tone="plain" onPress={() => router.push('/transaction')} />
+            <ActionTile icon="add" label="เพิ่มเงินเข้า" sub="เงินโอน เงินสด ค่าขนม" tone="income" onPress={() => router.push({ pathname: '/transaction', params: { kind: 'income' } })} />
+          </Row>
+        </View>
       </Reveal>
 
       {recapMonth ? (

@@ -13,7 +13,8 @@ import { useAutoScan } from '../services/AutoScanProvider';
 import { forgetScanned } from '../services/slips';
 import { PERSONAS } from '../domain/insights';
 import { formatSatang, parseBahtToSatang } from '../domain/money';
-import { Button, Card, Chip, IconButton, Ionicons, Row, T } from '../ui/components';
+import { Button, Card, Chip, IconButton, Ionicons, Row, Segmented, T } from '../ui/components';
+import { setThemeMode, useThemeMode, type ThemeMode } from '../ui/themeMode';
 import { ConfirmSheet, useToast } from '../ui/feedback';
 import { Field } from '../ui/inputs';
 import { space, useTheme } from '../ui/theme';
@@ -31,6 +32,7 @@ export default function Settings() {
       .catch(() => {});
   }, [repo]);
   const auto = useAutoScan();
+  const themeMode = useThemeMode();
   const [name, setName] = useState(profile?.displayName ?? '');
   const [opening, setOpening] = useState(formatSatang(profile?.openingBalanceSatang ?? 0, { decimals: false }).replace(/,/g, ''));
   const [floor, setFloor] = useState(formatSatang(profile?.runwayFloorSatang ?? 50_000, { decimals: false }).replace(/,/g, ''));
@@ -140,6 +142,20 @@ export default function Settings() {
                 />
               ))}
             </Row>
+          </Card>
+
+          <Card>
+            <T v="h3">หน้าตาแอป</T>
+            <Segmented<ThemeMode>
+              options={[
+                { key: 'system', label: 'ตามมือถือ' },
+                { key: 'light', label: 'สว่าง' },
+                { key: 'dark', label: 'มืด' },
+              ]}
+              value={themeMode}
+              onChange={setThemeMode}
+            />
+            <T v="micro">โหมดมืดช่วยถนอมสายตาตอนกลางคืน และประหยัดแบตบนจอ OLED</T>
           </Card>
 
           <Card>
