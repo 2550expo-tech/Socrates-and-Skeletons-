@@ -15,6 +15,8 @@ import { formatBaht } from '../../domain/money';
 import { goalLine, goalProgress } from '../../domain/goals';
 import { recapToOffer } from '../../domain/recap';
 import { skinById } from '../../domain/skins';
+import { HALLOWEEN_LINES, halloweenOn } from '../../domain/halloween';
+import { HalloweenBunting, HalloweenCard, HalloweenInvite, SpookyHeroDecor, useHalloween } from '../../ui/halloween';
 import { endOfMonthDay, safeDailySpend } from '../../domain/runway';
 import { dailyTotals, monthExpense, summarizeRange } from '../../domain/summary';
 import type { RangeKey } from '../../domain/types';
@@ -47,7 +49,7 @@ import { KlaPicture } from '../../ui/kla/KlaPicture';
 import { Medal } from '../../ui/Medal';
 import { useCountUp, useReduceMotion } from '../../ui/motion';
 import { TxRow } from '../../ui/TxRow';
-import { fonts, palette, radius, space, useTheme } from '../../ui/theme';
+import { alpha, fonts, palette, radius, space, useTheme } from '../../ui/theme';
 
 const RUNWAY_BADGE = {
   healthy: { label: 'สบาย ๆ', tone: 'good' },
@@ -152,7 +154,7 @@ function StreakPill({ days, today }: { days: number; today: boolean }) {
           paddingHorizontal: 12,
           height: 36,
           borderRadius: 18,
-          backgroundColor: theme.dark ? 'rgba(226,182,74,0.14)' : theme.accentSoft,
+          backgroundColor: theme.dark ? alpha(theme.accent, 0.14) : theme.accentSoft,
           borderWidth: 1,
           borderColor: today ? theme.accent : 'transparent',
         }}
@@ -189,6 +191,7 @@ export default function Home() {
   const recapMonth = useMemo(() => recapToOffer(txs, today), [txs, today]);
   const ach = useAchievements();
   const kla = useKla();
+  const halloween = useHalloween();
   const whatsNew = useWhatsNewPending();
   const celebrate = useCelebrate();
   const freshIds = [...ach.fresh.map((b) => b.id), ...kla.fresh.map((id) => `skin:${id}`)].join(',');
@@ -216,7 +219,9 @@ export default function Home() {
   function pokeBuddy() {
     pokes.current += 1;
     setHop((h) => h + 1);
-    setSaid(buddyPoke(pokes.current, runway.status));
+    // Halloween theme: every other tap is a spooky-cute line.
+    const n = pokes.current;
+    setSaid(halloween && n % 2 === 1 ? { mood: 'cheer', text: HALLOWEEN_LINES[((n - 1) / 2) % HALLOWEEN_LINES.length] } : buddyPoke(n, runway.status));
   }
   function tapTree() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -237,7 +242,8 @@ export default function Home() {
 
   return (
     <Screen scrollY={scrollY} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.primary} />}>
-      <Row justify="space-between" style={{ paddingTop: space.sm }}>
+      {halloween ? <HalloweenBunting /> : null}
+      <Row justify="space-between" style={{ paddingTop: halloween ? 0 : space.sm, marginTop: halloween ? -space.md : 0 }}>
         <View style={{ flex: 1 }}>
           <T v="small">{formatThaiDayLong(today)}</T>
           <T v="h2">สวัสดี {profile?.displayName || ''}</T>
@@ -263,7 +269,7 @@ export default function Home() {
               </View>
               <View style={{ flex: 1 }}>
                 <T v="h3">มีอะไรใหม่ในอัปเดตนี้</T>
-                <T v="small">โค้ชน้องกล้าพูดได้, ตู้สกิน, ภารกิจการเงิน, เพิ่มเงินเข้า, ธีมสี และอีกเพียบ</T>
+                <T v="small">ธีมฮาโลวีน 👻, โค้ชน้องกล้าพูดได้, ตู้สกิน, ภารกิจการเงิน, ธีมสี และอีกเพียบ</T>
               </View>
               <IconButton icon="close" label="ไม่ต้องแสดงอีก" onPress={() => markWhatsNewSeen()} />
             </Row>
@@ -329,6 +335,9 @@ export default function Home() {
         </Reveal>
       ) : null}
 
+      {/* ฮาโลวีน: catch ghosts in the Halloween theme; other themes get an invitation. */}
+      {halloweenOn(today) ? <Reveal zoom>{halloween ? <HalloweenCard /> : <HalloweenInvite />}</Reveal> : null}
+
       {repo?.mode === 'demo' ? (
         <Card tone="alt" style={{ paddingVertical: space.md }}>
           <Row gap={space.sm}>
@@ -374,6 +383,7 @@ export default function Home() {
             <ContourLines width={420} height={260} color={theme.heroAccent} />
             <Sparkles trigger={balance} count={9} area={{ top: 4, bottom: 55 }} />
             <Shine trigger={balance} />
+            {halloween ? <SpookyHeroDecor /> : null}
             <Row align="flex-start" justify="space-between">
               <View style={{ flex: 1, gap: 2 }}>
                 <T v="label" color={theme.heroInkSoft}>ยอดคงเหลือ</T>
@@ -471,7 +481,7 @@ export default function Home() {
             <LinearGradient colors={['#4A1F3D', '#2E1327', theme.heroDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: space.lg }}>
               <Shine times={1} delay={1400} color="rgba(255,255,255,0.18)" />
               <Row gap={space.md}>
-                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(226,182,74,0.16)', alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: alpha(theme.heroAccent, 0.16), alignItems: 'center', justifyContent: 'center' }}>
                   <Ionicons name="sparkles" size={22} color={palette.goldBright} />
                 </View>
                 <View style={{ flex: 1 }}>

@@ -17,6 +17,7 @@ import { Field } from '../../ui/inputs';
 import { useCountUp, useReduceMotion } from '../../ui/motion';
 import { Slider } from '../../ui/Slider';
 import { fonts, palette, radius, space, useTheme } from '../../ui/theme';
+import { TitleDecor } from '../../ui/halloween';
 
 function daysText(r: Runway) {
   if (r.status === 'below_floor') return 'แตะเส้นสำรองแล้ว';
@@ -49,10 +50,13 @@ export default function RunwayScreen() {
 
   return (
     <Screen>
-      <View style={{ paddingTop: space.sm, gap: 2 }}>
-        <T v="label">Money Runway</T>
-        <T v="h1">เงินพอถึงวันไหน</T>
-      </View>
+      <Row justify="space-between" align="flex-end" style={{ paddingTop: space.sm }}>
+        <View style={{ gap: 2 }}>
+          <T v="label">Money Runway</T>
+          <T v="h1">เงินพอถึงวันไหน</T>
+        </View>
+        <TitleDecor />
+      </Row>
 
       <Reveal zoom>
         <View style={{ borderRadius: radius.xl, overflow: 'hidden' }}>

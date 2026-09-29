@@ -986,6 +986,51 @@ try {
     check('Coach (demo): explains that the AI needs a real account', await visible(page, 'โหมดทดลองยังถาม AI ไม่ได้'));
     await ctx.close();
   }
+
+  // 20. ฮาโลวีน: an invitation on home, the Halloween theme, catching ghosts for candies, Halloween skins
+  {
+    const { ctx, page } = await freshPage('halloween');
+    await page.clock.install({ time: new Date('2026-09-30T05:00:00Z') }); // noon on 30 Sep in Bangkok, during the event
+    await page.goto(APP);
+    await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
+    await introGone(page);
+    await page.getByText('ลองใช้ด้วยข้อมูลตัวอย่าง').click();
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    check('Halloween: other themes get an invitation on home', await visible(page, 'ฮาโลวีนมาแล้ว!'));
+    await button(page, 'เปิดธีมฮาโลวีน').click();
+    const card = await visible(page, 'จับผีรับลูกอม');
+    check('Halloween: one tap switches to the Halloween theme, with ghosts to catch', card && (await shown(button(page, 'จับผีตัวที่ 1'))));
+    const candies = async () => {
+      const label = (await page.getByLabel(/^ลูกอม \d+ เม็ด$/).first().getAttribute('aria-label').catch(() => '')) ?? '';
+      return Number(label.match(/\d+/)?.[0] ?? NaN);
+    };
+    const before = await candies();
+    await page.waitForTimeout(800);
+    await shot(page, '37-halloween-home');
+    await button(page, 'จับผีตัวที่ 1').click();
+    const booed = await visible(page, 'ได้ลูกอม 1 เม็ด');
+    await page.waitForTimeout(700);
+    const after = await candies();
+    check('Halloween: catching a ghost says boo and gives a candy', booed && after === before + 1, `${before} -> ${after}`);
+    check('Halloween: that ghost is gone for today (two left)', (await visible(page, 'วันนี้มีผีน้อย 2 ตัว')) && (await page.getByRole('button', { name: 'จับผีตัวที่ 1' }).count()) === 0);
+    await button(page, 'ดูสกินฮาโลวีน').click();
+    check('Halloween skins: their own section with the candies', (await visible(page, 'ฮาโลวีน 2569')) && (await visible(page, 'จับผีบนหน้าหลัก')));
+    check('Halloween skins: the pumpkin ghost is free during the event', await shown(button(page, 'สกิน ผีหัวฟักทอง สกินลิมิเต็ด มีแล้ว')));
+    await button(page, 'สกิน แฟรงเกนสไตน์').click();
+    const franken = await visible(page, 'สะสมลูกอม 40 เม็ดเพื่อปลดล็อก');
+    await page.waitForTimeout(900);
+    await shot(page, '38-halloween-frankenstein');
+    check('Halloween skins: Frankenstein needs 40 candies (limited)', franken);
+    await button(page, 'สกิน ผีหัวฟักทอง').click();
+    await button(page, 'ใส่ชุดนี้').click();
+    check('Halloween skins: wearing the pumpkin ghost', await visible(page, 'น้องกล้าใส่ชุดผีหัวฟักทองแล้ว'));
+    await page.goto(`${APP}coach`);
+    await introGone(page);
+    check('Halloween coach: a spooky-cute greeting, in the pumpkin ghost skin', (await visible(page, 'บู้! ตกใจไหม')) && (await shown(button(page, 'น้องกล้าในชุดผีหัวฟักทอง'))));
+    await page.waitForTimeout(900);
+    await shot(page, '39-halloween-coach');
+    await ctx.close();
+  }
 } catch (e) {
   check('Test run crashed', false, e.stack?.slice(0, 500));
 }

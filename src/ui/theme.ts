@@ -53,7 +53,7 @@ export interface Theme {
   overlay: string;
 }
 
-export type ColorThemeKey = 'forest' | 'redvelvet' | 'purple' | 'sapphire' | 'amber' | 'sunset' | 'rose' | 'onyx';
+export type ColorThemeKey = 'forest' | 'redvelvet' | 'purple' | 'sapphire' | 'amber' | 'sunset' | 'rose' | 'onyx' | 'halloween';
 
 type ModeColors = Pick<Theme, 'bg' | 'surface' | 'surfaceAlt' | 'line' | 'ink' | 'inkSoft' | 'inkFaint' | 'primary' | 'onPrimary' | 'accent' | 'accentSoft'>;
 
@@ -70,6 +70,8 @@ interface ColorThemeSpec {
   heroInkSoft: string;
   light: ModeColors;
   dark: ModeColors;
+  /** A festival theme: comes with its own decorations (ghosts, bats), see src/ui/halloween.tsx. */
+  festival?: boolean;
 }
 
 /**
@@ -175,6 +177,20 @@ export const COLOR_THEMES: ColorThemeSpec[] = [
     light: { bg: '#F4F3F1', surface: '#FFFFFF', surfaceAlt: '#EAE8E4', line: '#DAD7D1', ink: '#161514', inkSoft: '#55524D', inkFaint: '#95918A', primary: '#2A2826', onPrimary: '#F4E7C2', accent: '#B8912F', accentSoft: '#F2E8CC' },
     dark: { bg: '#0A0A0A', surface: '#141413', surfaceAlt: '#1D1C1A', line: '#2C2B28', ink: '#EEEAE3', inkSoft: '#B3ADA2', inkFaint: '#7A756C', primary: '#D9B45A', onPrimary: '#151209', accent: '#E2BE5A', accentSoft: '#2F2816' },
   },
+  {
+    // Festival: spooky-cute Halloween, midnight purple with pumpkin orange.
+    key: 'halloween',
+    name: 'ฮาโลวีน',
+    nameEn: 'Spooky Night',
+    hero: ['#3B1E5C', '#24123D', '#120822'],
+    heroDarkTop: '#2F174C',
+    heroAccent: '#FF9A3C',
+    heroBare: '#6E5A8A',
+    heroInkSoft: '#D9C8F0',
+    light: { bg: '#F7F3FA', surface: '#FFFFFF', surfaceAlt: '#EFE8F5', line: '#E0D5EA', ink: '#1C1226', inkSoft: '#5C4B6E', inkFaint: '#9A8CA8', primary: '#6A35A8', onPrimary: '#FFFFFF', accent: '#E0761E', accentSoft: '#FCE4CF' },
+    dark: { bg: '#0E0914', surface: '#1A1224', surfaceAlt: '#241A31', line: '#352845', ink: '#F2ECF8', inkSoft: '#BBA9CF', inkFaint: '#7F6F92', primary: '#B48CF0', onPrimary: '#150A24', accent: '#FF9A3C', accentSoft: '#3B2414' },
+    festival: true,
+  },
 ];
 
 const SEMANTIC = {
@@ -200,6 +216,13 @@ export function buildTheme(key: ColorThemeKey, dark: boolean): Theme {
     heroInk: '#F4F1E6',
     heroInkSoft: spec.heroInkSoft,
   };
+}
+
+/** A colour from the theme with some transparency: alpha('#6A35A8', 0.15) -> 'rgba(106,53,168,0.15)'. */
+export function alpha(hex: string, a: number): string {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h.slice(0, 6), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }
 
 const cache = new Map<string, Theme>();

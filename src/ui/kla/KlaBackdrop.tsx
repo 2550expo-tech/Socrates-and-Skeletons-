@@ -8,6 +8,7 @@ import { useId, type ReactNode } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 import { Aurora } from '../effects';
+import { SpookyBackdropDecor } from '../halloween';
 import { radius, useTheme } from '../theme';
 
 export function KlaBackdrop({
@@ -41,6 +42,7 @@ export function KlaBackdrop({
         <Ellipse cx={50} cy={floorAt * 100 - 30} rx={42} ry={40} fill={`url(#${id}spot)`} />
         <Ellipse cx={50} cy={floorAt * 100} rx={40} ry={7} fill={`url(#${id}floor)`} />
       </Svg>
+      {theme.colorTheme === 'halloween' ? <SpookyBackdropDecor /> : null}
       {children}
     </View>
   );

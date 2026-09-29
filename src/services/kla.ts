@@ -1,7 +1,8 @@
 /**
  * น้องกล้า's wardrobe for the signed-in account (or the demo), kept on this
  * phone: the skins owned, the one being worn, the skins already celebrated,
- * and the days the app was opened (for "เปิดแอปติดต่อกัน 30 วัน").
+ * the days the app was opened (for "เปิดแอปติดต่อกัน 30 วัน"), and the
+ * Halloween ghosts caught each day (candies, src/domain/halloween.ts).
  *
  * One shared store, so choosing a skin in the collection changes น้องกล้า on
  * every screen at once. `useKlaSync` (mounted once inside the app) records
@@ -11,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useApp, useAppMaybe } from '../data/AppProvider';
 import { Storage } from '../data/storage';
+import { catchGhost as addGhost, countCandies, ghostsLeft, type GhostCatches } from '../domain/halloween';
 import { computeMissions, recordOpen } from '../domain/missions';
 import { DEFAULT_SKIN, isSkinId, limitedOpenToday, wearable, type SkinId } from '../domain/skins';
 import { useAchievements } from './useAchievements';
@@ -22,9 +24,11 @@ interface Wardrobe {
   equipped: SkinId;
   /** Bangkok days the app was opened. */
   opens: string[];
+  /** Halloween ghosts caught per Bangkok day. */
+  ghosts: GhostCatches;
 }
 
-const EMPTY: Wardrobe = { owned: [DEFAULT_SKIN], seen: [DEFAULT_SKIN], equipped: DEFAULT_SKIN, opens: [] };
+const EMPTY: Wardrobe = { owned: [DEFAULT_SKIN], seen: [DEFAULT_SKIN], equipped: DEFAULT_SKIN, opens: [], ghosts: {} };
 const key = (who: string) => `mindpay.kla.${who}`;
 
 type Snap = { who: string; data: Wardrobe } | null;
@@ -50,6 +54,14 @@ function clean(raw: unknown): Wardrobe {
     seen: [...new Set<SkinId>([DEFAULT_SKIN, ...ids(r.seen)])],
     equipped: isSkinId(r.equipped) ? r.equipped : DEFAULT_SKIN,
     opens: Array.isArray(r.opens) ? r.opens.filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) : [],
+    ghosts:
+      r.ghosts && typeof r.ghosts === 'object'
+        ? Object.fromEntries(
+            Object.entries(r.ghosts as Record<string, unknown>).filter(
+              (e): e is [string, number] => /^\d{4}-\d{2}-\d{2}$/.test(e[0]) && typeof e[1] === 'number' && e[1] > 0,
+            ),
+          )
+        : {},
   };
 }
 
@@ -135,6 +147,14 @@ export function useKla() {
     [who],
   );
 
+  // Halloween: candies from caught ghosts and from days with a record.
+  const ghosts = data?.ghosts;
+  const candies = useMemo(() => countCandies({ txs, caught: ghosts ?? {} }), [txs, ghosts]);
+  const catchGhost = useCallback(() => {
+    if (!who) return;
+    save(who, (w) => (ghostsLeft(w.ghosts, today) > 0 ? { ...w, ghosts: addGhost(w.ghosts, today) } : w));
+  }, [who, today]);
+
   return {
     ready: !!data,
     missions,
@@ -143,29 +163,33 @@ export function useKla() {
     fresh,
     equip,
     markSeen,
+    candies,
+    ghostsLeft: data ? ghostsLeft(data.ghosts, today) : 0,
+    catchGhost,
   };
 }
 
 /**
  * Mounted once inside the app: records today's visit and gives the skins the
- * user has earned (finished missions, limited events open today).
+ * user has earned (finished missions, limited events open today, Halloween
+ * skins with enough candies).
  */
 export function useKlaSync() {
   const { today, userId, repo } = useApp();
   const who = whoOf(repo, userId);
-  const { missions, ready } = useKla();
+  const { missions, ready, candies } = useKla();
   const doneSkins = missions
     .filter((m) => m.done)
     .map((m) => m.skin)
     .join(',');
   useEffect(() => {
     if (!who || !ready) return;
-    const give = new Set<SkinId>([...limitedOpenToday(today), ...(doneSkins ? (doneSkins.split(',') as SkinId[]) : [])]);
+    const give = new Set<SkinId>([...limitedOpenToday(today, candies.total), ...(doneSkins ? (doneSkins.split(',') as SkinId[]) : [])]);
     save(who, (w) => {
       const opens = w.opens.includes(today) ? w.opens : recordOpen(w.opens, today);
       const owned = [...new Set([...w.owned, ...give])];
       if (opens === w.opens && owned.length === w.owned.length) return w;
       return { ...w, opens, owned };
     });
-  }, [who, ready, today, doneSkins]);
+  }, [who, ready, today, doneSkins, candies.total]);
 }

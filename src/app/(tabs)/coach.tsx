@@ -16,7 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp, useMoney } from '../../data/AppProvider';
 import { BUDDY_NAME, buddyPoke, type BuddyMood } from '../../domain/buddy';
 import { buildCoachContext, buildInsights } from '../../domain/insights';
-import { KLA_AFTER, KLA_GREETING, KLA_THINKING, REPEAT_MAX } from '../../domain/klaTalk';
+import { HALLOWEEN_LINES } from '../../domain/halloween';
+import { KLA_AFTER, KLA_GREETING, KLA_GREETING_HALLOWEEN, KLA_THINKING, REPEAT_MAX } from '../../domain/klaTalk';
 import { formatBaht, parseBahtToSatang } from '../../domain/money';
 import { runwayAfterPurchase } from '../../domain/runway';
 import { SKINS, skinById, type SkinId } from '../../domain/skins';
@@ -25,6 +26,7 @@ import { useEquippedSkin, useKla } from '../../services/kla';
 import { Buddy } from '../../ui/Buddy';
 import { Card, Chip, Ionicons, Row, T, type IconName } from '../../ui/components';
 import { Reveal, TypingDots } from '../../ui/effects';
+import { TitleDecor, useHalloween } from '../../ui/halloween';
 import { KlaBackdrop } from '../../ui/kla/KlaBackdrop';
 import { KlaPicture } from '../../ui/kla/KlaPicture';
 import { KlaStage } from '../../ui/kla/KlaStage';
@@ -58,6 +60,7 @@ export default function Coach() {
   const { balance, runway } = useMoney();
   const skin = useEquippedSkin();
   const kla = useKla();
+  const halloween = useHalloween();
   const [picking, setPicking] = useState(false);
   const { subtitle, talking, said, speak, stop, sound, voice } = useKlaTalk();
   const [input, setInput] = useState(params.ask ?? '');
@@ -95,14 +98,14 @@ export default function Coach() {
       setFocused(true);
       if (!greeted) {
         greeted = true;
-        tell(KLA_GREETING);
+        tell(halloween ? KLA_GREETING_HALLOWEEN : KLA_GREETING);
       }
       return () => {
         setFocused(false);
         stop();
         setSpeakingId(null);
       };
-    }, [tell, stop]),
+    }, [tell, stop, halloween]),
   );
 
   const toTop = () => setTimeout(() => scroll.current?.scrollTo({ y: 0, animated: true }), 30);
@@ -154,7 +157,9 @@ export default function Coach() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     setHop((h) => h + 1);
     pokes.current += 1;
-    const line = buddyPoke(pokes.current, runway.status);
+    const n = pokes.current;
+    // Halloween theme: every other tap is a spooky-cute line.
+    const line = halloween && n % 2 === 0 ? { mood: 'cheer' as const, text: HALLOWEEN_LINES[(n / 2 - 1) % HALLOWEEN_LINES.length] } : buddyPoke(n, runway.status);
     tell(line.text, { mood: line.mood });
   }
 
@@ -175,10 +180,13 @@ export default function Coach() {
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bg }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={80}>
         <ScrollView ref={scroll} contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xl }} keyboardShouldPersistTaps="handled">
-          <View style={{ gap: 2 }}>
-            <T v="label">โค้ชส่วนตัว</T>
-            <T v="h1">น้อง{BUDDY_NAME}</T>
-          </View>
+          <Row justify="space-between" align="flex-end">
+            <View style={{ gap: 2 }}>
+              <T v="label">โค้ชส่วนตัว</T>
+              <T v="h1">น้อง{BUDDY_NAME}</T>
+            </View>
+            <TitleDecor />
+          </Row>
 
           {/* The stage */}
           <KlaBackdrop floorAt={0.8}>

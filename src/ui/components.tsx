@@ -22,7 +22,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GrowBar, Reveal, Shine, usePressSpring } from './effects';
 import { useCountUp, useNative, useReduceMotion } from './motion';
-import { fonts, radius, space, type, useTheme } from './theme';
+import { alpha, fonts, radius, space, type, useTheme } from './theme';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -486,7 +486,7 @@ export function Chip({
         borderRadius: radius.pill,
         borderWidth: 1.5,
         borderColor: selected ? theme.primary : theme.line,
-        backgroundColor: selected ? (theme.dark ? '#153B2A' : '#E3F1E8') : theme.surface,
+        backgroundColor: selected ? alpha(theme.primary, theme.dark ? 0.22 : 0.12) : theme.surface,
         transform: [{ scale: press.scale }],
       }}
     >

@@ -14,10 +14,18 @@ import { Button, Card, IconButton, Ionicons, Row, T } from '../ui/components';
 import { Reveal } from '../ui/effects';
 import { goBack } from '../ui/nav';
 import { palette, radius, space, useTheme } from '../ui/theme';
+import { HeaderDecor } from '../ui/halloween';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
 const FEATURES: { icon: IconName; colors: [string, string]; title: string; body: string; action?: { label: string; href: Href } }[] = [
+  {
+    icon: 'moon',
+    colors: ['#3B1E5C', '#120822'],
+    title: 'ธีมฮาโลวีน 👻',
+    body: 'ธีมหลอน ๆ น่ารัก ๆ สีม่วงมืดกับส้มฟักทอง มีค้างคาวบิน ผีน้อยให้จับรับลูกอม แลกสกินผีหัวฟักทอง แฟรงเกนสไตน์ แม่มดน้อย แวมไพร์ มัมมี่ และผีน้อยผ้าขาว (ถึง 2 พ.ย.)',
+    action: { label: 'ลองธีมฮาโลวีน', href: '/settings' },
+  },
   {
     icon: 'chatbubbles',
     colors: ['#1F7A52', '#0E3B2C'],
@@ -112,7 +120,7 @@ export default function WhatsNew() {
       <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
         <IconButton icon="close" label="ปิด" onPress={() => goBack()} />
         <T v="h3">มีอะไรใหม่</T>
-        <View style={{ width: 42 }} />
+        <HeaderDecor />
       </Row>
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.md, paddingBottom: space.xxxl }}>
         <BuddySays mood="cheer">{`อัปเดตใหม่มาแล้ว! ${BUDDY_NAME}เตรียมของเล่นใหม่ไว้หลายอย่างเลย`}</BuddySays>

@@ -7,7 +7,9 @@
 import { BUDDY_NAME } from './buddy';
 
 export const KLA_GREETING = `สวัสดี ${BUDDY_NAME}เองนะ ถามเรื่องเงินได้ทุกเรื่องเลย เช่น สัปดาห์นี้ใช้ไปกับอะไรเยอะสุด หรือของชิ้นนี้ซื้อได้ไหม`;
-export const KLA_THINKING = `${BUDDY_NAME}กำลังดูตัวเลขของคุณ…`;
+/** The greeting in the Halloween theme. */
+export const KLA_GREETING_HALLOWEEN = `บู้! ตกใจไหม ${BUDDY_NAME}เองนะ ถามเรื่องเงินได้ทุกเรื่องเลย ฮาโลวีนนี้อย่าให้ค่าขนมมาหลอกหลอนกระเป๋าเงินนะ`;
+export const KLA_THINKING =`${BUDDY_NAME}กำลังดูตัวเลขของคุณ…`;
 export const KLA_AFTER = `อ่านคำตอบเต็มได้ด้านล่าง สงสัยอะไรอีก ถาม${BUDDY_NAME}ต่อได้เลยนะ`;
 
 /** A subtitle this long or longer is not repeated whole in the bubble after it is said. */

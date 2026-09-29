@@ -8,7 +8,7 @@ import { DEFAULT_SKIN, formatWindow, isSkinId, limitedOpenToday, skinById, SKINS
 describe('Skins', () => {
   it('TC-73 every skin has a unique id and a Thai name; limited skins have a window', () => {
     expect(new Set(SKINS.map((s) => s.id)).size).toBe(SKINS.length);
-    expect(SKINS.length).toBe(13);
+    expect(SKINS.length).toBe(19);
     for (const s of SKINS) {
       expect(s.name).toMatch(/[฀-๿]/);
       expect(!!s.window).toBe(s.kind === 'limited');
@@ -27,7 +27,7 @@ describe('Skins', () => {
     expect(skinState(pioneer, new Set(['pioneer']), '2027-05-01')).toEqual({ kind: 'owned' }); // kept for good
     expect(skinState(skinById('newyear2570'), none, '2026-09-29')).toEqual({ kind: 'limited_soon', from: '2026-12-25' });
     expect(skinState(skinById('songkran2569'), none, '2026-09-29')).toEqual({ kind: 'limited_ended' });
-    expect(limitedOpenToday('2026-09-29')).toEqual(['pioneer']);
+    expect(limitedOpenToday('2026-09-29')).toEqual(['pioneer', 'pumpkin']); // Halloween candy skins need candies
     expect(limitedOpenToday('2027-01-01')).toEqual(['newyear2570']);
     expect(limitedOpenToday('2026-12-01')).toEqual([]);
 

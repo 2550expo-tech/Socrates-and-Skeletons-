@@ -26,6 +26,7 @@ import { useToast } from '../ui/feedback';
 import { useNative, useReduceMotion } from '../ui/motion';
 import { goBack } from '../ui/nav';
 import { fonts, palette, radius, space, useTheme } from '../ui/theme';
+import { HeaderDecor } from '../ui/halloween';
 
 const EXAMPLES = ['ข้าว 50 บาท', 'ค่ารถ 25 กาแฟ 65', 'ได้เงินจากแม่ 500', 'เมื่อวาน หมูกระทะ 299'];
 
@@ -174,7 +175,7 @@ export default function VoiceEntry() {
       <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
         <IconButton icon="close" label="ปิด" onPress={() => goBack()} />
         <T v="h3">พูดจดรายการ</T>
-        <View style={{ width: 42 }} />
+        <HeaderDecor />
       </Row>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxxl }} keyboardShouldPersistTaps="handled">

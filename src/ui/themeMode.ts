@@ -75,7 +75,7 @@ export function useSchemeChoice(): 'light' | 'dark' {
 // ---------------------------------------------------------------------------
 
 const COLOR_KEY = 'mindpay.colorTheme';
-const COLOR_KEYS = ['forest', 'redvelvet', 'purple', 'sapphire', 'amber', 'sunset', 'rose', 'onyx'] as const;
+const COLOR_KEYS = ['forest', 'redvelvet', 'purple', 'sapphire', 'amber', 'sunset', 'rose', 'onyx', 'halloween'] as const;
 export type ColorThemeChoice = (typeof COLOR_KEYS)[number];
 let color: ColorThemeChoice = 'forest';
 let colorLoaded = false;

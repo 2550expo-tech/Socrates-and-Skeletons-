@@ -18,6 +18,7 @@ import { Reveal } from '../../ui/effects';
 import { SpendCalendar } from '../../ui/SpendCalendar';
 import { TxRow } from '../../ui/TxRow';
 import { fonts, radius, space, useTheme } from '../../ui/theme';
+import { TitleDecor } from '../../ui/halloween';
 
 type Filter = 'all' | 'expense' | 'income';
 
@@ -54,7 +55,10 @@ export default function Transactions() {
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bg }}>
       <View style={{ paddingHorizontal: space.lg, gap: space.md, paddingTop: space.sm, paddingBottom: space.sm }}>
         <Row justify="space-between">
-          <T v="h1">รายการ</T>
+          <Row gap={space.sm} align="flex-end">
+            <T v="h1">รายการ</T>
+            <TitleDecor />
+          </Row>
           <Row gap={space.xs}>
             <IconButton
               icon={showCalendar ? 'calendar' : 'calendar-outline'}

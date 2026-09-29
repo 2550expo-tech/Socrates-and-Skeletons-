@@ -19,6 +19,7 @@ import { Button, Card, Chip, IconButton, Ionicons, Row, Segmented, T } from '../
 import { ConfirmSheet, useToast } from '../ui/feedback';
 import { AmountField, Field } from '../ui/inputs';
 import { fonts, radius, space, useTheme } from '../ui/theme';
+import { HeaderDecor } from '../ui/halloween';
 
 export default function TransactionForm() {
   const theme = useTheme();
@@ -177,7 +178,7 @@ export default function TransactionForm() {
           {existing ? (
             <IconButton icon="trash-outline" label="ลบรายการ" color={theme.critical} onPress={() => setAskDelete(true)} />
           ) : (
-            <View style={{ width: 42 }} />
+            <HeaderDecor />
           )}
         </Row>
 

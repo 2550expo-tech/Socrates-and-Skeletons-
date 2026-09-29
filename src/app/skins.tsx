@@ -21,6 +21,11 @@ import { KlaPicture } from '../ui/kla/KlaPicture';
 import { KlaStage } from '../ui/kla/KlaStage';
 import { goBack } from '../ui/nav';
 import { fonts, radius, space, useTheme } from '../ui/theme';
+import { CandyArt, HeaderDecor, PumpkinArt, useHalloween } from '../ui/halloween';
+import { setColorTheme } from '../ui/themeMode';
+import { LinearGradient } from 'expo-linear-gradient';
+import { formatThaiDay } from '../domain/dates';
+import { HALLOWEEN } from '../domain/halloween';
 
 export default function Skins() {
   const theme = useTheme();
@@ -28,7 +33,8 @@ export default function Skins() {
   const celebrate = useCelebrate();
   const params = useLocalSearchParams<{ skin?: string }>();
   const { today } = useApp();
-  const { missions, owned, equipped, fresh, equip, markSeen } = useKla();
+  const { missions, owned, equipped, fresh, equip, markSeen, candies } = useKla();
+  const halloween = useHalloween();
   const [picked, setPicked] = useState<SkinId>(isSkinId(params.skin) ? params.skin : equipped);
   const [hop, setHop] = useState(0);
   const [cheer, setCheer] = useState(false);
@@ -51,13 +57,14 @@ export default function Skins() {
     return () => clearTimeout(t);
   }, [cheer]);
 
-  const states = useMemo(() => new Map(SKINS.map((s) => [s.id, skinState(s, owned, today)])), [owned, today]);
+  const states = useMemo(() => new Map(SKINS.map((s) => [s.id, skinState(s, owned, today, candies.total)])), [owned, today, candies.total]);
   const skin = SKINS.find((s) => s.id === picked) ?? SKINS[0];
   const state = states.get(skin.id)!;
   const mission = missionForSkin(missions, skin.id);
   const mine = SKINS.filter((s) => states.get(s.id)!.kind === 'owned');
   const toUnlock = SKINS.filter((s) => s.kind === 'mission' && states.get(s.id)!.kind !== 'owned');
-  const limited = SKINS.filter((s) => s.kind === 'limited' && states.get(s.id)!.kind !== 'owned');
+  const spooky = SKINS.filter((s) => s.event === 'halloween2569' && states.get(s.id)!.kind !== 'owned');
+  const limited = SKINS.filter((s) => s.kind === 'limited' && !s.event && states.get(s.id)!.kind !== 'owned');
 
   function wear() {
     equip(skin.id);
@@ -73,7 +80,7 @@ export default function Skins() {
       <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
         <IconButton icon="chevron-back" label="กลับ" onPress={() => goBack()} />
         <T v="h3">ตู้สกินน้องกล้า</T>
-        <View style={{ width: 42 }} />
+        <HeaderDecor />
       </Row>
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxxl }}>
         <Reveal zoom>
@@ -105,6 +112,57 @@ export default function Skins() {
             <SkinCard key={s.id} skin={s} state={states.get(s.id)!} index={i} picked={picked === s.id} worn={equipped === s.id} onPress={() => setPicked(s.id)} />
           ))}
         </Section>
+
+        {spooky.length ? (
+          <View style={{ gap: space.sm }}>
+            <View style={{ borderRadius: radius.lg, overflow: 'hidden' }}>
+              <LinearGradient colors={['#3B1E5C', '#24123D', '#120822']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: space.md, gap: 4 }}>
+                <Row justify="space-between">
+                  <Row gap={space.sm}>
+                    <PumpkinArt size={30} />
+                    <T v="h3" color="#F4F1E6">
+                      ฮาโลวีน 2569
+                    </T>
+                  </Row>
+                  <View
+                    accessible
+                    accessibilityLabel={`ลูกอม ${candies.total} เม็ด`}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.12)' }}
+                  >
+                    <CandyArt size={18} />
+                    <T v="body" color="#FF9A3C">
+                      {candies.total}
+                    </T>
+                  </View>
+                </Row>
+                <T v="micro" color="#D9C8F0">
+                  สกินลิมิเต็ดถึง {formatThaiDay(HALLOWEEN.to)} · ได้ลูกอมจากการจับผีบนหน้าหลัก (ธีมฮาโลวีน วันละ {HALLOWEEN.ghostsPerDay} ตัว) และจดรายการวันไหนได้ {HALLOWEEN.candiesPerRecordDay} เม็ด
+                </T>
+                {!halloween ? (
+                  <View style={{ alignSelf: 'flex-start', marginTop: 4 }}>
+                    <Button label="เปิดธีมฮาโลวีน" small kind="gold" icon="moon" onPress={() => setColorTheme('halloween')} />
+                  </View>
+                ) : null}
+              </LinearGradient>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+              {spooky.map((s, i) => {
+                const st = states.get(s.id)!;
+                return (
+                  <SkinCard
+                    key={s.id}
+                    skin={s}
+                    state={st}
+                    index={i}
+                    picked={picked === s.id}
+                    progress={st.kind === 'candy' ? { value: st.have, target: st.need } : undefined}
+                    onPress={() => setPicked(s.id)}
+                  />
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
 
         {toUnlock.length ? (
           <Section title="ปลดล็อกด้วยภารกิจการเงิน" hint="ทำภารกิจในหน้าความสำเร็จ แล้วชุดจะเข้าตู้ให้เอง">
@@ -176,6 +234,25 @@ function SkinAction({
       </View>
     );
   }
+  if (state.kind === 'candy') {
+    return (
+      <View style={{ alignSelf: 'stretch', gap: 6, marginTop: space.xs, backgroundColor: 'rgba(0,0,0,0.18)', borderRadius: radius.md, padding: space.md }}>
+        <Row gap={6}>
+          <CandyArt size={18} />
+          <T v="small" color="#F4F1E6" style={{ flex: 1, fontFamily: fonts.sansSemi }}>
+            สะสมลูกอม {state.need} เม็ดเพื่อปลดล็อก
+          </T>
+          <T v="small" color={theme.heroAccent}>
+            {state.have}/{state.need}
+          </T>
+        </Row>
+        <GrowBar value={state.have / state.need} color={theme.heroAccent} track="rgba(244,241,230,0.18)" />
+        <T v="micro" color={theme.heroInkSoft}>
+          สกินลิมิเต็ดฮาโลวีน รับได้ถึง {formatThaiDay(state.until)} จับผีบนหน้าหลัก (ธีมฮาโลวีน) และจดรายการทุกวันเพื่อเก็บลูกอม
+        </T>
+      </View>
+    );
+  }
   if (state.kind === 'locked' && mission) {
     const { value, target } = mission.progress;
     return (
@@ -241,7 +318,9 @@ function SkinCard({
           ? 'เร็ว ๆ นี้'
           : state.kind === 'limited_open'
             ? 'รับได้ตอนนี้'
-            : progress
+            : state.kind === 'candy'
+              ? `ลูกอม ${state.have}/${state.need}`
+              : progress
               ? progress.target === 100
                 ? `${progress.value}%`
                 : `${progress.value}/${progress.target}`
@@ -289,7 +368,7 @@ function SkinCard({
         <T v="small" color={theme.ink} center numberOfLines={1} style={{ fontFamily: fonts.sansSemi }}>
           {skin.name}
         </T>
-        {progress && state.kind === 'locked' ? (
+        {progress && (state.kind === 'locked' || state.kind === 'candy') ? (
           <View style={{ alignSelf: 'stretch', paddingHorizontal: 4, gap: 2 }}>
             <GrowBar value={progress.value / progress.target} color={theme.primary} track={theme.surfaceAlt} height={5} />
           </View>

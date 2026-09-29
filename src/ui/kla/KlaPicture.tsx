@@ -42,7 +42,7 @@ export function KlaPicture({
       <KlaHead id={id} skin={skin} mood={mood} />
       <KlaEyes id={id} mood={mood} closed={blink} />
       <KlaGlasses skin={skin} />
-      <KlaMouth mood={mood} />
+      <KlaMouth mood={mood} skin={skin} />
       {extras ? <KlaExtras mood={mood} /> : null}
     </Svg>
   );

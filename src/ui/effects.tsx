@@ -564,6 +564,8 @@ export function ScanBeam({ height, color = '#5CE0A0', active }: { height: number
 // ---------------------------------------------------------------------------
 
 const CONFETTI_BASE = [palette.goldBright, palette.gold, '#F4F1E6'];
+/** Halloween theme: pumpkin orange, candy purple and night black. */
+const CONFETTI_SPOOKY = ['#FF9A3C', '#B48CF0', '#1B1026', '#F4F1E6'];
 const SAMPLES = 10;
 
 interface Piece {
@@ -577,8 +579,8 @@ interface Piece {
   delay: number;
 }
 
-function makePieces(count: number, width: number, height: number, origin: { x: number; y: number }, seed: number, tints: string[]): Piece[] {
-  const CONFETTI_COLORS = [...CONFETTI_BASE, ...tints];
+function makePieces(count: number, width: number, height: number, origin: { x: number; y: number }, seed: number, tints: string[], spooky = false): Piece[] {
+  const CONFETTI_COLORS = [...(spooky ? CONFETTI_SPOOKY : CONFETTI_BASE), ...tints];
   const rnd = seeded(seed);
   const g = height * 1.9; // gravity, points per second²
   const duration = 1.9;
@@ -598,7 +600,7 @@ function makePieces(count: number, width: number, height: number, origin: { x: n
     const kind: Piece['kind'] = r < 0.22 ? 'coin' : r < 0.48 ? 'leaf' : 'ribbon';
     return {
       kind,
-      color: kind === 'coin' ? palette.goldBright : CONFETTI_COLORS[Math.floor(rnd() * CONFETTI_COLORS.length)],
+      color: kind === 'coin' ? (spooky ? '#FF9A3C' : palette.goldBright) : CONFETTI_COLORS[Math.floor(rnd() * CONFETTI_COLORS.length)],
       w: kind === 'coin' ? 11 : kind === 'leaf' ? 13 : 6 + rnd() * 4,
       h: kind === 'coin' ? 11 : kind === 'leaf' ? 7 : 11 + rnd() * 6,
       xs,
@@ -616,6 +618,7 @@ function ConfettiBurst({
   origin,
   onDone,
   tints,
+  spooky,
 }: {
   id: number;
   width: number;
@@ -624,12 +627,14 @@ function ConfettiBurst({
   onDone: (id: number) => void;
   /** Colours of the colour theme mixed in with the gold. */
   tints: string[];
+  /** Halloween theme: pumpkins and candies instead of gold coins. */
+  spooky: boolean;
 }) {
   const [p] = useState(() => new Animated.Value(0));
   const tintKey = tints.join(',');
   const pieces = useMemo(
-    () => makePieces(44, width, height, origin ?? { x: width / 2, y: height * 0.42 }, Math.floor(id) % 100000, tintKey.split(',')),
-    [width, height, origin, id, tintKey],
+    () => makePieces(44, width, height, origin ?? { x: width / 2, y: height * 0.42 }, Math.floor(id) % 100000, tintKey.split(','), spooky),
+    [width, height, origin, id, tintKey, spooky],
   );
   useEffect(() => {
     const anim = Animated.timing(p, { toValue: 1, duration: 1900, easing: Easing.linear, useNativeDriver: useNative });
@@ -651,7 +656,7 @@ function ConfettiBurst({
             borderRadius: c.kind === 'coin' ? c.w / 2 : c.kind === 'leaf' ? c.h : 2,
             backgroundColor: c.color,
             borderWidth: c.kind === 'coin' ? 2 : 0,
-            borderColor: palette.gold,
+            borderColor: spooky ? '#B4530C' : palette.gold,
             opacity: p.interpolate({ inputRange: [0, 0.04, 0.72, 1], outputRange: [0, 1, 1, 0] }),
             transform: [
               { translateX: p.interpolate({ inputRange: input, outputRange: c.xs }) },
@@ -699,7 +704,7 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
       >
         {size.w
           ? bursts.map((b) => (
-              <ConfettiBurst key={b.id} id={b.id} width={size.w} height={size.h} origin={b.origin} onDone={remove} tints={[theme.primary, theme.heroAccent, theme.heroInkSoft]} />
+              <ConfettiBurst key={b.id} id={b.id} width={size.w} height={size.h} origin={b.origin} onDone={remove} tints={[theme.primary, theme.heroAccent, theme.heroInkSoft]} spooky={theme.colorTheme === 'halloween'} />
             ))
           : null}
       </View>

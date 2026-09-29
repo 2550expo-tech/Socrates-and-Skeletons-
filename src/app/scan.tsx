@@ -33,6 +33,7 @@ import { ScannerStage } from '../ui/ScannerStage';
 import { TxRow } from '../ui/TxRow';
 import { radius, space, useTheme } from '../ui/theme';
 import { WaitNotice } from '../ui/WaitNotice';
+import { HeaderDecor } from '../ui/halloween';
 
 export default function Scan() {
   const theme = useTheme();
@@ -93,7 +94,7 @@ export default function Scan() {
       <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
         <IconButton icon="close" label="ปิด" onPress={() => goBack()} />
         <T v="h3">สแกนสลิป</T>
-        <View style={{ width: 42 }} />
+        <HeaderDecor />
       </Row>
 
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxxl }}>

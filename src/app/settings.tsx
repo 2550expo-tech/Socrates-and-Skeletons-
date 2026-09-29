@@ -21,6 +21,7 @@ import { setThemeMode, useThemeMode, type ThemeMode } from '../ui/themeMode';
 import { ConfirmSheet, useToast } from '../ui/feedback';
 import { Field } from '../ui/inputs';
 import { space, useTheme } from '../ui/theme';
+import { HeaderDecor } from '../ui/halloween';
 
 export default function Settings() {
   const theme = useTheme();
@@ -74,7 +75,7 @@ export default function Settings() {
       <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
         <IconButton icon="chevron-back" label="กลับ" onPress={() => goBack()} />
         <T v="h3">ตั้งค่า</T>
-        <View style={{ width: 42 }} />
+        <HeaderDecor />
       </Row>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxxl }} keyboardShouldPersistTaps="handled">

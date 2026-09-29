@@ -191,8 +191,8 @@ export function KlaStage({
           {layer(<KlaHead id={id} skin={skin} mood={mood} />)}
           <Animated.View style={[fill, { transformOrigin: t.eyesAt, transform: t.blink }]}>{layer(<KlaEyes id={id} mood={mood} />)}</Animated.View>
           {layer(<KlaGlasses skin={skin} />, false)}
-          <Animated.View style={[fill, { opacity: t.closed }]}>{layer(<KlaMouth mood={mood} />, false)}</Animated.View>
-          <Animated.View style={[fill, { opacity: t.open, transformOrigin: t.mouthAt, transform: t.openShape }]}>{layer(<KlaMouthOpen />, false)}</Animated.View>
+          <Animated.View style={[fill, { opacity: t.closed }]}>{layer(<KlaMouth mood={mood} skin={skin} />, false)}</Animated.View>
+          <Animated.View style={[fill, { opacity: t.open, transformOrigin: t.mouthAt, transform: t.openShape }]}>{layer(<KlaMouthOpen skin={skin} />, false)}</Animated.View>
           {layer(<KlaExtras mood={mood} />, false)}
         </Animated.View>
       </Animated.View>

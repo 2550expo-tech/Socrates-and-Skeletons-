@@ -18,7 +18,7 @@ import { useKlaSync } from '../../services/kla';
 import { Ionicons, type IconName } from '../../ui/components';
 import { PulseRing, usePressSpring } from '../../ui/effects';
 import { useNative, useReduceMotion } from '../../ui/motion';
-import { fonts, useTheme } from '../../ui/theme';
+import { alpha, fonts, useTheme } from '../../ui/theme';
 
 const TABS: Record<string, { label: string; icon: IconName; iconActive: IconName }> = {
   index: { label: 'หน้าหลัก', icon: 'home-outline', iconActive: 'home' },
@@ -124,7 +124,8 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
             width: PILL_W,
             height: 30,
             borderRadius: 15,
-            backgroundColor: theme.dark ? '#153B2A' : '#E3F1E8',
+            // A soft pill in the colour theme's main colour.
+            backgroundColor: alpha(theme.primary, theme.dark ? 0.22 : 0.12),
             opacity: shown,
             transform: [{ translateX: Animated.subtract(slide, PILL_W / 2) }],
           }}

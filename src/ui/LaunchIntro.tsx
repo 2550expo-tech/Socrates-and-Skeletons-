@@ -14,7 +14,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Image, Platform, StyleSheet, View } from 'react-native';
 import { Shine } from './effects';
-import { fonts, palette } from './theme';
+import { fonts, palette, useTheme } from './theme';
 
 const useNative = Platform.OS !== 'web';
 /** Same size as "imageWidth" of expo-splash-screen in app.json, so the hand-over is seamless. */
@@ -28,6 +28,7 @@ const LEAVES = Array.from({ length: 8 }, (_, i) => {
 });
 
 export function LaunchIntro({ ready, fontsReady, onDone }: { ready: boolean; fontsReady: boolean; onDone: () => void }) {
+  const theme = useTheme();
   const [v] = useState(() => ({
     tree: new Animated.Value(0),
     ripple: new Animated.Value(0),
@@ -122,7 +123,8 @@ export function LaunchIntro({ ready, fontsReady, onDone }: { ready: boolean; fon
         StyleSheet.absoluteFill,
         {
           zIndex: 2000,
-          backgroundColor: palette.forest,
+          // Phones hand over from the native splash (forest green); the web has none, so it follows the colour theme.
+          backgroundColor: Platform.OS === 'web' ? theme.hero : palette.forest,
           alignItems: 'center',
           justifyContent: 'center',
           opacity: v.exit.interpolate({ inputRange: [0, 0.6, 1], outputRange: [1, 0.6, 0] }),

@@ -21,7 +21,8 @@ import { KlaPicture } from '../ui/kla/KlaPicture';
 import { Medal } from '../ui/Medal';
 import { useCountUp, useReduceMotion } from '../ui/motion';
 import { goBack } from '../ui/nav';
-import { fonts, radius, space, useTheme } from '../ui/theme';
+import { alpha, fonts, radius, space, useTheme } from '../ui/theme';
+import { HeaderDecor } from '../ui/halloween';
 
 const WEEKDAY = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
@@ -50,7 +51,7 @@ export default function Achievements() {
       <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
         <IconButton icon="chevron-back" label="กลับ" onPress={() => goBack()} />
         <T v="h3">ความสำเร็จ</T>
-        <View style={{ width: 42 }} />
+        <HeaderDecor />
       </Row>
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxxl }}>
         {/* Streak */}
@@ -72,7 +73,7 @@ export default function Achievements() {
                       width: 68,
                       height: 68,
                       borderRadius: 34,
-                      backgroundColor: 'rgba(226,182,74,0.14)',
+                      backgroundColor: alpha(theme.heroAccent, 0.14),
                       borderWidth: 2,
                       borderColor: streak.today ? theme.heroAccent : 'rgba(244,241,230,0.35)',
                       alignItems: 'center',
