@@ -287,7 +287,8 @@ try {
     await page.reload();
     await introGone(page);
     const kept = await page.getByRole('button', { name: 'ธีม เรดเวลเวท' }).getAttribute('aria-selected');
-    check('Colour theme: Red Velvet colours the app and is remembered', saveBg === 'rgb(142, 36, 54)' && kept === 'true', `${saveBg} selected=${kept}`);
+    const velvet = phone.colorScheme === 'dark' ? 'rgb(208, 86, 108)' : 'rgb(142, 36, 54)';
+    check('Colour theme: Red Velvet colours the app and is remembered', saveBg === velvet && kept === 'true', `${saveBg} selected=${kept}`);
     await page.getByRole('button', { name: 'ธีม ป่าทอง' }).click();
     await button(page, 'กลับ').click();
     check('Back from settings opened directly goes home', await visible(page, 'สวัสดี', 8000));
