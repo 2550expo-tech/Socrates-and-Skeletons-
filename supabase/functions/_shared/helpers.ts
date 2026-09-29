@@ -121,11 +121,15 @@ export function parseJsonText(text: string): unknown {
   }
 }
 
-/** Coach replies are shown as plain text: drop markdown bold and headings if a model adds them. */
+/**
+ * Coach replies are shown as plain text and read aloud: drop markdown bold,
+ * headings and list bullets if a model adds them.
+ */
 export function plainText(text: string): string {
   return text
     .replace(/\*\*(.+?)\*\*/g, '$1')
     .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*(?:[-*•]|\d+[.)])\s+/gm, '')
     .trim();
 }
 

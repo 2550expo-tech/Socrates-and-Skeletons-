@@ -21,6 +21,7 @@
     "expo-linking": "~57.0.11",
     "expo-media-library": "~57.0.5",
     "expo-router": "~57.0.23",
+    "expo-speech": "~57.0.3",
     "expo-speech-recognition": "^57.1.0",
     "expo-splash-screen": "~57.0.9",
     "expo-sqlite": "~57.0.3",

@@ -70,6 +70,11 @@ export function useApp() {
   return ctx;
 }
 
+/** Same as useApp, but null outside the provider (for small shared pieces such as the companion). */
+export function useAppMaybe() {
+  return useContext(AppContext);
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [repo, setRepo] = useState<Repo | null>(null);

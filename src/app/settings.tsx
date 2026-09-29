@@ -1,8 +1,10 @@
 /**
- * Settings: the numbers behind FR-6 (balance start, low line, budget), coach
- * tone (FR-5), privacy notes, the account (email, change password) and sign out.
+ * Settings: the numbers behind FR-6 (balance start, low line, budget), น้องกล้า
+ * (voice on/off, skins), how the app looks, privacy notes, the account (email,
+ * change password) and sign out.
  */
 import Constants from 'expo-constants';
+import { router } from 'expo-router';
 import { goBack } from '../ui/nav';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Switch, View } from 'react-native';
@@ -11,9 +13,9 @@ import { useApp } from '../data/AppProvider';
 import { supabase } from '../data/supabase';
 import { useAutoScan } from '../services/AutoScanProvider';
 import { forgetScanned } from '../services/slips';
-import { PERSONAS } from '../domain/insights';
 import { formatSatang, parseBahtToSatang } from '../domain/money';
-import { Button, Card, Chip, IconButton, Ionicons, Row, Segmented, T } from '../ui/components';
+import { Button, Card, IconButton, Ionicons, Row, Segmented, T } from '../ui/components';
+import { setKlaSound, useKlaSound } from '../ui/kla/useKlaTalk';
 import { ThemePicker } from '../ui/ThemePicker';
 import { setThemeMode, useThemeMode, type ThemeMode } from '../ui/themeMode';
 import { ConfirmSheet, useToast } from '../ui/feedback';
@@ -34,6 +36,7 @@ export default function Settings() {
   }, [repo]);
   const auto = useAutoScan();
   const themeMode = useThemeMode();
+  const klaSound = useKlaSound();
   const [name, setName] = useState(profile?.displayName ?? '');
   const [opening, setOpening] = useState(formatSatang(profile?.openingBalanceSatang ?? 0, { decimals: false }).replace(/,/g, ''));
   const [floor, setFloor] = useState(formatSatang(profile?.runwayFloorSatang ?? 50_000, { decimals: false }).replace(/,/g, ''));
@@ -131,18 +134,20 @@ export default function Settings() {
           ) : null}
 
           <Card>
-            <T v="h3">โทนของโค้ช</T>
-            <Row gap={space.sm} style={{ flexWrap: 'wrap' }}>
-              {PERSONAS.map((p) => (
-                <Chip
-                  key={p.tone}
-                  label={p.name}
-                  glyph={p.glyph}
-                  selected={profile?.coachTone === p.tone}
-                  onPress={() => saveProfile({ coachTone: p.tone }).catch(() => toast({ message: 'เปลี่ยนไม่สำเร็จ', tone: 'error' }))}
-                />
-              ))}
+            <T v="h3">น้องกล้า</T>
+            <Row justify="space-between" gap={space.md}>
+              <View style={{ flex: 1 }}>
+                <T v="body">เสียงน้องกล้า</T>
+                <T v="micro">น้องกล้าพูดคำแนะนำออกเสียงในหน้าโค้ช ปิดไว้ก็ยังมีตัวหนังสือขึ้นให้อ่าน</T>
+              </View>
+              <Switch
+                value={klaSound}
+                onValueChange={setKlaSound}
+                trackColor={{ true: theme.primary, false: theme.line }}
+                accessibilityLabel="เสียงน้องกล้า"
+              />
             </Row>
+            <Button label="ตู้สกินน้องกล้า" kind="soft" small icon="shirt-outline" onPress={() => router.push('/skins')} />
           </Card>
 
           <Card>
@@ -168,7 +173,8 @@ export default function Settings() {
             <T v="small">
               • รูปในแกลเลอรีถูกตรวจบนมือถือก่อน เฉพาะรูปที่มี QR ของสลิปจะถูกส่งให้ AI (Google Gemini) อ่าน และไม่ถูกเก็บบนเซิร์ฟเวอร์ MindPay{'\n'}
               • ช่วงทดลองใช้ Gemini แบบฟรี ซึ่ง Google อาจเก็บข้อมูลที่ส่งไปเพื่อปรับปรุง AI ตามเงื่อนไขของ Google{'\n'}
-              • โค้ช AI เห็นเฉพาะยอดรวมตามหมวด ไม่เห็นรูปสลิป เลขบัญชี หรือชื่อคนที่คุณโอนให้{'\n'}
+              • น้องกล้า (โค้ช AI) เห็นเฉพาะยอดรวมตามหมวด ไม่เห็นรูปสลิป เลขบัญชี หรือชื่อคนที่คุณโอนให้{'\n'}
+              • เสียงของน้องกล้าใช้เสียงอ่านภาษาไทยที่มากับมือถือหรือเบราว์เซอร์ของคุณ (ข้อความที่อ่านเป็นคำตอบของโค้ชเท่านั้น){'\n'}
               • ข้อมูลรายการของคุณมองเห็นได้เฉพาะบัญชีของคุณ (Row Level Security)
             </T>
             {userId ? (

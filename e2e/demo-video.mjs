@@ -151,7 +151,8 @@ try {
   await pause(1400);
   await page.getByText('สรุปสัปดาห์นี้ให้หน่อย').first().click();
   await page.getByText('ตัดสินใจได้เลย', { exact: false }).first().waitFor({ timeout: 15000 });
-  await pause(2200);
+  // น้องกล้า reads the answer out with subtitles, moving its mouth and hands.
+  await pause(5200);
 
   // 8. Back home
   await page.getByRole('tab', { name: 'หน้าหลัก' }).click();

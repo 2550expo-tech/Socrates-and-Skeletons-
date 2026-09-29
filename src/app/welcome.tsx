@@ -25,7 +25,8 @@ import {
   otpErrorMessage,
   type AuthErrorLike,
 } from '../domain/auth';
-import { ContourLines, MoneyTree } from '../ui/art';
+import { ContourLines } from '../ui/art';
+import { KlaStage } from '../ui/kla/KlaStage';
 import { Button, Card, Ionicons, Row, Segmented, T } from '../ui/components';
 import { Aurora, Reveal, Shine, Sparkles } from '../ui/effects';
 import { useToast } from '../ui/feedback';
@@ -43,7 +44,7 @@ const RESEND_WAIT_S = 60;
 const VALUE_POINTS = [
   { icon: 'receipt-outline', label: 'จดจากสลิปให้เอง' },
   { icon: 'leaf-outline', label: 'รู้ว่าเงินพอถึงวันไหน' },
-  { icon: 'chatbubble-ellipses-outline', label: 'โค้ช AI ช่วยคิด' },
+  { icon: 'chatbubble-ellipses-outline', label: 'น้องกล้าโค้ชส่วนตัว' },
 ] as const;
 
 export default function Welcome() {
@@ -58,6 +59,7 @@ export default function Welcome() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; password?: string }>({});
+  const [hop, setHop] = useState(0);
   const [sent, setSent] = useState<Sent | null>(null);
   const [resendIn, setResendIn] = useState(0);
 
@@ -233,8 +235,11 @@ export default function Welcome() {
           <Aurora cycles={2} strength={0.4} seed={17} />
           <ContourLines width={420} height={320} color={theme.heroAccent} />
           <Sparkles count={14} cycles={3} seed={41} area={{ top: 6, bottom: 70 }} />
+          {/* The cover: น้องกล้า, the MindPay mascot, says hello (and hops when tapped). */}
           <Reveal zoom from={10}>
-            <MoneyTree health={0.85} size={120} trunk="#E8E1CC" leaf={theme.heroAccent} bare={theme.heroBare} glow={theme.heroAccent} grow sway />
+            <Pressable onPress={() => setHop((h) => h + 1)} accessibilityRole="button" accessibilityLabel="น้องกล้า มาสคอตของ MindPay แตะเพื่อทักทาย">
+              <KlaStage skin="classic" mood="happy" width={136} hop={hop} onDark />
+            </Pressable>
           </Reveal>
           <Reveal index={2} from={14}>
             <View style={{ overflow: 'hidden', borderRadius: radius.md, marginTop: space.sm, paddingHorizontal: space.sm }}>

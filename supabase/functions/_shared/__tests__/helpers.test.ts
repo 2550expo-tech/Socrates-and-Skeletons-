@@ -63,6 +63,8 @@ describe('AI provider', () => {
     expect(parseJsonText('Here it is: {"a":2} done')).toEqual({ a: 2 });
     expect(() => parseJsonText('no json')).toThrow();
     expect(plainText('## หัวข้อ\n**สรุป** ใช้ไป ฿1,200')).toBe('หัวข้อ\nสรุป ใช้ไป ฿1,200');
+    // Read aloud by น้องกล้า: no list bullets or numbers in front of lines.
+    expect(plainText('- กินข้าวบ้าน\n• ลดกาแฟ\n2) เก็บ ฿100')).toBe('กินข้าวบ้าน\nลดกาแฟ\nเก็บ ฿100');
   });
 });
 

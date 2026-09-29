@@ -369,16 +369,20 @@ describe('FR-5 coach insights', () => {
     expect(rise).toMatchObject({ key: 'food', week: 60_000, usualWeek: 30_000, changePct: 100 });
   });
 
-  it('TC-32 speaks in the chosen tone and never without data', () => {
+  it('TC-32 speaks as น้องกล้า in one calm voice, with the facts behind it, and never without data', () => {
     const runway = computeRunway({ balanceSatang: 100_000, floorSatang: 50_000, averageSatang: 10_000, now: NOW });
     const empty = buildInsights({ txs: [], profile, runway, now: NOW });
     expect(empty[0].kind).toBe('no_data');
+    expect(empty[0].message).toContain('กล้า');
     const txs = [tx({ day: '2026-09-27', amount: 100 })];
-    const friend = buildInsights({ txs, profile: { ...profile, coachTone: 'friend' }, runway, now: NOW });
-    const senior = buildInsights({ txs, profile: { ...profile, coachTone: 'senior' }, runway, now: NOW });
-    expect(friend[0].fact).toBe(senior[0].fact); // same facts
-    expect(friend[0].message).not.toBe(senior[0].message); // different voice
-    for (const i of [...friend, ...senior]) expect(i.message).not.toMatch(/เกินไป!/);
+    // The old tone setting no longer changes anything: there is one coach now.
+    const a = buildInsights({ txs, profile: { ...profile, coachTone: 'friend' }, runway, now: NOW });
+    const b = buildInsights({ txs, profile: { ...profile, coachTone: 'senior' }, runway, now: NOW });
+    expect(a).toEqual(b);
+    for (const i of a) {
+      expect(i.fact.length).toBeGreaterThan(0);
+      expect(i.message).not.toMatch(/เกินไป!|พี่|น้องตั้ง/);
+    }
   });
 });
 
@@ -386,12 +390,10 @@ describe('FR-5 budget wording', () => {
   it('TC-34 says "over budget" plainly when spending passed the budget, without shaming', () => {
     const txs = [tx({ day: '2026-09-10', amount: 9500 }), tx({ day: '2026-09-27', amount: 100 })];
     const runway = computeRunway({ balanceSatang: 900_000, floorSatang: 50_000, averageSatang: 10_000, now: NOW });
-    for (const tone of ['friend', 'coach', 'senior'] as const) {
-      const budget = buildInsights({ txs, profile: { ...profile, coachTone: tone }, runway, now: NOW }).find((i) => i.kind === 'budget_pace')!;
-      expect(budget.message).toContain('เกินงบ');
-      expect(budget.message).toContain('฿600');
-      expect(budget.message).not.toMatch(/นิดนึง|นิดหน่อย/);
-    }
+    const budget = buildInsights({ txs, profile, runway, now: NOW }).find((i) => i.kind === 'budget_pace')!;
+    expect(budget.message).toContain('เกินงบ');
+    expect(budget.message).toContain('฿600');
+    expect(budget.message).not.toMatch(/นิดนึง|นิดหน่อย/);
   });
 });
 

@@ -56,6 +56,8 @@ const visible = (page, text, timeout = 6000) => page.getByText(text, { exact: fa
 const gone = (page, text, timeout = 6000) => page.getByText(text, { exact: false }).first().waitFor({ state: 'hidden', timeout }).then(() => true, () => false);
 const introGone = (page) => page.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
 const button = (page, name) => page.getByRole('button', { name, exact: false }).first();
+/** Waits (up to `timeout`) until the element is visible. */
+const shown = (locator, timeout = 6000) => locator.waitFor({ state: 'visible', timeout }).then(() => true, () => false);
 /** Choose a period (วันนี้ / 7 วัน / ...) on the segmented control; clicks again if a layout shift ate the first click. */
 async function pickPeriod(page, label) {
   const tab = page.getByRole('tab', { name: label, exact: true }).first();
@@ -275,6 +277,7 @@ try {
     await introGone(page);
     await shot(page, '12-settings');
     check('Settings shows the signed-in email', await visible(page, 'mint@example.com'));
+    check('Settings: no coach tone picker; น้องกล้า has a sound switch', (await page.getByText('โทนของโค้ช').count()) === 0 && (await visible(page, 'เสียงน้องกล้า')));
     await button(page, 'เปลี่ยนรหัสผ่าน').click();
     check('Settings: change password opens the new-password dialog', await visible(page, 'บันทึกรหัสผ่านใหม่'));
     await button(page, 'ไว้ทีหลัง').click();
@@ -476,7 +479,8 @@ try {
     await introGone(page);
     await visible(page, 'ยอดคงเหลือ', 8000);
     const beforeIncome = await balance();
-    await button(page, 'เพิ่มเงินเข้า').click();
+    // Exactly the tile (the "มีอะไรใหม่" card also mentions it).
+    await page.getByRole('button', { name: 'เพิ่มเงินเข้า', exact: true }).first().click();
     const incomeForm = (await visible(page, 'ได้รับจาก')) && (await page.getByRole('tab', { name: 'รายรับ', exact: true }).first().getAttribute('aria-selected')) === 'true';
     await page.getByRole('button', { name: '+฿1,000', exact: true }).first().click();
     await page.fill('#tx-title', 'ค่าสอนพิเศษ');
@@ -492,6 +496,38 @@ try {
   {
     state.confirmEmail = false;
     const { ctx, page } = await freshPage('coach');
+    // A stand-in for the browser's speech (the test browser has no Thai voice): records what is said.
+    await ctx.addInitScript(() => {
+      window.__spoken = [];
+      const voices = [
+        { name: 'Google US English', lang: 'en-US', default: true, localService: false, voiceURI: 'en' },
+        { name: 'Microsoft Premwadee Online (Natural) - Thai (Thailand)', lang: 'th-TH', default: false, localService: false, voiceURI: 'th1' },
+        { name: 'Microsoft Niwat Online (Natural) - Thai (Thailand)', lang: 'th-TH', default: false, localService: false, voiceURI: 'th2' },
+      ];
+      class FakeUtterance {
+        constructor(text) {
+          this.text = text;
+          this.lang = '';
+          this.rate = 1;
+          this.pitch = 1;
+          this.voice = null;
+          this.onend = null;
+          this.onerror = null;
+        }
+      }
+      const synth = {
+        speaking: false,
+        getVoices: () => voices,
+        addEventListener() {},
+        speak(u) {
+          window.__spoken.push({ text: u.text, lang: u.lang, rate: u.rate, pitch: u.pitch, voice: u.voice?.name ?? '' });
+          setTimeout(() => u.onend?.(), 250);
+        },
+        cancel() {},
+      };
+      Object.defineProperty(window, 'speechSynthesis', { value: synth, configurable: true });
+      Object.defineProperty(window, 'SpeechSynthesisUtterance', { value: FakeUtterance, configurable: true, writable: true });
+    });
     await page.goto(APP);
     await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
     await introGone(page);
@@ -508,8 +544,18 @@ try {
     await page.goto(`${APP}coach`);
     await introGone(page);
     check('Coach: the companion greets before the first question', await visible(page, 'ถามเรื่องเงินได้ทุกเรื่อง'));
+    const greeted = await page.waitForFunction(() => window.__spoken.length > 0, null, { timeout: 6000 }).then(() => true, () => false);
+    const firstSaid = greeted ? (await page.evaluate(() => window.__spoken))[0] : null;
+    check(
+      'Coach voice: น้องกล้า speaks Thai with a calm Thai voice, a little slower and lower than normal',
+      !!firstSaid && firstSaid.lang === 'th-TH' && firstSaid.voice.includes('Niwat') && firstSaid.rate < 1 && firstSaid.pitch < 1 && firstSaid.text.includes('สวัสดี'),
+      JSON.stringify(firstSaid),
+    );
+    check('Coach voice: no "no Thai voice" note on a device that has one', (await page.getByText('เครื่องนี้ยังไม่มีเสียงอ่านภาษาไทย').count()) === 0);
     await page.getByText('สรุปสัปดาห์นี้ให้หน่อย').first().click();
     check('Coach: the AI answer appears', await visible(page, 'สัปดาห์นี้ใช้ไป ฿0'));
+    const readAloud = await page.waitForFunction(() => window.__spoken.some((u) => u.text.includes('ใช้ไป 0 บาท')), null, { timeout: 8000 }).then(() => true, () => false);
+    check('Coach voice: the answer is read aloud, with "฿0" said as "0 บาท"', readAloud);
     state.coach = { status: 503, body: { error: { code: 'not_configured', message: 'x' } } };
     await page.fill('#coach-input', 'หมวดไหนควรลดก่อน');
     await button(page, 'ส่งคำถาม').click();
@@ -866,6 +912,46 @@ try {
     check('Recap: ends with the money tree and the badges', outro && (await visible(page, 'เหรียญที่ได้แล้ว')));
     await button(page, 'เสร็จ').click();
     check('Recap: "เสร็จ" returns home', await visible(page, 'ยอดคงเหลือ', 8000));
+
+    // น้องกล้า's skins: announced on home, money missions on the achievements screen, the collection.
+    check('Home: new skins for น้องกล้า are announced', await visible(page, 'น้องกล้าได้ชุดใหม่'));
+    await page.goto(`${APP}achievements`);
+    await introGone(page);
+    check(
+      'Achievements: money missions, each unlocking a skin (open the app 30 days in a row -> ชุดไทย)',
+      (await visible(page, 'ภารกิจการเงิน')) && (await visible(page, 'มาหากล้าทุกวัน')) && (await visible(page, 'เปิดแอปติดต่อกัน 30 วัน')),
+    );
+    await button(page, 'ภารกิจ มาหากล้าทุกวัน').click();
+    const thaiLocked = (await visible(page, 'ชุดของฉัน')) && (await visible(page, 'ปลดล็อก: เปิดแอปติดต่อกัน 30 วัน'));
+    await page.waitForTimeout(900);
+    await shot(page, '33-skins-thai-locked');
+    check('Mission -> its skin in the collection: ชุดไทย, locked, with how to unlock it', thaiLocked);
+    await button(page, 'สกิน สงกรานต์ 2569').click();
+    check('Skins: a limited skin whose time has passed says it can no longer be collected', await visible(page, 'สกินลิมิเต็ด · หมดเวลาแล้ว หาไม่ได้อีก'));
+    await button(page, 'สกิน บัณฑิตการเงิน').click();
+    await button(page, 'ใส่ชุดนี้').click();
+    check('Skins: wearing an unlocked skin', await visible(page, 'น้องกล้าใส่ชุดบัณฑิตการเงินแล้ว'));
+    await page.waitForTimeout(1200);
+    await shot(page, '34-skins-wearing');
+    check('Skins: the skin being worn is marked', await visible(page, 'น้องกล้าใส่ชุดนี้อยู่'));
+
+    // The coach is now น้องกล้า, big, wearing the chosen skin; the three coach tones are gone.
+    await page.goto(`${APP}coach`);
+    await introGone(page);
+    check('Coach: the big น้องกล้า wears the chosen skin', (await visible(page, 'โค้ชส่วนตัว')) && (await shown(button(page, 'น้องกล้าในชุดบัณฑิตการเงิน'))));
+    check('Coach: the three coach tones are gone', (await page.getByText('โค้ชตรงประเด็น').count()) === 0);
+    await button(page, 'น้องกล้าในชุดบัณฑิตการเงิน').click();
+    const talks = (await visible(page, 'เก็บสลิปไว้ในเครื่องได้เลย')) && (await shown(button(page, 'ให้น้องกล้าหยุดพูด')));
+    await page.waitForTimeout(700);
+    await shot(page, '35-coach-kla-talking');
+    check('Coach: tapping น้องกล้า -> it talks (subtitle, and a stop button while talking)', talks);
+    await button(page, 'ให้น้องกล้าหยุดพูด').click();
+    check('Coach: stop -> quiet, with "ฟังอีกครั้ง"', await visible(page, 'ฟังอีกครั้ง'));
+    await button(page, 'ปิดเสียงน้องกล้า').click();
+    check('Coach: the sound can be turned off', await shown(button(page, 'เปิดเสียงน้องกล้า')));
+    await button(page, 'เปิดเสียงน้องกล้า').click();
+    await page.getByText('สรุปสัปดาห์นี้ให้หน่อย').first().click();
+    check('Coach (demo): explains that the AI needs a real account', await visible(page, 'โหมดทดลองยังถาม AI ไม่ได้'));
     await ctx.close();
   }
 } catch (e) {

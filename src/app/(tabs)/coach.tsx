@@ -1,25 +1,33 @@
 /**
- * FR-5 AI Persona Coach. Explains the user's confirmed numbers in the tone they
- * pick. Two layers:
+ * FR-5 AI coach: น้องกล้า, big, on a little stage. It talks to the user with
+ * subtitles, a moving mouth and small gestures, and with a calm, friendly
+ * voice when the phone has a Thai voice and the sound is on. It wears the skin
+ * the user chose. Two layers of advice:
  *   1. "สิ่งที่ควรรู้ตอนนี้" — rule-based facts from src/domain/insights.ts
- *      (works offline, every number traceable);
+ *      (works offline, every number traceable); tap one and น้องกล้า tells it;
  *   2. questions answered by the AI coach, which receives only a summary of
  *      confirmed totals (see buildCoachContext).
  */
-import { useLocalSearchParams } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
-import { Animated, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Keyboard, Platform, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp, useMoney } from '../../data/AppProvider';
-import { buildCoachContext, buildInsights, personaFor, PERSONAS } from '../../domain/insights';
+import { BUDDY_NAME, buddyPoke, type BuddyMood } from '../../domain/buddy';
+import { buildCoachContext, buildInsights } from '../../domain/insights';
+import { KLA_AFTER, KLA_GREETING, KLA_THINKING, REPEAT_MAX } from '../../domain/klaTalk';
 import { formatBaht, parseBahtToSatang } from '../../domain/money';
 import { runwayAfterPurchase } from '../../domain/runway';
-import type { CoachTone } from '../../domain/types';
+import { skinById } from '../../domain/skins';
 import { askCoach, CoachError } from '../../services/coach';
-import { Buddy, BuddySays } from '../../ui/Buddy';
-import { Card, Chip, Ionicons, Row, T } from '../../ui/components';
-import { Reveal, TypingDots, Typewriter, usePressSpring } from '../../ui/effects';
-import { useToast } from '../../ui/feedback';
+import { useEquippedSkin } from '../../services/kla';
+import { Buddy } from '../../ui/Buddy';
+import { Card, Chip, Ionicons, Row, T, type IconName } from '../../ui/components';
+import { Reveal, TypingDots } from '../../ui/effects';
+import { KlaBackdrop } from '../../ui/kla/KlaBackdrop';
+import { KlaStage } from '../../ui/kla/KlaStage';
+import { setKlaSound, useKlaTalk } from '../../ui/kla/useKlaTalk';
 import { fonts, radius, space, useTheme } from '../../ui/theme';
 
 interface Msg {
@@ -29,13 +37,11 @@ interface Msg {
   error?: boolean;
 }
 
-const GREETING: Record<CoachTone, string> = {
-  friend: 'หวัดดี! ถามเรื่องเงินได้ทุกเรื่องเลยนะ เช่น สัปดาห์นี้ใช้ไปกับอะไรเยอะสุด',
-  coach: 'พร้อมแล้ว ถามมาได้เลย จะตอบสั้น ๆ พร้อมตัวเลขและสิ่งที่ควรทำต่อ',
-  senior: 'สวัสดีจ้ะน้อง อยากรู้อะไรเรื่องเงิน ถามพี่ได้เลยนะ ค่อย ๆ ดูไปด้วยกัน',
-};
-
 const QUICK = ['สรุปสัปดาห์นี้ให้หน่อย', 'หมวดไหนควรลดก่อน', 'ซื้อของ 500 บาทวันนี้ได้ไหม', 'ทำยังไงให้เงินพอถึงสิ้นเดือน'];
+const IDLE = `สงสัยอะไรเรื่องเงิน ถาม${BUDDY_NAME}ได้เลยนะ`;
+
+/** น้องกล้า says hello once each time the app is opened, not on every visit to the tab. */
+let greeted = false;
 
 /** Find a price in a question like "ซื้อของ 500 บาท" or "฿1,290". */
 function priceInQuestion(q: string): number | null {
@@ -45,13 +51,20 @@ function priceInQuestion(q: string): number | null {
 
 export default function Coach() {
   const theme = useTheme();
-  const toast = useToast();
+  const { width: screenW } = useWindowDimensions();
   const params = useLocalSearchParams<{ ask?: string; price?: string }>();
-  const { profile, txs, saveProfile, repo } = useApp();
+  const { profile, txs, repo } = useApp();
   const { balance, runway } = useMoney();
+  const skin = useEquippedSkin();
+  const { subtitle, talking, said, speak, stop, sound, voice } = useKlaTalk();
   const [input, setInput] = useState(params.ask ?? '');
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [busy, setBusy] = useState(false);
+  const [rest, setRest] = useState<{ text: string; mood: BuddyMood }>({ text: KLA_GREETING, mood: 'happy' });
+  const [speakingId, setSpeakingId] = useState<number | null>(null);
+  const [hop, setHop] = useState(0);
+  const [focused, setFocused] = useState(false);
+  const pokes = useRef(0);
   const scroll = useRef<ScrollView>(null);
   const seq = useRef(0);
 
@@ -62,27 +75,44 @@ export default function Coach() {
     if (params.ask) setInput(params.ask);
   }
 
-  const insights = useMemo(
-    () => (profile ? buildInsights({ txs, profile, runway }) : []),
-    [txs, profile, runway],
-  );
-  const persona = personaFor(profile?.coachTone ?? 'friend');
+  const insights = useMemo(() => (profile ? buildInsights({ txs, profile, runway }) : []), [txs, profile, runway]);
 
-  async function setTone(tone: CoachTone) {
-    try {
-      await saveProfile({ coachTone: tone });
-    } catch {
-      toast({ message: 'เปลี่ยนโทนไม่สำเร็จ', tone: 'error' });
-    }
-  }
+  /** Say something on the stage; afterwards the bubble keeps `after` (or the whole line if it is short). */
+  const tell = useCallback(
+    (text: string, opts: { mood?: BuddyMood; after?: string; msgId?: number } = {}) => {
+      setRest({ text: opts.after ?? (text.length <= REPEAT_MAX ? text : KLA_AFTER), mood: opts.mood ?? 'happy' });
+      setSpeakingId(opts.msgId ?? null);
+      speak(text, () => setSpeakingId(null));
+    },
+    [speak],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true);
+      if (!greeted) {
+        greeted = true;
+        tell(KLA_GREETING);
+      }
+      return () => {
+        setFocused(false);
+        stop();
+        setSpeakingId(null);
+      };
+    }, [tell, stop]),
+  );
+
+  const toTop = () => setTimeout(() => scroll.current?.scrollTo({ y: 0, animated: true }), 30);
 
   async function send(text: string) {
     const q = text.trim();
     if (!q || busy || !profile) return;
     setInput('');
-    const mine: Msg = { id: ++seq.current, from: 'me', text: q };
-    setMsgs((m) => [...m, mine]);
+    Keyboard.dismiss();
+    stop();
+    setMsgs((m) => [...m, { id: ++seq.current, from: 'me', text: q }]);
     setBusy(true);
+    toTop();
     try {
       const price = params.price && q === params.ask ? Number(params.price) : priceInQuestion(q);
       const context = {
@@ -101,69 +131,137 @@ export default function Coach() {
           : {}),
       };
       if (repo?.mode === 'demo') {
-        throw new CoachError('โหมดทดลองยังคุยกับโค้ช AI ไม่ได้ เข้าสู่ระบบด้วยบัญชีจริงเพื่อใช้งาน ระหว่างนี้ดูคำแนะนำด้านบนได้เลย');
+        throw new CoachError(`โหมดทดลองยังถาม AI ไม่ได้นะ เข้าสู่ระบบด้วยบัญชีจริงแล้วถาม${BUDDY_NAME}ได้เลย ระหว่างนี้แตะการ์ด "สิ่งที่ควรรู้ตอนนี้" ให้${BUDDY_NAME}เล่าให้ฟังได้`);
       }
-      const answer = await askCoach({ tone: profile.coachTone, context, question: q });
-      setMsgs((m) => [...m, { id: ++seq.current, from: 'coach', text: answer }]);
+      const answer = await askCoach({ context, question: q });
+      const id = ++seq.current;
+      setMsgs((m) => [...m, { id, from: 'coach', text: answer }]);
+      tell(answer, { msgId: id });
     } catch (e) {
-      const text = e instanceof CoachError ? e.message : 'ติดต่อโค้ชไม่ได้ตอนนี้ ลองใหม่อีกครั้ง';
+      const text = e instanceof CoachError ? e.message : `ติดต่อ${BUDDY_NAME}ไม่ได้ตอนนี้ ลองใหม่อีกครั้งนะ`;
       setMsgs((m) => [...m, { id: ++seq.current, from: 'coach', text, error: true }]);
+      // Problems are shown, not read aloud.
+      setRest({ text, mood: 'worried' });
     } finally {
       setBusy(false);
-      setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 50);
     }
   }
+
+  function poke() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setHop((h) => h + 1);
+    pokes.current += 1;
+    const line = buddyPoke(pokes.current, runway.status);
+    tell(line.text, { mood: line.mood });
+  }
+
+  const mood: BuddyMood = busy ? 'thinking' : talking ? (rest.mood === 'worried' ? 'calm' : rest.mood) : rest.mood;
+  const kW = Math.round(Math.min(214, Math.min(screenW, 440) * 0.52));
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bg }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={80}>
         <ScrollView ref={scroll} contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xl }} keyboardShouldPersistTaps="handled">
           <View style={{ gap: 2 }}>
-            <T v="label">AI Persona Coach</T>
-            <T v="h1">โค้ชของคุณ</T>
+            <T v="label">โค้ชส่วนตัว</T>
+            <T v="h1">น้อง{BUDDY_NAME}</T>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
-            {PERSONAS.map((p, i) => (
-              <Reveal key={p.tone} index={i} from={10}>
-                <PersonaCard persona={p} active={p.tone === persona.tone} onPress={() => setTone(p.tone)} />
-              </Reveal>
-            ))}
-          </ScrollView>
+          {/* The stage */}
+          <KlaBackdrop floorAt={0.8}>
+            <View style={{ alignItems: 'center', paddingTop: space.lg, paddingHorizontal: space.lg, paddingBottom: space.md }}>
+              <SpeechBubble>
+                {busy ? (
+                  <Row gap={space.sm}>
+                    <TypingDots color={theme.primary} />
+                    <T v="body" color={theme.inkSoft}>
+                      {KLA_THINKING}
+                    </T>
+                  </Row>
+                ) : (
+                  <T v="body" color={rest.mood === 'worried' && !talking ? theme.inkSoft : theme.ink} style={{ fontFamily: fonts.sansMedium }}>
+                    {subtitle ? subtitle.text : rest.text}
+                  </T>
+                )}
+                {subtitle && subtitle.total > 1 ? (
+                  <Row gap={4} style={{ marginTop: 6 }} justify="center">
+                    {Array.from({ length: subtitle.total }, (_, i) => (
+                      <View key={i} style={{ width: i === subtitle.index ? 14 : 5, height: 5, borderRadius: 3, backgroundColor: i <= subtitle.index ? theme.primary : theme.line }} />
+                    ))}
+                  </Row>
+                ) : null}
+              </SpeechBubble>
+              <Pressable onPress={poke} accessibilityRole="button" accessibilityLabel={`น้อง${BUDDY_NAME}ในชุด${skinById(skin).name} แตะเพื่อฟังเคล็ดลับ`} style={{ marginTop: 2 }}>
+                <KlaStage skin={skin} mood={mood} width={kW} talking={talking} hop={hop} active={focused} onDark />
+              </Pressable>
+              <Row gap={space.sm} style={{ marginTop: -space.sm }}>
+                <StageButton
+                  icon={sound ? 'volume-high' : 'volume-mute'}
+                  label={sound ? 'เสียงเปิด' : 'เสียงปิด'}
+                  a11y={sound ? `ปิดเสียงน้อง${BUDDY_NAME}` : `เปิดเสียงน้อง${BUDDY_NAME}`}
+                  onPress={() => setKlaSound(!sound)}
+                />
+                {talking ? (
+                  <StageButton
+                    icon="stop"
+                    label="หยุด"
+                    a11y={`ให้น้อง${BUDDY_NAME}หยุดพูด`}
+                    onPress={() => {
+                      stop();
+                      setSpeakingId(null);
+                    }}
+                  />
+                ) : said ? (
+                  <StageButton icon="refresh" label="ฟังอีกครั้ง" a11y={`ให้น้อง${BUDDY_NAME}พูดอีกครั้ง`} onPress={() => tell(said, { mood: rest.mood === 'worried' ? 'calm' : rest.mood })} />
+                ) : null}
+                <StageButton icon="shirt" label="เปลี่ยนชุด" a11y={`เปลี่ยนชุดน้อง${BUDDY_NAME}`} onPress={() => router.push('/skins')} />
+              </Row>
+              {sound && voice === null ? (
+                <T v="micro" color={theme.heroInkSoft} center style={{ marginTop: space.sm }}>
+                  เครื่องนี้ยังไม่มีเสียงอ่านภาษาไทย {BUDDY_NAME}จะพูดเป็นตัวหนังสือแทนนะ
+                </T>
+              ) : null}
+            </View>
+          </KlaBackdrop>
 
           <View style={{ gap: space.sm }}>
             <T v="h3">สิ่งที่ควรรู้ตอนนี้</T>
             {insights.map((i, n) => (
               <Reveal key={n} index={n + 1}>
-              <Card style={{ borderLeftWidth: 0 }}>
-                <Row align="flex-start" gap={space.md}>
-                  <Ionicons
-                    name={i.severity === 'watch' ? 'alert-circle-outline' : i.severity === 'good' ? 'checkmark-circle-outline' : 'information-circle-outline'}
-                    size={22}
-                    color={i.severity === 'watch' ? theme.watch : i.severity === 'good' ? theme.good : theme.inkSoft}
-                  />
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <T v="body">{i.message}</T>
-                    <T v="micro">ข้อมูล: {i.fact}</T>
-                  </View>
-                </Row>
-              </Card>
+                <Card
+                  onPress={() => {
+                    tell(i.message, { mood: i.severity === 'watch' ? 'calm' : 'happy', after: IDLE });
+                    toTop();
+                  }}
+                >
+                  <Row align="flex-start" gap={space.md}>
+                    <Ionicons
+                      name={i.severity === 'watch' ? 'alert-circle-outline' : i.severity === 'good' ? 'checkmark-circle-outline' : 'information-circle-outline'}
+                      size={22}
+                      color={i.severity === 'watch' ? theme.watch : i.severity === 'good' ? theme.good : theme.inkSoft}
+                    />
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <T v="body">{i.message}</T>
+                      <T v="micro">ข้อมูล: {i.fact}</T>
+                      <Row gap={4}>
+                        <Ionicons name="volume-medium-outline" size={14} color={theme.primary} />
+                        <T v="micro" color={theme.primary}>
+                          แตะให้น้อง{BUDDY_NAME}เล่า
+                        </T>
+                      </Row>
+                    </View>
+                  </Row>
+                </Card>
               </Reveal>
             ))}
           </View>
 
           <View style={{ gap: space.sm }}>
-            <T v="h3">ถาม{persona.name}</T>
-            {msgs.length === 0 ? (
-              <>
-                <BuddySays mood="happy">{GREETING[persona.tone]}</BuddySays>
-                <T v="micro">โค้ชตอบจากตัวเลขที่คุณยืนยันแล้วเท่านั้น ไม่เห็นรูปสลิปหรือชื่อคนที่คุณโอนให้</T>
-              </>
-            ) : null}
-            {msgs.map((m, n) => {
+            <T v="h3">คุยกับน้อง{BUDDY_NAME}</T>
+            {msgs.length === 0 ? <T v="micro">{BUDDY_NAME}ตอบจากตัวเลขที่คุณยืนยันแล้วเท่านั้น ไม่เห็นรูปสลิปหรือชื่อคนที่คุณโอนให้</T> : null}
+            {msgs.map((m) => {
               const color = m.from === 'me' ? theme.onPrimary : m.error ? theme.inkSoft : theme.ink;
-              // The newest answer writes itself out; earlier ones are shown whole.
-              const write = m.from === 'coach' && !m.error && n === msgs.length - 1;
+              const live = m.id === speakingId;
               return (
                 <Reveal key={m.id} from={12} zoom style={{ alignSelf: m.from === 'me' ? 'flex-end' : 'flex-start', maxWidth: '92%' }}>
                   <Row gap={6} align="flex-end">
@@ -175,54 +273,36 @@ export default function Coach() {
                         borderRadius: radius.lg,
                         borderBottomRightRadius: m.from === 'me' ? 6 : radius.lg,
                         borderBottomLeftRadius: m.from === 'coach' ? 6 : radius.lg,
-                        borderWidth: m.from === 'coach' ? 1 : 0,
-                        borderColor: theme.line,
+                        borderWidth: m.from === 'coach' ? (live ? 1.5 : 1) : 0,
+                        borderColor: live ? theme.accent : theme.line,
                         padding: space.md,
                         gap: 4,
                       }}
                     >
-                      {m.from === 'coach' && !m.error ? <T v="micro">{persona.glyph} {persona.name} · ตอบโดย AI</T> : null}
-                      {write ? (
-                        <Typewriter text={m.text}>
-                          {(shown) => (
-                            <T v="body" color={color} selectable>
-                              {shown}
-                            </T>
-                          )}
-                        </Typewriter>
-                      ) : (
-                        <T v="body" color={color} selectable>
-                          {m.text}
-                        </T>
-                      )}
+                      {m.from === 'coach' && !m.error ? (
+                        <Row justify="space-between" gap={space.sm}>
+                          <T v="micro">น้อง{BUDDY_NAME} · ตอบโดย AI</T>
+                          <Pressable
+                            onPress={() => {
+                              tell(m.text, { msgId: m.id });
+                              toTop();
+                            }}
+                            hitSlop={8}
+                            accessibilityRole="button"
+                            accessibilityLabel={live ? `น้อง${BUDDY_NAME}กำลังพูดข้อความนี้` : 'ฟังข้อความนี้'}
+                          >
+                            <Ionicons name={live ? 'volume-high' : 'volume-medium-outline'} size={16} color={live ? theme.accent : theme.inkFaint} />
+                          </Pressable>
+                        </Row>
+                      ) : null}
+                      <T v="body" color={color} selectable>
+                        {m.text}
+                      </T>
                     </View>
                   </Row>
                 </Reveal>
               );
             })}
-            {busy ? (
-              <Reveal from={10}>
-                <Row gap={6} align="flex-end">
-                  <Buddy mood="thinking" size={34} />
-                  <View
-                    style={{
-                      backgroundColor: theme.surface,
-                      borderRadius: radius.lg,
-                      borderBottomLeftRadius: 6,
-                      borderWidth: 1,
-                      borderColor: theme.line,
-                      paddingHorizontal: space.md,
-                      paddingVertical: space.sm,
-                      gap: 2,
-                    }}
-                    accessibilityLabel={`${persona.name}กำลังดูตัวเลขของคุณ`}
-                  >
-                    <TypingDots color={theme.primary} />
-                    <T v="micro">{persona.name}กำลังดูตัวเลขของคุณ…</T>
-                  </View>
-                </Row>
-              </Reveal>
-            ) : null}
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
@@ -240,9 +320,9 @@ export default function Coach() {
             nativeID="coach-input"
             value={input}
             onChangeText={setInput}
-            placeholder="ถามเรื่องเงินของคุณ เช่น ซื้อรองเท้า 1,290 ได้ไหม"
+            placeholder={`ถามน้อง${BUDDY_NAME} เช่น ซื้อรองเท้า 1,290 ได้ไหม`}
             placeholderTextColor={theme.inkFaint}
-            accessibilityLabel="คำถามถึงโค้ช"
+            accessibilityLabel={`คำถามถึงน้อง${BUDDY_NAME}`}
             multiline
             maxLength={400}
             style={{
@@ -279,45 +359,70 @@ export default function Coach() {
   );
 }
 
-/** A persona to pick; the chosen one grows a little and glows gold. */
-function PersonaCard({
-  persona,
-  active,
-  onPress,
-}: {
-  persona: (typeof PERSONAS)[number];
-  active: boolean;
-  onPress: () => void;
-}) {
+/** The white bubble over น้องกล้า, with a tail pointing down at it. */
+function SpeechBubble({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
-  const press = usePressSpring(0.94);
   return (
-    <Animated.View style={{ transform: [{ scale: press.scale }] }}>
-      <Pressable
-        onPress={onPress}
-        onPressIn={press.onPressIn}
-        onPressOut={press.onPressOut}
-        accessibilityRole="radio"
-        aria-selected={active}
+    <View style={{ alignSelf: 'stretch', alignItems: 'center' }} accessibilityLiveRegion="polite">
+      <View
         style={{
-          width: 150,
-          padding: space.md,
+          alignSelf: 'stretch',
+          minHeight: 54,
+          justifyContent: 'center',
+          backgroundColor: theme.surface,
           borderRadius: radius.lg,
-          borderWidth: 1.5,
-          borderColor: active ? theme.accent : theme.line,
-          backgroundColor: active ? theme.accentSoft : theme.surface,
-          gap: 4,
-          shadowColor: theme.accent,
-          shadowOpacity: active ? 0.35 : 0,
-          shadowRadius: 10,
-          shadowOffset: { width: 0, height: 3 },
-          elevation: active ? 4 : 0,
+          paddingHorizontal: space.lg,
+          paddingVertical: space.md,
+          shadowColor: '#000',
+          shadowOpacity: 0.18,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 6 },
+          elevation: 6,
         }}
       >
-        <T v="h2">{persona.glyph}</T>
-        <T v="body" style={{ fontFamily: fonts.sansSemi }}>{persona.name}</T>
-        <T v="micro">{persona.tagline}</T>
-      </Pressable>
-    </Animated.View>
+        {children}
+      </View>
+      <View
+        style={{
+          width: 16,
+          height: 16,
+          marginTop: -9,
+          backgroundColor: theme.surface,
+          transform: [{ rotate: '45deg' }],
+          borderBottomRightRadius: 4,
+        }}
+      />
+    </View>
+  );
+}
+
+/** A round, see-through button on the stage. */
+function StageButton({ icon, label, a11y, onPress }: { icon: IconName; label: string; a11y: string; onPress: () => void }) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => {});
+        onPress();
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={a11y}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: radius.pill,
+        backgroundColor: pressed ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.18)',
+      })}
+    >
+      <Ionicons name={icon} size={16} color={theme.heroAccent} />
+      <T v="small" color="#F4F1E6">
+        {label}
+      </T>
+    </Pressable>
   );
 }

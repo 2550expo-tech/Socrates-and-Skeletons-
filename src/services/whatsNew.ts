@@ -6,7 +6,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { Storage } from '../data/storage';
 
 /** Change this when a new "มีอะไรใหม่" page is written. */
-export const WHATS_NEW_VERSION = '2026-09-29';
+export const WHATS_NEW_VERSION = '2026-09-29-kla';
 const KEY = 'mindpay.whatsNewSeen';
 
 let seen: boolean | null = null; // null = not loaded yet

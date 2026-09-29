@@ -112,6 +112,7 @@ function Screens({ signedIn, needsOnboarding, inApp }: { signedIn: boolean; need
           <Stack.Screen name="scan" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
           <Stack.Screen name="voice" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
           <Stack.Screen name="achievements" />
+          <Stack.Screen name="skins" />
           <Stack.Screen name="recap" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="goals" />
           <Stack.Screen name="whatsnew" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />

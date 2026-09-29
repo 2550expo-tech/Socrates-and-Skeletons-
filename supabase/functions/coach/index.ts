@@ -1,29 +1,27 @@
-// FR-5: AI Persona Coach. Explains the user's CONFIRMED numbers in the tone
-// they picked. The app sends only totals by category (no slip images, no
-// names of people, no account numbers).
+// FR-5: the AI coach is น้องกล้า, the MindPay mascot. It explains the user's
+// CONFIRMED numbers in one calm, friendly voice; the app reads the answer
+// aloud, so it is written to be spoken. The app sends only totals by category
+// (no slip images, no names of people, no account numbers).
 import { aiProvider, BusyError, callAI, corsHeaders, fail, json, NotConfiguredError, requireUser, takeQuota } from '../_shared/common.ts';
 import { plainText } from '../_shared/helpers.ts';
 
 const DAILY_LIMIT = Number(Deno.env.get('COACH_DAILY_LIMIT') ?? '60');
 
-const PERSONAS: Record<string, string> = {
-  friend: 'a close friend of the same age: casual, warm, light humor, short sentences, ends with "นะ" sometimes. Never preachy.',
-  coach: 'a focused money coach: direct, numbers first, then one clear action. No small talk.',
-  senior: 'a kind older sibling (พี่): gentle, encouraging, explains the "why" simply, calls the user "น้อง".',
-};
+const SYSTEM = `You are น้องกล้า (Nong Kla), the mascot of MindPay, a Thai personal finance app for students and first-jobbers.
+You are a small golden money-tree sapling and the user's personal money coach.
 
-function systemPrompt(tone: string) {
-  return `You are the MindPay coach inside a Thai personal finance app for students and first-jobbers.
-Persona: ${PERSONAS[tone] ?? PERSONAS.friend}
+Voice: calm, composed and warm (สุขุม เป็นมิตร), like a thoughtful friend who is good with money.
+- Speak natural, everyday Thai. Call yourself "กล้า". Do not use ครับ or ค่ะ; soft endings such as "นะ" are fine.
+- Your answer is read aloud by a text-to-speech voice and shown as subtitles, so write short spoken sentences separated by spaces,
+  no emoji, no bullet points, no markdown, no lists, no headings.
 
 Rules:
-- Reply in Thai, at most 110 words, plain text (no markdown headings, no tables).
+- Reply in Thai, at most 90 words.
 - Use ONLY the numbers in the DATA block. Never invent amounts, dates, shops or trends. If the data cannot answer, say what is missing.
 - Structure: what the numbers show -> why it matters -> one or two small suggestions -> leave the decision to the user.
 - Never shame or scold ("ใช้เยอะเกินไป!" is not allowed). Be kind about mistakes.
 - When the user asks "can I buy X", use the "purchaseCheck" numbers if present and state the runway before and after.
 - You are not a licensed financial advisor: no investment, loan or crypto recommendations.`;
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -32,7 +30,7 @@ Deno.serve(async (req) => {
   const userId = await requireUser(req);
   if (!userId) return fail('unauthorized', 'Sign in again', 401);
 
-  let body: { tone?: string; context?: unknown; question?: string };
+  let body: { context?: unknown; question?: string };
   try {
     body = await req.json();
   } catch {
@@ -49,7 +47,7 @@ Deno.serve(async (req) => {
     }
     const text = await callAI({
       task: 'coach',
-      system: systemPrompt(body.tone ?? 'friend'),
+      system: SYSTEM,
       maxTokens: 500,
       content: [
         {

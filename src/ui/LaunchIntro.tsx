@@ -1,8 +1,8 @@
 /**
  * Opening animation. When the app icon is tapped, the phone first shows the
- * native splash (forest green + money tree, from app.json). This view is drawn
+ * native splash (forest green + น้องกล้า, from app.json). This view is drawn
  * the same way, takes over on its first frame, and then:
- *   1. the tree "breathes" (a small bounce with a light tap on the phone),
+ *   1. น้องกล้า bounces (with a light tap on the phone),
  *   2. gold rings ripple out and leaves sparkle,
  *   3. the MindPay name and tagline rise in,
  *   4. once the app is ready it lifts away and reveals the first screen.

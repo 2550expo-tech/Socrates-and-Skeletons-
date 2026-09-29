@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAutoScan } from '../../services/AutoScanProvider';
+import { useKlaSync } from '../../services/kla';
 import { Ionicons, type IconName } from '../../ui/components';
 import { PulseRing, usePressSpring } from '../../ui/effects';
 import { useNative, useReduceMotion } from '../../ui/motion';
@@ -171,6 +172,8 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
 }
 
 export default function TabsLayout() {
+  // Records today's visit and hands out น้องกล้า's skins for finished missions and events.
+  useKlaSync();
   return (
     <Tabs tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
       <Tabs.Screen name="index" />

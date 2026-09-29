@@ -1,36 +1,22 @@
 /**
- * FR-5 AI Persona Coach — the data side.
+ * FR-5 AI coach (น้องกล้า) — the data side.
  *
- * The coach only talks about CONFIRMED data. This file:
+ * The coach is น้องกล้า, and it only talks about CONFIRMED data. This file:
  *   1. finds simple, checkable facts ("food is up 40% this week") with plain rules,
  *      so the coach still works offline and every claim can be traced to numbers;
- *   2. words those facts in the tone the user picked;
+ *   2. words those facts in น้องกล้า's voice: calm, warm, never pushy;
  *   3. builds the compact data summary sent to the AI for free-form questions.
  *
- * Tone rule for every persona: inform -> explain -> suggest -> let the user decide.
+ * Voice rule: inform -> explain -> suggest -> let the user decide.
  * Never shame ("คุณใช้เงินเยอะเกินไป!").
  */
+import { BUDDY_NAME } from './buddy';
 import { getCategory } from './categories';
 import { addDays, bkkDayKey, formatThaiDay } from './dates';
 import { formatBaht } from './money';
 import type { Runway } from './runway';
 import { confirmedOnly, monthExpense } from './summary';
-import type { CoachTone, Profile, Transaction } from './types';
-
-export interface CoachPersona {
-  tone: CoachTone;
-  name: string;
-  tagline: string;
-  glyph: string;
-}
-
-export const PERSONAS: CoachPersona[] = [
-  { tone: 'friend', name: 'เพื่อนซี้', tagline: 'คุยสบาย ๆ ไม่กดดัน', glyph: '🌱' },
-  { tone: 'coach', name: 'โค้ชตรงประเด็น', tagline: 'สั้น ชัด มีตัวเลขและสิ่งที่ต้องทำ', glyph: '🎯' },
-  { tone: 'senior', name: 'พี่ใจดี', tagline: 'อบอุ่น ให้กำลังใจ อธิบายละเอียด', glyph: '🌳' },
-];
-
-export const personaFor = (tone: CoachTone) => PERSONAS.find((p) => p.tone === tone) ?? PERSONAS[0];
+import type { Profile, Transaction } from './types';
 
 export type InsightKind = 'category_up' | 'budget_pace' | 'runway' | 'no_data' | 'steady';
 
@@ -39,7 +25,7 @@ export interface Insight {
   severity: 'good' | 'info' | 'watch';
   /** The fact in neutral words, with the numbers behind it. */
   fact: string;
-  /** The same fact in the persona's voice. */
+  /** The same fact in น้องกล้า's voice. */
   message: string;
 }
 
@@ -74,10 +60,6 @@ export function findCategoryIncrease(txs: Transaction[], now: Date = new Date())
   return best;
 }
 
-function voice(tone: CoachTone, parts: { friend: string; coach: string; senior: string }) {
-  return parts[tone];
-}
-
 export function buildInsights(params: {
   txs: Transaction[];
   profile: Profile;
@@ -86,20 +68,15 @@ export function buildInsights(params: {
 }): Insight[] {
   const { txs, profile, runway } = params;
   const now = params.now ?? new Date();
-  const tone = profile.coachTone;
   const out: Insight[] = [];
+  const baht = (s: number) => formatBaht(s, { decimals: false });
 
   if (confirmedOnly(txs).length === 0) {
-    const fact = 'ยังไม่มีรายการที่ยืนยัน';
     out.push({
       kind: 'no_data',
       severity: 'info',
-      fact,
-      message: voice(tone, {
-        friend: 'ยังไม่มีข้อมูลให้ดูเลย ลองสแกนสลิปหรือจดรายการแรกก่อนนะ แล้วเราจะช่วยดูให้',
-        coach: 'ยังไม่มีข้อมูล เริ่มจากสแกนสลิป 7 วันล่าสุด แล้วค่อยกลับมาดูภาพรวม',
-        senior: 'เริ่มจากจดรายการแรกก่อนนะ ไม่ต้องครบทุกอย่างก็ได้ ค่อย ๆ เติมไป เดี๋ยวพี่ช่วยดูให้',
-      }),
+      fact: 'ยังไม่มีรายการที่ยืนยัน',
+      message: `ยังไม่มีรายการให้${BUDDY_NAME}ดูเลย ลองสแกนสลิปหรือจดรายการแรกก่อนนะ ไม่ต้องครบทุกอย่างก็ได้ แล้ว${BUDDY_NAME}จะช่วยดูให้`,
     });
     return out;
   }
@@ -107,29 +84,32 @@ export function buildInsights(params: {
   // Runway first: it is the most important number in the app.
   if (runway.status === 'below_floor') {
     const fact = `ยอดคงเหลือ ${formatBaht(runway.balanceSatang)} ต่ำกว่าเส้นเงินสำรอง ${formatBaht(runway.floorSatang)}`;
-    out.push({ kind: 'runway', severity: 'watch', fact, message: voice(tone, {
-      friend: `ตอนนี้เงินต่ำกว่าเส้นสำรองที่ตั้งไว้แล้วนะ (${formatBaht(runway.floorSatang)}) ช่วงนี้ใช้เฉพาะที่จำเป็นก่อนดีไหม`,
-      coach: `${fact} งดรายจ่ายที่เลื่อนได้จนกว่าจะมีรายรับเข้า`,
-      senior: `ตอนนี้เงินต่ำกว่าเงินสำรองที่น้องตั้งไว้แล้ว ไม่เป็นไรนะ ลองดูว่ามีรายจ่ายไหนเลื่อนออกไปได้บ้าง`,
-    }) });
+    out.push({
+      kind: 'runway',
+      severity: 'watch',
+      fact,
+      message: `ตอนนี้เงินต่ำกว่าเงินสำรองที่ตั้งไว้ (${formatBaht(runway.floorSatang)}) แล้วนะ ไม่เป็นไร ช่วงนี้ใช้เฉพาะที่จำเป็นก่อน แล้วลองดูว่ามีรายจ่ายไหนเลื่อนออกไปได้บ้าง`,
+    });
   } else if (runway.status === 'critical' || runway.status === 'watch') {
-    const fact = `ถ้าใช้วันละ ${formatBaht(runway.averageSatang, { decimals: false })} เงินจะแตะเส้นสำรองใน ${runway.days} วัน (${formatThaiDay(runway.depletionDay!, { year: false })})`;
-    out.push({ kind: 'runway', severity: runway.status === 'critical' ? 'watch' : 'info', fact, message: voice(tone, {
-      friend: `${fact} ถ้าลดลงนิดหน่อยจะยืดไปได้อีกหลายวันเลย`,
-      coach: `${fact} ลองกด "ลองปรับ" ในหน้าเงินพอถึง เพื่อดูว่าลดเท่าไหร่ถึงพอ`,
-      senior: `${fact} ไม่ต้องตกใจนะ ลองดูหน้าเงินพอถึงด้วยกัน จะเห็นว่าปรับนิดเดียวก็ช่วยได้เยอะ`,
-    }) });
+    const fact = `ถ้าใช้วันละ ${baht(runway.averageSatang)} เงินจะแตะเส้นสำรองใน ${runway.days} วัน (${formatThaiDay(runway.depletionDay!, { year: false })})`;
+    out.push({
+      kind: 'runway',
+      severity: runway.status === 'critical' ? 'watch' : 'info',
+      fact,
+      message: `${fact} ใช้น้อยลงวันละหน่อยก็ยืดไปได้อีกหลายวัน ลองกด "ลองปรับ" ในหน้าเงินพอถึงดูด้วยกันนะ`,
+    });
   }
 
   const rise = findCategoryIncrease(txs, now);
   if (rise) {
     const label = getCategory(rise.key).label;
-    const fact = `7 วันนี้ใช้หมวด${label} ${formatBaht(rise.week, { decimals: false })} สูงกว่าสัปดาห์ปกติ (${formatBaht(rise.usualWeek, { decimals: false })}) ${rise.changePct}%`;
-    out.push({ kind: 'category_up', severity: 'watch', fact, message: voice(tone, {
-      friend: `สัปดาห์นี้หมวด${label}มาแรงนะ ${formatBaht(rise.week, { decimals: false })} ปกติอยู่ที่ราว ${formatBaht(rise.usualWeek, { decimals: false })} มีอะไรพิเศษหรือเปล่า`,
-      coach: `${fact} ตั้งเพดานหมวดนี้สัปดาห์หน้าไว้ที่ ${formatBaht(rise.usualWeek, { decimals: false })}`,
-      senior: `สัปดาห์นี้หมวด${label}สูงกว่าปกติ ${rise.changePct}% ถ้าเป็นช่วงที่ต้องใช้จริงก็ไม่เป็นไร แค่อยากให้รู้ไว้นะ`,
-    }) });
+    const fact = `7 วันนี้ใช้หมวด${label} ${baht(rise.week)} สูงกว่าสัปดาห์ปกติ (${baht(rise.usualWeek)}) ${rise.changePct}%`;
+    out.push({
+      kind: 'category_up',
+      severity: 'watch',
+      fact,
+      message: `สัปดาห์นี้หมวด${label}สูงกว่าปกติ ${rise.changePct}% (${baht(rise.week)} จากปกติราว ${baht(rise.usualWeek)}) ถ้าเป็นช่วงที่ต้องใช้จริงก็ไม่เป็นไร ${BUDDY_NAME}แค่อยากให้รู้ไว้นะ`,
+    });
   }
 
   if (profile.monthlyBudgetSatang) {
@@ -140,33 +120,27 @@ export function buildInsights(params: {
     const pct = Math.round((spent / profile.monthlyBudgetSatang) * 100);
     const over = spent > profile.monthlyBudgetSatang;
     const ahead = spent > expected * 1.1;
-    const fact = `เดือนนี้ใช้ไป ${formatBaht(spent, { decimals: false })} จากงบ ${formatBaht(profile.monthlyBudgetSatang, { decimals: false })} (${pct}%) ผ่านเดือนมาแล้ว ${Math.round((d / daysInMonth) * 100)}%`;
-    const overBy = formatBaht(spent - profile.monthlyBudgetSatang, { decimals: false });
-    out.push({ kind: 'budget_pace', severity: ahead ? 'watch' : 'good', fact, message: over
-      ? voice(tone, {
-          friend: `เดือนนี้ใช้เกินงบไปแล้ว ${overBy} ไม่เป็นไรนะ ลองดูว่าเดือนหน้าจะตั้งงบเท่าเดิมหรือปรับให้ตรงกับชีวิตจริงขึ้น`,
-          coach: `${fact} เกินงบ ${overBy} ช่วงที่เหลือของเดือนใช้เฉพาะที่จำเป็น และทบทวนงบเดือนหน้า`,
-          senior: `เดือนนี้ใช้เกินงบไป ${overBy} แล้ว ไม่ต้องโทษตัวเองนะ ลองดูด้วยกันว่าหมวดไหนเกินเพราะอะไร`,
-        })
-      : ahead
-      ? voice(tone, {
-          friend: `งบเดือนนี้ไปเร็วกว่าเวลานิดนึง (${pct}%) ช่วงที่เหลือค่อย ๆ ผ่อนลงก็ทันนะ`,
-          coach: `${fact} ใช้เร็วกว่าแผน ลดรายจ่ายรายวันลงให้กลับมาตามแผน`,
-          senior: `เดือนนี้ใช้งบไป ${pct}% แล้ว เร็วกว่าเวลาอยู่นิดหน่อย ยังมีเวลาปรับนะ`,
-        })
-      : voice(tone, {
-          friend: `งบเดือนนี้ยังอยู่ในแผนดีเลย (${pct}%) เก่งมาก`,
-          coach: `${fact} อยู่ในแผน รักษาจังหวะนี้ไว้`,
-          senior: `เดือนนี้ใช้เงินได้ตามแผนดีมาก (${pct}%) ภูมิใจในตัวเองได้เลยนะ`,
-        }) });
+    const fact = `เดือนนี้ใช้ไป ${baht(spent)} จากงบ ${baht(profile.monthlyBudgetSatang)} (${pct}%) ผ่านเดือนมาแล้ว ${Math.round((d / daysInMonth) * 100)}%`;
+    const overBy = baht(spent - profile.monthlyBudgetSatang);
+    out.push({
+      kind: 'budget_pace',
+      severity: ahead ? 'watch' : 'good',
+      fact,
+      message: over
+        ? `เดือนนี้ใช้เกินงบไปแล้ว ${overBy} ไม่ต้องโทษตัวเองนะ ลองดูด้วยกันว่าหมวดไหนเกินเพราะอะไร แล้วค่อยตั้งงบเดือนหน้าให้ตรงกับชีวิตจริงขึ้น`
+        : ahead
+          ? `งบเดือนนี้ไปเร็วกว่าเวลาอยู่บ้าง ใช้ไปแล้ว ${pct}% ช่วงที่เหลือค่อย ๆ ผ่อนลงก็ยังทันนะ`
+          : `งบเดือนนี้ยังอยู่ในแผนดีมาก ใช้ไป ${pct}% รักษาจังหวะนี้ไว้นะ ${BUDDY_NAME}ภูมิใจด้วย`,
+    });
   }
 
   if (out.length === 0) {
-    out.push({ kind: 'steady', severity: 'good', fact: 'รายจ่ายสัปดาห์นี้ใกล้เคียงปกติ', message: voice(tone, {
-      friend: 'สัปดาห์นี้ใช้เงินสม่ำเสมอดี ไม่มีอะไรน่าห่วง',
-      coach: 'รายจ่ายคงที่ตามปกติ ไม่มีหมวดไหนเกินเกณฑ์',
-      senior: 'สัปดาห์นี้ใช้เงินสม่ำเสมอดีมากเลย รักษาไว้แบบนี้นะ',
-    }) });
+    out.push({
+      kind: 'steady',
+      severity: 'good',
+      fact: 'รายจ่ายสัปดาห์นี้ใกล้เคียงปกติ',
+      message: 'สัปดาห์นี้ใช้เงินสม่ำเสมอดี ไม่มีหมวดไหนน่าห่วงเลย รักษาไว้แบบนี้นะ',
+    });
   }
   return out;
 }

@@ -14,6 +14,7 @@ import { addDays, formatRangeSpan, formatThaiDay, formatThaiDayLong, formatThaiM
 import { formatBaht } from '../../domain/money';
 import { goalLine, goalProgress } from '../../domain/goals';
 import { recapToOffer } from '../../domain/recap';
+import { skinById } from '../../domain/skins';
 import { endOfMonthDay, safeDailySpend } from '../../domain/runway';
 import { dailyTotals, monthExpense, summarizeRange } from '../../domain/summary';
 import type { RangeKey } from '../../domain/types';
@@ -35,12 +36,14 @@ import {
   Segmented,
   T,
 } from '../../ui/components';
+import { useKla } from '../../services/kla';
 import { useAchievements } from '../../services/useAchievements';
 import { markWhatsNewSeen, useWhatsNewPending } from '../../services/whatsNew';
 import { AutoScanBanner } from '../../ui/AutoScanBanner';
 import { Buddy, BuddySays } from '../../ui/Buddy';
 import { Aurora, PulseRing, Reveal, Shine, Sparkles, useCelebrate, usePressSpring } from '../../ui/effects';
 import { Jar } from '../../ui/Jar';
+import { KlaPicture } from '../../ui/kla/KlaPicture';
 import { Medal } from '../../ui/Medal';
 import { useCountUp, useReduceMotion } from '../../ui/motion';
 import { TxRow } from '../../ui/TxRow';
@@ -185,9 +188,10 @@ export default function Home() {
   const reduce = useReduceMotion();
   const recapMonth = useMemo(() => recapToOffer(txs, today), [txs, today]);
   const ach = useAchievements();
+  const kla = useKla();
   const whatsNew = useWhatsNewPending();
   const celebrate = useCelebrate();
-  const freshIds = ach.fresh.map((b) => b.id).join(',');
+  const freshIds = [...ach.fresh.map((b) => b.id), ...kla.fresh.map((id) => `skin:${id}`)].join(',');
   useEffect(() => {
     const ids = freshIds ? freshIds.split(',') : [];
     if (!ids.some((id) => !celebrated.has(id))) return;
@@ -259,7 +263,7 @@ export default function Home() {
               </View>
               <View style={{ flex: 1 }}>
                 <T v="h3">มีอะไรใหม่ในอัปเดตนี้</T>
-                <T v="small">พูดจด, อ่านสลิปแม่นขึ้น, กระปุกออม, สรุปเดือน และอีกเพียบ</T>
+                <T v="small">โค้ชน้องกล้าพูดได้, ตู้สกิน, ภารกิจการเงิน, เพิ่มเงินเข้า, ธีมสี และอีกเพียบ</T>
               </View>
               <IconButton icon="close" label="ไม่ต้องแสดงอีก" onPress={() => markWhatsNewSeen()} />
             </Row>
@@ -278,6 +282,46 @@ export default function Home() {
                 <Row gap={space.sm} style={{ marginTop: space.xs }}>
                   <Button label="ดูเหรียญ" small kind="gold" icon="ribbon" onPress={() => router.push('/achievements')} />
                   <Button label="ไว้ทีหลัง" small kind="ghost" onPress={() => ach.markSeen(ach.fresh.map((b) => b.id))} />
+                </Row>
+              </View>
+            </Row>
+          </Card>
+        </Reveal>
+      ) : null}
+
+      {kla.fresh.length > 0 ? (
+        <Reveal zoom>
+          <Card style={{ borderColor: theme.accent, borderWidth: 1.5, paddingVertical: space.md }}>
+            <Row gap={space.md}>
+              <View style={{ width: 60, height: 60 }}>
+                <View style={{ position: 'absolute', top: -12 }}>
+                  <KlaPicture skin={kla.fresh[0]} mood="cheer" width={60} onDark={theme.dark} extras={false} />
+                </View>
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <T v="h3">{kla.fresh.length > 1 ? `น้องกล้าได้ชุดใหม่ ${kla.fresh.length} ชุด!` : 'น้องกล้าได้ชุดใหม่!'}</T>
+                <T v="small">
+                  {kla.fresh
+                    .map((id) => {
+                      const s = skinById(id);
+                      return s.kind === 'limited' ? `${s.name} (สกินลิมิเต็ด)` : s.name;
+                    })
+                    .join(' · ')}
+                </T>
+                <Row gap={space.sm} style={{ marginTop: space.xs }}>
+                  <Button
+                    label="ใส่เลย"
+                    small
+                    kind="gold"
+                    icon="shirt"
+                    onPress={() => {
+                      kla.equip(kla.fresh[0]);
+                      kla.markSeen(kla.fresh);
+                      setHop((h) => h + 1);
+                      celebrate();
+                    }}
+                  />
+                  <Button label="ดูตู้สกิน" small kind="ghost" onPress={() => router.push({ pathname: '/skins', params: { skin: kla.fresh[0] } })} />
                 </Row>
               </View>
             </Row>

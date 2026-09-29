@@ -19,6 +19,34 @@ type IconName = keyof typeof Ionicons.glyphMap;
 
 const FEATURES: { icon: IconName; colors: [string, string]; title: string; body: string; action?: { label: string; href: Href } }[] = [
   {
+    icon: 'chatbubbles',
+    colors: ['#1F7A52', '#0E3B2C'],
+    title: `โค้ชส่วนตัวคือน้อง${BUDDY_NAME}`,
+    body: `น้อง${BUDDY_NAME}ตัวใหญ่ ขยับปาก ขยับมือเวลาพูด และพูดออกเสียงด้วยน้ำเสียงสุขุม เป็นมิตร ถามเรื่องเงินได้ทุกเรื่อง (เสียงใช้เสียงอ่านภาษาไทยของมือถือ ปิดเสียงได้)`,
+    action: { label: `คุยกับน้อง${BUDDY_NAME}`, href: '/coach' },
+  },
+  {
+    icon: 'shirt',
+    colors: ['#C9A227', '#7A5A0E'],
+    title: 'ตู้สกินและภารกิจการเงิน',
+    body: `ทำภารกิจการเงินในหน้าความสำเร็จเพื่อปลดล็อกชุดให้น้อง${BUDDY_NAME} เช่น เปิดแอปติดต่อกัน 30 วันได้ชุดไทย และมีสกินลิมิเต็ดตามเทศกาล ตอนนี้แจกชุดผู้บุกเบิกถึง 31 ต.ค.`,
+    action: { label: 'เปิดตู้สกิน', href: '/skins' },
+  },
+  {
+    icon: 'add-circle',
+    colors: ['#2E8B57', '#14502F'],
+    title: 'เพิ่มเงินเข้าเอง',
+    body: 'เงินเข้าที่ไม่มีสลิป เช่น เงินเดือน เงินจากที่บ้าน กด “เพิ่มเงินเข้า” บนหน้าหลัก เลือกยอดด่วนได้เลย',
+    action: { label: 'เพิ่มเงินเข้า', href: '/transaction?kind=income' },
+  },
+  {
+    icon: 'color-palette',
+    colors: ['#6B2737', '#3A0F1B'],
+    title: 'ธีมสีหรู ครบทุกแม่สี',
+    body: 'Red Velvet, ม่วง, น้ำเงิน, ทอง และอีกหลายโทน ทั้งโหมดสว่างและโหมดมืด เลือกได้ในหน้าตั้งค่า',
+    action: { label: 'เลือกธีม', href: '/settings' },
+  },
+  {
     icon: 'mic',
     colors: ['#C8992A', '#8F600C'],
     title: 'พูดจด',
