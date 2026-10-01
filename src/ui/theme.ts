@@ -35,11 +35,19 @@ export interface Theme {
   onPrimary: string;
   accent: string;
   accentSoft: string;
+  /** Text and icons on an accent fill (the gold button). */
+  onAccent: string;
+  /** The accent colour for text and icons on light surfaces: dark enough to read (≥ 4.5:1). */
+  accentInk: string;
   income: string;
   expense: string;
   good: string;
   watch: string;
   critical: string;
+  /** Soft backgrounds of the meaning colours (badges, notes): text in good/watch/critical reads on them. */
+  goodSoft: string;
+  watchSoft: string;
+  criticalSoft: string;
   /** Hero surfaces (balance card, story screens): a gradient from heroTop to heroDeep. */
   heroTop: string;
   hero: string;
@@ -193,20 +201,42 @@ export const COLOR_THEMES: ColorThemeSpec[] = [
   },
 ];
 
+// Light-mode meaning colours are dark enough for text on the page and on their own soft tint (≥ 4.5:1).
 const SEMANTIC = {
-  light: { income: '#1F7A52', good: '#2E7D4F', watch: palette.amber, critical: palette.clay, overlay: 'rgba(10, 16, 12, 0.45)' },
+  light: { income: '#1F7A52', good: '#26704A', watch: '#8F5B0A', critical: '#A63A26', overlay: 'rgba(10, 16, 12, 0.45)' },
   dark: { income: '#5CC08E', good: '#5CC08E', watch: '#E0A548', critical: '#E07A63', overlay: 'rgba(0, 0, 0, 0.6)' },
 };
+
+/** Mix two hex colours: t = 1 gives `a`, t = 0 gives `b`. */
+export function mix(a: string, b: string, t: number): string {
+  const pa = parseInt(a.replace('#', '').slice(0, 6), 16);
+  const pb = parseInt(b.replace('#', '').slice(0, 6), 16);
+  const ch = (shift: number) => Math.round(((pa >> shift) & 255) * t + ((pb >> shift) & 255) * (1 - t));
+  return `#${[16, 8, 0].map((sh) => ch(sh).toString(16).padStart(2, '0')).join('')}`.toUpperCase();
+}
+
+/** The colour darkened (towards black) step by step until it reads at 4.5:1 on every background given. */
+function inkOf(color: string, backgrounds: string[]): string {
+  let c = color;
+  for (let i = 0; i < 20 && backgrounds.some((bg) => contrast(c, bg) < 4.5); i++) c = mix(c, '#000000', 0.9);
+  return c;
+}
 
 export function buildTheme(key: ColorThemeKey, dark: boolean): Theme {
   const spec = COLOR_THEMES.find((t) => t.key === key) ?? COLOR_THEMES[0];
   const mode = dark ? spec.dark : spec.light;
   const sem = dark ? SEMANTIC.dark : SEMANTIC.light;
+  const soft = (c: string) => (dark ? mix(c, mode.surface, 0.16) : mix(c, '#FFFFFF', 0.12));
   return {
     dark,
     colorTheme: spec.key,
     ...mode,
     ...sem,
+    onAccent: readableOn(mode.accent, '#1D1405', '#FFFFFF'),
+    accentInk: dark ? mode.accent : inkOf(mode.accent, [mode.surface, mode.bg, mode.accentSoft]),
+    goodSoft: soft(sem.good),
+    watchSoft: soft(sem.watch),
+    criticalSoft: soft(sem.critical),
     expense: mode.ink,
     heroTop: dark ? spec.heroDarkTop : spec.hero[0],
     hero: spec.hero[1],

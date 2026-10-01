@@ -40,9 +40,18 @@ export async function loadScannedIds(userId: string): Promise<Set<string>> {
   }
 }
 
+/**
+ * The manual scan (scan screen) is running: the automatic scan waits, so the two never read the
+ * same photos at the same time (which would spend the daily AI quota twice).
+ */
+export const scanLock = { manual: false };
+
 export async function rememberScanned(userId: string, ids: Set<string>) {
   try {
-    await Storage.setItem(scannedKey(userId), JSON.stringify([...ids].slice(-5000)));
+    // Merge with what is stored now: the other scan may have added photos since this one started.
+    const all = await loadScannedIds(userId);
+    for (const id of ids) all.add(id);
+    await Storage.setItem(scannedKey(userId), JSON.stringify([...all].slice(-5000)));
   } catch {
     // Not critical: worst case a photo is checked again and caught as a duplicate.
   }
@@ -161,6 +170,8 @@ export class SlipReaderError extends Error {
       | 'busy'
       | 'network'
       | 'reader_error'
+      | 'server'
+      | 'cancelled'
       | 'qr_unavailable',
     message: string,
   ) {
@@ -173,6 +184,8 @@ export const READER_MESSAGES: Record<SlipReaderError['code'], string> = {
   unauthorized: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง',
   quota: 'วันนี้อ่านสลิปครบโควตาแล้ว ลองใหม่พรุ่งนี้',
   too_large: 'รูปใหญ่เกินไป',
+  server: 'ระบบอ่านสลิปขัดข้องชั่วคราว สลิปที่เหลือจะอ่านต่อให้ภายหลัง',
+  cancelled: 'หยุดอ่านสลิปแล้ว',
   not_configured: 'ระบบอ่านสลิปยังไม่พร้อม: ผู้ดูแลต้องใส่ GEMINI_API_KEY ใน Supabase → Edge Functions → Secrets (หรือ key ที่ใส่ไว้ใช้ไม่ได้)',
   busy: 'ตอนนี้ AI อ่านสลิปมีคนใช้เยอะ ลองใหม่อีกสักครู่ สลิปที่เหลือจะอ่านต่อตอนเปิดแอปครั้งหน้า',
   network: 'เชื่อมต่ออินเทอร์เน็ตไม่ได้ ลองใหม่อีกครั้ง',
@@ -223,7 +236,14 @@ async function readSlipOnce(base64: string): Promise<SlipRead> {
     if (error instanceof FunctionsHttpError) {
       const body = await (error.context as Response).json().catch(() => null);
       const c = body?.error?.code;
-      code = c === 'unauthorized' || c === 'quota' || c === 'too_large' || c === 'not_configured' || c === 'busy' ? c : 'reader_error';
+      const status = (error.context as Response).status;
+      code =
+        c === 'unauthorized' || c === 'quota' || c === 'too_large' || c === 'not_configured' || c === 'busy'
+          ? c
+          : // A gateway error or timeout (no answer from the reader itself): the service is down, not this photo.
+            !c && status >= 500
+            ? 'server'
+            : 'reader_error';
     }
     throw new SlipReaderError(code, READER_MESSAGES[code]);
   }

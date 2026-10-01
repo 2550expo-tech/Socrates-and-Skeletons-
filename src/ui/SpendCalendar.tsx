@@ -111,7 +111,7 @@ export function SpendCalendar({
         {cal.usualSatang ? `เทียบกับวันที่ใช้ตามปกติของเดือนนี้ (${formatBaht(cal.usualSatang, { decimals: false })})` : 'เดือนนี้ยังไม่มีรายจ่าย'}
       </T>
       {picked ? (
-        <Row justify="space-between" style={{ backgroundColor: theme.surfaceAlt, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.sm }}>
+        <Row justify="space-between" style={{ backgroundColor: theme.surfaceAlt, borderRadius: radius.lg, paddingHorizontal: space.md, paddingVertical: space.sm }}>
           <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi }}>
             {formatThaiDay(picked.day)}
           </T>

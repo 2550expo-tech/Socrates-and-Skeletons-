@@ -49,7 +49,7 @@ import { KlaPicture } from '../../ui/kla/KlaPicture';
 import { Medal } from '../../ui/Medal';
 import { useCountUp, useReduceMotion } from '../../ui/motion';
 import { TxRow } from '../../ui/TxRow';
-import { alpha, fonts, palette, radius, space, useTheme } from '../../ui/theme';
+import { alpha, fonts, radius, readableOn, space, useTheme } from '../../ui/theme';
 
 const RUNWAY_BADGE = {
   healthy: { label: 'สบาย ๆ', tone: 'good' },
@@ -82,11 +82,19 @@ function ActionTile({
 }) {
   const theme = useTheme();
   const press = usePressSpring(0.95);
+  // Every colour from the theme; sub-text at full strength so it reads on the fill (AA) in every theme.
   const look = {
-    primary: { bg: theme.primary, border: theme.primary, ink: theme.onPrimary, soft: 'rgba(255,255,255,0.78)', dot: 'rgba(255,255,255,0.18)', icon: theme.onPrimary },
-    gold: { bg: theme.accent, border: theme.accent, ink: '#1D1405', soft: 'rgba(29,20,5,0.7)', dot: 'rgba(255,255,255,0.35)', icon: '#1D1405' },
+    primary: { bg: theme.primary, border: theme.primary, ink: theme.onPrimary, soft: theme.onPrimary, dot: alpha(theme.onPrimary, 0.16), icon: theme.onPrimary },
+    gold: { bg: theme.accent, border: theme.accent, ink: theme.onAccent, soft: theme.onAccent, dot: alpha(theme.onAccent, 0.12), icon: theme.onAccent },
     plain: { bg: theme.surface, border: theme.line, ink: theme.ink, soft: theme.inkSoft, dot: theme.surfaceAlt, icon: theme.ink },
-    income: { bg: theme.dark ? 'rgba(92,192,142,0.12)' : '#E4F3EA', border: theme.dark ? 'rgba(92,192,142,0.35)' : '#BFE3CD', ink: theme.ink, soft: theme.inkSoft, dot: theme.income, icon: '#FFFFFF' },
+    income: {
+      bg: alpha(theme.income, theme.dark ? 0.12 : 0.1),
+      border: alpha(theme.income, 0.35),
+      ink: theme.ink,
+      soft: theme.inkSoft,
+      dot: theme.income,
+      icon: readableOn(theme.income, '#FFFFFF', theme.bg),
+    },
   }[tone];
   return (
     <Animated.View style={{ flex: 1, transform: [{ scale: press.scale }] }}>
@@ -145,6 +153,7 @@ function StreakPill({ days, today }: { days: number; today: boolean }) {
         onPress={() => router.push('/achievements')}
         onPressIn={press.onPressIn}
         onPressOut={press.onPressOut}
+        hitSlop={6}
         accessibilityRole="button"
         accessibilityLabel={`จดต่อเนื่อง ${days} วัน ดูความสำเร็จ`}
         style={{
@@ -244,9 +253,11 @@ export default function Home() {
     <Screen scrollY={scrollY} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.primary} />}>
       {halloween ? <HalloweenBunting /> : null}
       <Row justify="space-between" style={{ paddingTop: halloween ? 0 : space.sm, marginTop: halloween ? -space.md : 0 }}>
-        <View style={{ flex: 1 }}>
-          <T v="small">{formatThaiDayLong(today)}</T>
-          <T v="h2">สวัสดี {profile?.displayName || ''}</T>
+        <View style={{ flex: 1, gap: 2 }}>
+          <T v="label">{formatThaiDayLong(today)}</T>
+          <T v="h1" numberOfLines={1}>
+            สวัสดี {profile?.displayName || ''}
+          </T>
         </View>
         <Row gap={space.xs}>
           <StreakPill days={ach.streak.days} today={ach.streak.today} />
@@ -265,7 +276,7 @@ export default function Home() {
           <Card onPress={() => router.push('/whatsnew')} style={{ paddingVertical: space.md, borderColor: theme.accent, borderWidth: 1.5 }}>
             <Row gap={space.md}>
               <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: theme.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="gift" size={22} color={theme.dark ? palette.goldBright : '#7A5A0E'} />
+                <Ionicons name="gift" size={22} color={theme.accentInk} />
               </View>
               <View style={{ flex: 1 }}>
                 <T v="h3">มีอะไรใหม่ในอัปเดตนี้</T>
@@ -387,7 +398,7 @@ export default function Home() {
             <Row align="flex-start" justify="space-between">
               <View style={{ flex: 1, gap: 2 }}>
                 <T v="label" color={theme.heroInkSoft}>ยอดคงเหลือ</T>
-                <Money satang={balance} size="display" color="#F4F1E6" countUp />
+                <Money satang={balance} size="display" color={theme.heroInk} countUp />
                 <View style={{ marginTop: space.sm }}>
                   <Badge label={badge.label} tone={badge.tone} onDark />
                 </View>
@@ -409,19 +420,19 @@ export default function Home() {
                 </Pressable>
               </Animated.View>
             </Row>
-            <View style={{ height: 1, backgroundColor: 'rgba(244,241,230,0.15)' }} />
+            <View style={{ height: 1, backgroundColor: alpha(theme.heroInk, 0.15) }} />
             <Row justify="space-between" align="flex-end">
               <View style={{ flex: 1 }}>
                 <T v="small" color={theme.heroInkSoft}>เงินพอใช้อีก</T>
                 {runway.days !== null && runway.status !== 'below_floor' ? (
                   <T v="h1" color={theme.heroAccent}>
                     {runway.capped ? '365+ ' : `${daysShown} `}
-                    <T v="body" color="#F4F1E6">วัน · ถึง {formatThaiDay(runway.depletionDay!, { year: false })}</T>
+                    <T v="body" color={theme.heroInk}>วัน · ถึง {formatThaiDay(runway.depletionDay!, { year: false })}</T>
                   </T>
                 ) : runway.status === 'below_floor' ? (
-                  <T v="h3" color="#F4F1E6">แตะเส้นเงินสำรองแล้ว</T>
+                  <T v="h3" color={theme.heroInk}>แตะเส้นเงินสำรองแล้ว</T>
                 ) : (
-                  <T v="h3" color="#F4F1E6">ยังคำนวณไม่ได้</T>
+                  <T v="h3" color={theme.heroInk}>ยังคำนวณไม่ได้</T>
                 )}
               </View>
               <Button label="ดูรายละเอียด" small kind="onDark" icon="chevron-forward" onPress={() => router.navigate('/runway')} />
@@ -435,7 +446,7 @@ export default function Home() {
       <Reveal index={2}>
       <Card tone="accent" style={{ paddingVertical: space.md }}>
         <Row gap={space.md}>
-          <Ionicons name="sunny-outline" size={22} color={theme.dark ? theme.accent : '#7A5A0E'} />
+          <Ionicons name="sunny-outline" size={22} color={theme.accentInk} />
           <View style={{ flex: 1 }}>
             <T v="small" color={theme.ink}>ถ้าอยากให้เงินพอถึงสิ้นเดือน วันนี้ใช้ได้ประมาณ</T>
             <T v="h3">{formatBaht(safeToday, { decimals: false })} / วัน</T>
@@ -447,7 +458,7 @@ export default function Home() {
       {drafts.length > 0 ? (
         <Card onPress={() => router.push('/drafts')} style={{ borderColor: theme.accent, borderWidth: 1.5 }}>
           <Row gap={space.md}>
-            <Ionicons name="receipt-outline" size={22} color={theme.accent} />
+            <Ionicons name="receipt-outline" size={22} color={theme.accentInk} />
             <View style={{ flex: 1 }}>
               <T v="h3">สลิปรอยืนยัน {drafts.length} รายการ</T>
               <T v="small">พร้อมยืนยัน {readyDrafts} · ต้องตรวจ {drafts.length - readyDrafts} · ยังไม่รวมในยอดเงิน</T>
@@ -478,17 +489,17 @@ export default function Home() {
             accessibilityLabel={`ดูสรุปเดือน${formatThaiMonth(recapMonth)}`}
             style={{ borderRadius: radius.lg, overflow: 'hidden' }}
           >
-            <LinearGradient colors={['#4A1F3D', '#2E1327', theme.heroDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: space.lg }}>
+            <LinearGradient colors={[theme.heroTop, theme.hero, theme.heroDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: space.lg }}>
               <Shine times={1} delay={1400} color="rgba(255,255,255,0.18)" />
               <Row gap={space.md}>
                 <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: alpha(theme.heroAccent, 0.16), alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="sparkles" size={22} color={palette.goldBright} />
+                  <Ionicons name="sparkles" size={22} color={theme.heroAccent} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <T v="h3" color="#F4F1E6">{`สรุปเดือน${formatThaiMonth(recapMonth)}`}</T>
-                  <T v="small" color="#D9C8D3">เงินไปไหน วันไหนใช้เยอะ และเก่งขึ้นแค่ไหน</T>
+                  <T v="h3" color={theme.heroInk}>{`สรุปเดือน${formatThaiMonth(recapMonth)}`}</T>
+                  <T v="small" color={theme.heroInkSoft}>เงินไปไหน วันไหนใช้เยอะ และเก่งขึ้นแค่ไหน</T>
                 </View>
-                <Ionicons name="play-circle" size={30} color={palette.goldBright} />
+                <Ionicons name="play-circle" size={30} color={theme.heroAccent} />
               </Row>
             </LinearGradient>
           </Pressable>

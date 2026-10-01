@@ -192,7 +192,7 @@ export default function Scan() {
             </Row>
             {!done ? <ProgressBar value={counts.total ? counts.finished / counts.total : 0} color={theme.accent} /> : null}
             {done && recorded.length === 0 && counts.not_slip > 0 && galleryAvailable ? (
-              <View style={{ backgroundColor: theme.surfaceAlt, borderRadius: radius.md, padding: space.md, gap: space.sm }}>
+              <View style={{ backgroundColor: theme.surfaceAlt, borderRadius: radius.lg, padding: space.md, gap: space.sm }}>
                 <T v="small">
                   มีสลิปในเครื่องแต่{BUDDY_NAME}ไม่เจอ? {BUDDY_NAME}หาสลิปจาก QR ตรวจสอบสลิปที่แอปธนาคารพิมพ์ไว้ ถ้าเป็นรูปถ่ายสลิปกระดาษ หรือรูปที่ตัด QR ออก ให้เลือกรูปนั้นเอง
                 </T>
@@ -206,7 +206,7 @@ export default function Scan() {
               <Button label={`ยืนยัน ${readyIds.length} รายการที่อ่านชัด`} kind="gold" icon="checkmark-done" onPress={confirmReady} />
             ) : null}
             {done && drafts.length - readyIds.length > 0 ? (
-              <Button label={`ตรวจ ${drafts.length - readyIds.length} รายการที่อ่านไม่ชัด`} kind="soft" icon="receipt-outline" onPress={() => router.replace('/drafts')} />
+              <Button label={`ตรวจ ${drafts.length - readyIds.length} รายการที่อ่านไม่ชัด`} kind="soft" icon="receipt-outline" onPress={() => router.dismissTo('/drafts')} />
             ) : null}
             {done ? (
               <Row gap={space.sm}>
@@ -227,7 +227,7 @@ export default function Scan() {
                 <Reveal key={g.day} index={i}>
                 <Card style={{ paddingVertical: space.sm, gap: 0 }}>
                   <Row justify="space-between" style={{ paddingVertical: space.xs }}>
-                    <T v="body" style={{ fontFamily: undefined }}>{relativeDayLabel(g.day)}</T>
+                    <T v="body">{relativeDayLabel(g.day)}</T>
                     <T v="small" color={g.netSatang >= 0 ? theme.income : theme.expense}>
                       สุทธิ {formatBaht(g.netSatang, { sign: true, decimals: false })}
                     </T>
@@ -245,7 +245,7 @@ export default function Scan() {
           </>
         ) : null}
 
-        <View style={{ backgroundColor: theme.surfaceAlt, borderRadius: radius.md, padding: space.md, gap: 4 }}>
+        <View style={{ backgroundColor: theme.surfaceAlt, borderRadius: radius.lg, padding: space.md, gap: 4 }}>
           <Row gap={6}>
             <Ionicons name="shield-checkmark-outline" size={16} color={theme.inkSoft} />
             <T v="micro" style={{ flex: 1 }}>

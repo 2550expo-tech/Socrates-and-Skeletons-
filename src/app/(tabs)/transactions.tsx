@@ -17,7 +17,8 @@ import { Buddy } from '../../ui/Buddy';
 import { Reveal } from '../../ui/effects';
 import { SpendCalendar } from '../../ui/SpendCalendar';
 import { TxRow } from '../../ui/TxRow';
-import { fonts, radius, space, useTheme } from '../../ui/theme';
+import { inputBox, inputText } from '../../ui/inputs';
+import { space, useTheme } from '../../ui/theme';
 import { TitleDecor } from '../../ui/halloween';
 
 type Filter = 'all' | 'expense' | 'income';
@@ -28,6 +29,7 @@ export default function Transactions() {
   const { drafts } = useMoney();
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
+  const [searching, setSearching] = useState(false);
   const [showCalendar, setShowCalendar] = useState(true);
   const [month, setMonth] = useState(today.slice(0, 7));
   const [day, setDay] = useState<string | null>(null);
@@ -56,14 +58,17 @@ export default function Transactions() {
       <View style={{ paddingHorizontal: space.lg, gap: space.md, paddingTop: space.sm, paddingBottom: space.sm }}>
         <Row justify="space-between">
           <Row gap={space.sm} align="flex-end">
-            <T v="h1">รายการ</T>
+            <View style={{ gap: 2 }}>
+              <T v="label">รายรับ · รายจ่าย</T>
+              <T v="h1">รายการ</T>
+            </View>
             <TitleDecor />
           </Row>
           <Row gap={space.xs}>
             <IconButton
               icon={showCalendar ? 'calendar' : 'calendar-outline'}
               label={showCalendar ? 'ซ่อนปฏิทิน' : 'ดูปฏิทินการใช้จ่าย'}
-              color={showCalendar ? theme.accent : theme.ink}
+              color={showCalendar ? theme.accentInk : theme.ink}
               onPress={() => {
                 setShowCalendar((v) => !v);
                 setDay(null);
@@ -72,21 +77,20 @@ export default function Transactions() {
             <IconButton icon="add-circle" label="จดรายการ" color={theme.primary} onPress={() => router.push('/transaction')} />
           </Row>
         </Row>
-        <Row
-          gap={space.sm}
-          style={{ backgroundColor: theme.surface, borderRadius: radius.pill, paddingHorizontal: 14, borderWidth: 1, borderColor: theme.line }}
-        >
-          <Ionicons name="search" size={18} color={theme.inkFaint} />
+        <View style={[inputBox(theme, { focused: searching }), { gap: space.sm }]}>
+          <Ionicons name="search" size={18} color={theme.inkSoft} />
           <TextInput
             nativeID="tx-search"
             value={query}
             onChangeText={setQuery}
+            onFocus={() => setSearching(true)}
+            onBlur={() => setSearching(false)}
             placeholder="ค้นหาชื่อรายการหรือหมวด"
             placeholderTextColor={theme.inkFaint}
             accessibilityLabel="ค้นหารายการ"
-            style={{ flex: 1, paddingVertical: 10, fontFamily: fonts.sans, fontSize: 15, color: theme.ink }}
+            style={[inputText(theme), { paddingVertical: 10 }]}
           />
-        </Row>
+        </View>
         <Segmented<Filter>
           options={[
             { key: 'all', label: 'ทั้งหมด' },
@@ -97,9 +101,9 @@ export default function Transactions() {
           onChange={setFilter}
         />
         {drafts.length > 0 ? (
-          <Card onPress={() => router.push('/drafts')} style={{ paddingVertical: space.md, borderColor: theme.accent }}>
+          <Card onPress={() => router.push('/drafts')} style={{ paddingVertical: space.md, borderColor: theme.accent, borderWidth: 1.5 }}>
             <Row gap={space.sm}>
-              <Ionicons name="receipt-outline" size={20} color={theme.accent} />
+              <Ionicons name="receipt-outline" size={20} color={theme.accentInk} />
               <T v="body" style={{ flex: 1 }}>สลิปรอยืนยัน {drafts.length} รายการ</T>
               <Ionicons name="chevron-forward" size={18} color={theme.inkFaint} />
             </Row>
@@ -142,7 +146,7 @@ export default function Transactions() {
         )}
         ListEmptyComponent={
           day ? (
-            <EmptyState icon="calendar-outline" art={<Buddy mood="calm" size={84} />} title="วันนี้ไม่มีรายการ" body="แตะวันอื่นในปฏิทิน หรือกด ดูทุกวัน" />
+            <EmptyState icon="calendar-outline" art={<Buddy mood="calm" size={84} />} title={`${relativeDayLabel(day)} ไม่มีรายการ`} body="แตะวันอื่นในปฏิทิน หรือกด ดูทุกวัน" />
           ) : query || filter !== 'all' ? (
             <EmptyState icon="search" art={<Buddy mood="thinking" size={84} />} title="ไม่พบรายการ" body="ลองเปลี่ยนคำค้นหรือตัวกรองดูนะ" />
           ) : (

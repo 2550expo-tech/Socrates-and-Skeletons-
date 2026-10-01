@@ -62,10 +62,13 @@ export function addPayer(stats: NameStats, payer: string | null | undefined): Na
   const key = nameKey(payer);
   if (!key) return stats;
   const counts = { ...stats.counts, [key]: (stats.counts[key] ?? 0) + 1 };
-  const kept = Object.entries(counts)
+  // Keep the most frequent names, but never drop the one just counted: otherwise, once the table
+  // is full, a new name (the user's own on a new phone) would be cut straight away every time.
+  const others = Object.entries(counts)
+    .filter(([k]) => k !== key)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, KEEP_NAMES);
-  return { counts: Object.fromEntries(kept), total: stats.total + 1 };
+    .slice(0, KEEP_NAMES - 1);
+  return { counts: Object.fromEntries([[key, counts[key]], ...others]), total: stats.total + 1 };
 }
 
 export function isMine(stats: NameStats, name: string | null | undefined): boolean {

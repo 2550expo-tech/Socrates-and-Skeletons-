@@ -64,10 +64,12 @@ export function applyDeposit(g: SavingsGoal, deltaSatang: number, now: Date = ne
 /** One friendly line under a goal. */
 export function goalLine(g: SavingsGoal, today: string): string {
   const left = g.targetSatang - g.savedSatang;
+  // What is still to save is rounded up to whole baht, so it never reads "อีก ฿0" while short.
+  const upBaht = (s: number) => formatBaht(Math.ceil(s / 100) * 100, { decimals: false });
   if (left <= 0) return 'ครบแล้ว! เก่งมาก ถึงเวลาใช้เงินก้อนนี้อย่างสบายใจ';
-  if (!g.dueDay) return `อีก ${formatBaht(left, { decimals: false })} ก็ครบ`;
+  if (!g.dueDay) return `อีก ${upBaht(left)} ก็ครบ`;
   const days = daysBetween(today, g.dueDay);
-  if (days < 0) return `เลยกำหนดมาแล้ว อีก ${formatBaht(left, { decimals: false })} ก็ครบ ค่อย ๆ เก็บต่อได้นะ`;
+  if (days < 0) return `เลยกำหนดมาแล้ว อีก ${upBaht(left)} ก็ครบ ค่อย ๆ เก็บต่อได้นะ`;
   const per = perDayToReach(g, today)!;
-  return `เก็บวันละ ${formatBaht(per, { decimals: false })} ก็ทันวันที่ ${formatThaiDay(g.dueDay, { year: false })}`;
+  return `เก็บวันละ ${upBaht(per)} ก็ทันวันที่ ${formatThaiDay(g.dueDay, { year: false })}`;
 }

@@ -924,7 +924,8 @@ try {
     // Month recap: a story of full screens that moves on by itself; tap right for the next one.
     await button(page, 'ดูสรุปเดือน').click();
     check('Recap: opens on the month\'s title screen', await visible(page, 'แตะด้านขวาเพื่อไปต่อ'));
-    check('Recap: moves on to the next screen by itself', await visible(page, 'เดือนนี้ใช้ไปแล้ว', 9000));
+    // This month so far, or (on the 1st, when the recap is the month just ended) the whole month.
+    check('Recap: moves on to the next screen by itself', await visible(page, /เดือนนี้ใช้ไปแล้ว|ทั้งเดือนใช้ไป/, 9000));
     await button(page, 'ถัดไป').click();
     const where = await visible(page, 'เงินไปที่ไหนมากที่สุด');
     await page.waitForTimeout(1600);

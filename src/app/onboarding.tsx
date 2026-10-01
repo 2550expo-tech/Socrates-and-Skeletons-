@@ -5,31 +5,30 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform } from 'react-native';
 import { useApp } from '../data/AppProvider';
-import { formatSatang, parseBahtToSatang } from '../domain/money';
+import { amountToInput, parseBahtToSatang } from '../domain/money';
 import { Button, Card, Screen, T } from '../ui/components';
 import { useToast } from '../ui/feedback';
 import { Field } from '../ui/inputs';
 import { BuddySays } from '../ui/Buddy';
 import { Reveal, useCelebrate } from '../ui/effects';
 import { StepDots } from '../ui/StepDots';
-import { space, useTheme } from '../ui/theme';
+import { space } from '../ui/theme';
 
 export default function Onboarding() {
-  const theme = useTheme();
   const toast = useToast();
   const celebrate = useCelebrate();
   const { profile, saveProfile } = useApp();
   const [name, setName] = useState(profile?.displayName ?? '');
   const [balance, setBalance] = useState('');
-  const [floor, setFloor] = useState(formatSatang(profile?.runwayFloorSatang ?? 50_000, { decimals: false }));
+  const [floor, setFloor] = useState(amountToInput(profile?.runwayFloorSatang ?? 50_000));
   const [budget, setBudget] = useState('');
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   async function finish() {
     const e: Record<string, string> = {};
-    const balanceSatang = balance.trim() === '0' ? 0 : parseBahtToSatang(balance);
-    const floorSatang = floor.trim() === '0' ? 0 : parseBahtToSatang(floor);
+    const balanceSatang = parseBahtToSatang(balance, { allowZero: true });
+    const floorSatang = parseBahtToSatang(floor, { allowZero: true });
     const budgetSatang = budget.trim() ? parseBahtToSatang(budget) : null;
     if (!name.trim()) e.name = 'ใส่ชื่อเล่นสั้น ๆ ให้โค้ชเรียกคุณ';
     if (balanceSatang === null) e.balance = 'ใส่ยอดเงินที่มีตอนนี้ เช่น 3500';
@@ -98,7 +97,7 @@ export default function Onboarding() {
         </Card>
         </Reveal>
         <Button label="เริ่มใช้ MindPay" kind="gold" shine onPress={finish} loading={busy} />
-        <T v="micro" center color={theme.inkFaint}>แก้ไขทุกค่าได้ภายหลังในหน้าตั้งค่า</T>
+        <T v="micro" center>แก้ไขทุกค่าได้ภายหลังในหน้าตั้งค่า</T>
       </Screen>
     </KeyboardAvoidingView>
   );

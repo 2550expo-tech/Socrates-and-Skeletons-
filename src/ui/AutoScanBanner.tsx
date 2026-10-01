@@ -6,10 +6,9 @@ import { router } from 'expo-router';
 import { useEffect } from 'react';
 import { View } from 'react-native';
 import { BUDDY_NAME } from '../domain/buddy';
-import { formatBaht } from '../domain/money';
 import { useAutoScan } from '../services/AutoScanProvider';
 import { Buddy } from './Buddy';
-import { Button, Card, IconButton, ProgressBar, Row, T } from './components';
+import { Button, Card, IconButton, Money, ProgressBar, Row, T } from './components';
 import { Reveal, ScanBeam, useCelebrate } from './effects';
 import { useToast } from './feedback';
 import { space, useTheme } from './theme';
@@ -100,9 +99,7 @@ export function AutoScanBanner() {
               <T v="h3">
                 {BUDDY_NAME}จดให้แล้ว {state.confirmed.length} รายการ
               </T>
-              <T v="h2" color={total >= 0 ? theme.income : theme.ink}>
-                {formatBaht(total, { sign: true, decimals: false })}
-              </T>
+              <Money satang={total} sign decimals={false} size="h2" color={total >= 0 ? theme.income : theme.ink} />
             </>
           ) : (
             <T v="h3">{BUDDY_NAME}เจอสลิปใหม่ {state.drafts} ใบ</T>

@@ -92,7 +92,7 @@ export function DayBars({ days, averageSatang, height = 140 }: { days: DayTotal[
                 y={height - 6}
                 fontSize={11}
                 fontFamily={fonts.sansMedium}
-                fill={isToday ? theme.ink : theme.inkFaint}
+                fill={isToday ? theme.ink : theme.inkSoft}
                 textAnchor="middle"
               >
                 {isToday ? 'วันนี้' : WEEKDAY_SHORT[dow]}

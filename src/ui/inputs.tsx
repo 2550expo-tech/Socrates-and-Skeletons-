@@ -1,7 +1,31 @@
 import { useState, type ReactNode } from 'react';
-import { TextInput, View, type KeyboardTypeOptions, type TextInputProps } from 'react-native';
+import { Platform, TextInput, View, type KeyboardTypeOptions, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native';
 import { IconButton, T } from './components';
-import { fonts, radius, space, useTheme } from './theme';
+import { fonts, radius, space, useTheme, type Theme } from './theme';
+
+/**
+ * The one look of every text box in the app (design system): surface fill, 1.5pt border in
+ * `line`, `primary` while typing, `critical` when something is wrong; radius md.
+ */
+export function inputBox(theme: Theme, state: { focused?: boolean; error?: boolean } = {}): ViewStyle {
+  return {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: state.error ? theme.critical : state.focused ? theme.primary : theme.line,
+    borderRadius: radius.md,
+    backgroundColor: theme.surface,
+    paddingHorizontal: 14,
+  };
+}
+
+/**
+ * The text inside an input box: body size, and 16 on the web, where iPhone Safari zooms the whole
+ * page into any field with smaller text.
+ */
+export function inputText(theme: Theme): TextStyle {
+  return { flex: 1, paddingVertical: 12, fontFamily: fonts.sans, fontSize: Platform.OS === 'web' ? 16 : 15, color: theme.ink };
+}
 
 export function Field({
   id,
@@ -32,24 +56,23 @@ export function Field({
   inputProps?: Omit<TextInputProps, 'value' | 'onChangeText' | 'style'>;
 }) {
   const theme = useTheme();
+  const [focused, setFocused] = useState(false);
   return (
     <View style={{ gap: 6 }}>
       <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi }}>
         {label}
       </T>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          borderWidth: 1.5,
-          borderColor: error ? theme.critical : theme.line,
-          borderRadius: radius.md,
-          backgroundColor: theme.surface,
-          paddingHorizontal: 14,
-        }}
-      >
+      <View style={inputBox(theme, { focused, error: !!error })}>
         <TextInput
           {...inputProps}
+          onFocus={(e) => {
+            setFocused(true);
+            inputProps?.onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            inputProps?.onBlur?.(e);
+          }}
           nativeID={id}
           accessibilityLabel={label}
           value={value}
@@ -59,15 +82,7 @@ export function Field({
           keyboardType={keyboardType}
           multiline={multiline}
           maxLength={maxLength}
-          style={{
-            flex: 1,
-            paddingVertical: 12,
-            fontFamily: fonts.sans,
-            fontSize: 15,
-            color: theme.ink,
-            minHeight: multiline ? 72 : undefined,
-            textAlignVertical: multiline ? 'top' : 'center',
-          }}
+          style={[inputText(theme), { minHeight: multiline ? 72 : undefined, textAlignVertical: multiline ? 'top' : 'center' }]}
         />
         {right}
       </View>

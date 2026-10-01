@@ -245,7 +245,7 @@ export default function Welcome() {
           </Reveal>
           <Reveal index={2} from={14}>
             <View style={{ overflow: 'hidden', borderRadius: radius.md, marginTop: space.sm, paddingHorizontal: space.sm }}>
-              <T v="display" color="#F4F1E6">MindPay</T>
+              <T v="display" color={theme.heroInk}>MindPay</T>
               <Shine times={2} delay={700} color="rgba(255,236,170,0.35)" />
             </View>
           </Reveal>
@@ -435,10 +435,10 @@ function NoticeBox({
       accessibilityLiveRegion="polite"
       accessibilityRole="alert"
       style={{
-        borderRadius: radius.md,
+        borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: color,
-        backgroundColor: notice.tone === 'error' ? (theme.dark ? '#3A1712' : '#FBEDEA') : theme.surfaceAlt,
+        backgroundColor: notice.tone === 'error' ? theme.criticalSoft : theme.surfaceAlt,
         padding: space.md,
         gap: space.sm,
       }}
@@ -554,7 +554,7 @@ function SentCard({
         disabled={resendIn > 0 || busy}
         onPress={onResend}
       />
-      <View style={{ gap: 4, backgroundColor: theme.surfaceAlt, borderRadius: radius.md, padding: space.md }}>
+      <View style={{ gap: 4, backgroundColor: theme.surfaceAlt, borderRadius: radius.lg, padding: space.md }}>
         <T v="micro">ไม่เจออีเมล? ดูในจดหมายขยะ/Spam ผู้ส่งคือ Supabase Auth</T>
         <T v="micro">
           {confirm

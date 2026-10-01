@@ -10,7 +10,7 @@
  */
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Animated, Easing, Platform, Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, Easing, Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { BuddyMood } from '../domain/buddy';
 import type { SkinId } from '../domain/skins';
 import { useEquippedSkin } from '../services/kla';
@@ -172,7 +172,7 @@ export function BuddySays({
           style={{
             backgroundColor: theme.surface,
             borderColor: theme.line,
-            borderWidth: 1,
+            borderWidth: StyleSheet.hairlineWidth,
             borderRadius: radius.lg,
             borderBottomLeftRadius: 6,
             paddingHorizontal: space.md,

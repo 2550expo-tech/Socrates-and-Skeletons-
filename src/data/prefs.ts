@@ -18,17 +18,31 @@ export interface ScanPrefs {
 const KEY = 'mindpay.scanPrefs.v1';
 export const DEFAULT_SCAN_PREFS: ScanPrefs = { autoScan: true, autoConfirm: true, lastAutoScanAt: 0, askedGalleryOnce: false };
 
-export async function loadScanPrefs(): Promise<ScanPrefs> {
+/** Stored form: the switches belong to this phone, the scan window to each account on it. */
+type Stored = Omit<ScanPrefs, 'lastAutoScanAt'> & { lastAutoScanBy?: Record<string, number> };
+
+async function loadStored(): Promise<Stored> {
   try {
     const raw = await Storage.getItem(KEY);
-    return raw ? { ...DEFAULT_SCAN_PREFS, ...(JSON.parse(raw) as Partial<ScanPrefs>) } : DEFAULT_SCAN_PREFS;
+    const parsed = raw ? (JSON.parse(raw) as Partial<Stored>) : {};
+    const { autoScan, autoConfirm, askedGalleryOnce } = { ...DEFAULT_SCAN_PREFS, ...parsed };
+    return { autoScan, autoConfirm, askedGalleryOnce, lastAutoScanBy: parsed.lastAutoScanBy ?? {} };
   } catch {
-    return DEFAULT_SCAN_PREFS;
+    return { ...DEFAULT_SCAN_PREFS, lastAutoScanBy: {} };
   }
 }
 
-export async function saveScanPrefs(patch: Partial<ScanPrefs>): Promise<ScanPrefs> {
-  const next = { ...(await loadScanPrefs()), ...patch };
+/** This phone's scan settings, with the scan window of `userId` (another account starts with its own). */
+export async function loadScanPrefs(userId?: string | null): Promise<ScanPrefs> {
+  const s = await loadStored();
+  return { autoScan: s.autoScan, autoConfirm: s.autoConfirm, askedGalleryOnce: s.askedGalleryOnce, lastAutoScanAt: (userId && s.lastAutoScanBy?.[userId]) || 0 };
+}
+
+export async function saveScanPrefs(patch: Partial<ScanPrefs>, userId?: string | null): Promise<ScanPrefs> {
+  const s = await loadStored();
+  const { lastAutoScanAt, ...rest } = patch;
+  const next: Stored = { ...s, ...rest };
+  if (lastAutoScanAt !== undefined && userId) next.lastAutoScanBy = { ...s.lastAutoScanBy, [userId]: lastAutoScanAt };
   await Storage.setItem(KEY, JSON.stringify(next));
-  return next;
+  return loadScanPrefs(userId);
 }

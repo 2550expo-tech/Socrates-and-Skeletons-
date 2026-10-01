@@ -18,6 +18,26 @@ import { supabase } from './supabase';
 
 const MODE_KEY = 'mindpay.mode';
 const LAST_DAY_KEY = 'mindpay.lastOpenDay';
+/** Fingerprints of email links already used (never the link itself: it holds sign-in tokens). */
+const USED_LINKS_KEY = 'mindpay.usedAuthLinks';
+
+/** A short fingerprint of a link (FNV-1a), enough to recognise it again. */
+function linkFingerprint(url: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < url.length; i++) {
+    h ^= url.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
+
+async function usedLinks(): Promise<string[]> {
+  try {
+    return JSON.parse((await Storage.getItem(USED_LINKS_KEY)) ?? '[]') as string[];
+  } catch {
+    return [];
+  }
+}
 
 type AuthStatus = 'loading' | 'signedOut' | 'ready';
 
@@ -34,6 +54,8 @@ interface AppContextValue {
   userId: string | null;
   profile: Profile | null;
   txs: Transaction[];
+  /** Net of confirmed money older than the loaded transactions (it still counts in the balance). */
+  carrySatang: number;
   /** Savings goals ("กระปุกออม"). */
   goals: SavingsGoal[];
   addGoal(input: GoalInput): Promise<SavingsGoal>;
@@ -81,6 +103,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [txs, setTxs] = useState<Transaction[]>([]);
+  const [carrySatang, setCarry] = useState(0);
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -92,17 +115,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
   /** The account whose data is loaded (or being loaded): prevents loading the same account twice. */
   const activeUserRef = useRef<string | null>(null);
   const handledLinks = useRef(new Set<string>());
+  /** Each load gets a number; an older load that finishes late is ignored (it may be another account's). */
+  const loadGen = useRef(0);
+  /** Changes made on this phone while a load is running (null = deleted), put back over what it returns. */
+  const localChanges = useRef(new Map<string, Transaction | null>());
+
+  const noteLocal = (id: string, tx: Transaction | null) => {
+    localChanges.current.set(id, tx);
+  };
 
   const loadAll = useCallback(async (r: Repo) => {
+    const gen = ++loadGen.current;
+    localChanges.current = new Map();
     setLoadError(null);
     try {
       // Goals never block the app: if they cannot be loaded, the rest still works.
       const [p, list, g] = await Promise.all([r.getProfile(), r.listTransactions(), r.listGoals().catch(() => [] as SavingsGoal[])]);
+      if (gen !== loadGen.current || repoRef.current !== r) return;
+      // A slip saved by the automatic scan during the load is not lost when the list arrives.
+      const changes = localChanges.current;
+      const fresh = list.txs.filter((t) => !changes.has(t.id));
+      const kept = [...changes.values()].filter((t): t is Transaction => t !== null);
       setProfile(p);
-      setTxs(list);
+      setTxs([...kept, ...fresh]);
+      setCarry(list.carrySatang);
       setGoals(g);
       setStatus('ready');
     } catch (e) {
+      if (gen !== loadGen.current || repoRef.current !== r) return;
       setLoadError(e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ');
       setStatus('ready');
     }
@@ -110,6 +150,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const activateRepo = useCallback(
     async (r: Repo, id: string) => {
+      if (activeUserRef.current !== id) {
+        // Another account (or leaving the demo): never show or use the previous one's data meanwhile.
+        setProfile(null);
+        setTxs([]);
+        setCarry(0);
+        setGoals([]);
+      }
       activeUserRef.current = id;
       repoRef.current = r;
       setRepo(r);
@@ -120,12 +167,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const clear = useCallback(() => {
+    loadGen.current += 1;
     activeUserRef.current = null;
     repoRef.current = null;
     setRepo(null);
     setUserId(null);
     setProfile(null);
     setTxs([]);
+    setCarry(0);
     setGoals([]);
     setStatus('signedOut');
   }, []);
@@ -170,6 +219,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const result = parseAuthLink(url);
     if (!url || !result || !supabase || handledLinks.current.has(url)) return false;
     handledLinks.current.add(url);
+    // Android keeps handing back the link that opened the app, even after an update reloads it:
+    // a link used once is never used again (its tokens are spent, and reusing them signs out).
+    const fp = linkFingerprint(url);
+    const used = await usedLinks();
+    if (used.includes(fp)) return false;
+    Storage.setItem(USED_LINKS_KEY, JSON.stringify([...used, fp].slice(-20))).catch(() => {});
     clearLinkFromAddressBar();
     if (result.kind === 'error') {
       setAuthNotice({ kind: 'link_error', message: authLinkErrorMessage(result) });
@@ -184,6 +239,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setAuthNotice({ kind: 'link_error', message: authErrorMessage(error) });
         return false;
       }
+      // Sign in right away (the auth event may only say TOKEN_REFRESHED when a session already existed).
+      const uid = data.session.user.id;
+      if (activeUserRef.current !== uid) {
+        Storage.setItem(MODE_KEY, 'cloud').catch(() => {});
+        activateRepo(createCloudRepo(uid), uid);
+      }
       const name = (data.session.user.user_metadata?.display_name as string | undefined) ?? null;
       if (result.type === 'recovery') setAuthNotice({ kind: 'recovery' });
       else if (result.type === 'signup' || result.type === 'email' || result.type === 'invite') {
@@ -194,7 +255,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setAuthNotice({ kind: 'link_error', message: authErrorMessage(e as Error) });
       return false;
     }
-  }, []);
+  }, [activateRepo]);
 
   // Decide the starting mode once, then follow Supabase auth changes.
   useEffect(() => {
@@ -224,7 +285,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // (it can deadlock the auth lock), so the actual work is deferred.
       setTimeout(() => {
         // A password-reset code signs in with the PASSWORD_RECOVERY event instead of SIGNED_IN.
-        const signedIn = event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY';
+        // Opened offline with an expired token, the session only comes back later as TOKEN_REFRESHED:
+        // that signs in too, but only while nothing is open (never over the demo or another account).
+        const signedIn =
+          event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY' || (event === 'TOKEN_REFRESHED' && !activeUserRef.current);
         if (signedIn && session && activeUserRef.current !== session.user.id) {
           Storage.setItem(MODE_KEY, 'cloud').catch(() => {});
           activateRepo(createCloudRepo(session.user.id), session.user.id);
@@ -254,6 +318,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       userId,
       profile,
       txs,
+      carrySatang,
       goals,
       async addGoal(input) {
         const g = await need().insertGoal(input);
@@ -301,26 +366,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
       async addTx(input) {
         const tx = await need().insert(input);
+        noteLocal(tx.id, tx);
         setTxs((list) => [tx, ...list]);
         return tx;
       },
       async updateTx(id, patch) {
         const tx = await need().update(id, patch);
+        noteLocal(id, tx);
         setTxs((list) => list.map((t) => (t.id === id ? tx : t)));
         return tx;
       },
       async removeTx(id) {
         const removed = txs.find((t) => t.id === id);
         await need().remove(id);
+        noteLocal(id, null);
         setTxs((list) => list.filter((t) => t.id !== id));
         return removed;
       },
       async confirmTxs(ids) {
         await need().confirmMany(ids);
         const set = new Set(ids);
-        setTxs((list) => list.map((t) => (set.has(t.id) ? { ...t, status: 'confirmed', reviewFlags: [] } : t)));
+        setTxs((list) =>
+          list.map((t) => {
+            if (!set.has(t.id)) return t;
+            const next = { ...t, status: 'confirmed' as const, reviewFlags: [] };
+            noteLocal(t.id, next);
+            return next;
+          }),
+        );
       },
       upsertLocal(tx) {
+        noteLocal(tx.id, tx);
         setTxs((list) => [tx, ...list.filter((t) => t.id !== tx.id)]);
       },
       authNotice,
@@ -331,7 +407,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       today,
       newDay,
     }),
-    [status, repo, userId, profile, txs, goals, loadError, refreshing, authNotice, today, newDay, loadAll, activateRepo, clear],
+    [status, repo, userId, profile, txs, carrySatang, goals, loadError, refreshing, authNotice, today, newDay, loadAll, activateRepo, clear],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
@@ -339,11 +415,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 /** Derived money numbers used across screens (FR-2 balance, FR-6 runway). */
 export function useMoney() {
-  const { profile, txs, goals, today } = useApp();
+  const { profile, txs, carrySatang, goals, today } = useApp();
   return useMemo(() => {
     const opening = profile?.openingBalanceSatang ?? 0;
     const floor = profile?.runwayFloorSatang ?? 50_000;
-    const balance = computeBalance(opening, txs);
+    // Money from before the loaded window (over ~13 months ago) still counts.
+    const balance = computeBalance(opening + carrySatang, txs);
     const average = averageDailyExpense(txs);
     // Money in savings goals is set aside: it does not count as money to spend.
     const reserved = reservedSatang(goals);
@@ -352,5 +429,5 @@ export function useMoney() {
     return { balance, average, runway, drafts, reserved, floor };
     // `today` makes the runway and averages start over at midnight.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, txs, goals, today]);
+  }, [profile, txs, carrySatang, goals, today]);
 }

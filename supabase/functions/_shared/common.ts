@@ -64,23 +64,22 @@ export class NotConfiguredError extends Error {}
 /** The AI service is rate-limiting us (e.g. Gemini free tier) or overloaded: try again shortly. */
 export class BusyError extends Error {}
 
+/** A daily limit from the function settings; a missing or non-number setting uses the default. */
+export function envLimit(name: string, fallback: number): number {
+  const n = Number(Deno.env.get(name));
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+}
+
 /**
  * Daily cap per user so a leaked account or a bug cannot run up the AI bill.
  * Returns false when the user is over the limit; otherwise records one use.
+ * Counting and recording happen in one database call under a per-user lock
+ * (take_ai_quota), so many requests at once cannot all slip under the limit.
  */
 export async function takeQuota(userId: string, kind: 'slip' | 'coach', dailyLimit: number) {
-  const db = admin();
-  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const { count, error } = await db
-    .from('ai_usage')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('kind', kind)
-    .gte('created_at', since);
+  const { data, error } = await admin().rpc('take_ai_quota', { p_user: userId, p_kind: kind, p_limit: dailyLimit });
   if (error) throw error;
-  if ((count ?? 0) >= dailyLimit) return false;
-  await db.from('ai_usage').insert({ user_id: userId, kind });
-  return true;
+  return data === true;
 }
 
 // ---------------------------------------------------------------------------
@@ -114,18 +113,44 @@ export function aiProvider(): AiProvider | null {
 
 /** Ask the configured AI and return its text reply. */
 export async function callAI(req: AiRequest): Promise<string> {
+  return (await callAIWithModel(req)).text;
+}
+
+/**
+ * Longest wait for one call to the AI service, and for all tries of one request together
+ * (the platform stops a function after 150 s; both slip reads run at the same time).
+ */
+const FETCH_TIMEOUT_MS = 45_000;
+const REQUEST_DEADLINE_MS = 110_000;
+
+/** Ask the configured AI; also says which model answered (the two slip reads compare it). */
+export async function callAIWithModel(req: AiRequest): Promise<{ text: string; model: string }> {
   const provider = aiProvider();
   if (!provider) throw new NotConfiguredError('No AI key is set');
   const started = Date.now();
-  const { text, model } = provider === 'claude' ? await callClaude(req) : await callGemini(req);
+  const deadline = started + REQUEST_DEADLINE_MS;
+  const result = provider === 'claude' ? await callClaude(req, deadline) : await callGemini(req, deadline);
   // Metadata only: never log images, questions or replies.
-  console.log(JSON.stringify({ ai: provider, model, task: req.task, variant: req.variant ?? 'primary', ms: Date.now() - started }));
-  return text;
+  console.log(JSON.stringify({ ai: provider, model: result.model, task: req.task, variant: req.variant ?? 'primary', ms: Date.now() - started }));
+  return result;
+}
+
+/** fetch with a time limit; running out of time counts as the AI being busy (the app waits and retries). */
+async function timedFetch(url: string, init: RequestInit, deadline: number): Promise<Response> {
+  const left = deadline - Date.now();
+  if (left <= 1000) throw new BusyError('AI request deadline reached');
+  try {
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(Math.min(FETCH_TIMEOUT_MS, left)) });
+  } catch (e) {
+    const name = (e as Error)?.name;
+    if (name === 'TimeoutError' || name === 'AbortError') throw new BusyError(`AI request timed out (${url.split('/')[2]})`);
+    throw e;
+  }
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function callClaude(req: AiRequest): Promise<{ text: string; model: string }> {
+async function callClaude(req: AiRequest, deadline: number): Promise<{ text: string; model: string }> {
   const key = claudeKey()!;
   const main = Deno.env.get(req.task === 'slip' ? 'SLIP_MODEL' : 'COACH_MODEL') ?? CLAUDE_DEFAULT_MODEL;
   const model = req.variant === 'verify' ? (Deno.env.get('VERIFY_MODEL') ?? main) : main;
@@ -145,15 +170,19 @@ async function callClaude(req: AiRequest): Promise<{ text: string; model: string
   if (req.schema) {
     body.output_config = { format: { type: 'json_schema', schema: req.schema } };
   }
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
+  const res = await timedFetch(
+    'https://api.anthropic.com/v1/messages',
+    {
+      method: 'POST',
+      headers: {
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(body),
     },
-    body: JSON.stringify(body),
-  });
+    deadline,
+  );
   if (!res.ok) {
     const detail = await res.text();
     const msg = `Claude API ${res.status}: ${detail.slice(0, 300)}`;
@@ -170,7 +199,7 @@ async function callClaude(req: AiRequest): Promise<{ text: string; model: string
   return { text, model };
 }
 
-async function callGemini(req: AiRequest): Promise<{ text: string; model: string }> {
+async function callGemini(req: AiRequest, deadline: number): Promise<{ text: string; model: string }> {
   const key = geminiKey()!;
   const parts = req.content.map((c) =>
     c.type === 'text' ? { text: c.text } : { inlineData: { mimeType: c.mediaType, data: c.data } },
@@ -192,15 +221,19 @@ async function callGemini(req: AiRequest): Promise<{ text: string; model: string
           if (useJsonSchema) generationConfig.responseJsonSchema = req.schema;
           else system += `\n\nReply with one JSON object that matches this JSON Schema:\n${JSON.stringify(req.schema)}`;
         }
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-          method: 'POST',
-          headers: { 'x-goog-api-key': key, 'content-type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: system }] },
-            contents: [{ role: 'user', parts }],
-            generationConfig,
-          }),
-        });
+        const res = await timedFetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: 'POST',
+            headers: { 'x-goog-api-key': key, 'content-type': 'application/json' },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: system }] },
+              contents: [{ role: 'user', parts }],
+              generationConfig,
+            }),
+          },
+          deadline,
+        );
         if (res.ok) {
           const data = await res.json();
           const text = geminiText(data);
@@ -226,8 +259,10 @@ async function callGemini(req: AiRequest): Promise<{ text: string; model: string
     }
     if (busyDelayMs === null) break; // no model is usable with this key
     if (round === 1) throw new BusyError(lastError);
-    console.warn(JSON.stringify({ ai: 'gemini', task: req.task, waitMs: Math.min(busyDelayMs, 12000) }));
-    await sleep(Math.min(busyDelayMs, 12000));
+    const waitMs = Math.min(busyDelayMs, 12000);
+    if (Date.now() + waitMs > deadline - FETCH_TIMEOUT_MS / 2) throw new BusyError(lastError);
+    console.warn(JSON.stringify({ ai: 'gemini', task: req.task, waitMs }));
+    await sleep(waitMs);
   }
   throw new Error(lastError);
 }

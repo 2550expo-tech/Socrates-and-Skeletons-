@@ -51,7 +51,7 @@ export function TxRow({ tx, showTime = true }: { tx: Transaction; showTime?: boo
           ) : null}
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <T v="body" numberOfLines={1} style={{ fontFamily: undefined }}>
+          <T v="body" numberOfLines={1}>
             {tx.title || cat.label}
           </T>
           <Row gap={6}>
@@ -75,7 +75,7 @@ export function TxRow({ tx, showTime = true }: { tx: Transaction; showTime?: boo
           satang={tx.kind === 'income' ? tx.amountSatang : -tx.amountSatang}
           size="h3"
           sign
-          color={draft ? theme.inkFaint : tx.kind === 'income' ? theme.income : theme.expense}
+          color={draft ? theme.inkSoft : tx.kind === 'income' ? theme.income : theme.expense}
         />
       </Row>
     </Pressable>

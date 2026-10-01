@@ -4,7 +4,7 @@
  */
 import * as Haptics from 'expo-haptics';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, Modal, Pressable, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, Modal, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, T } from './components';
 import { buildTheme, fonts, radius, readableOn, space, useTheme } from './theme';
@@ -36,6 +36,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (t: ToastOptions) => {
       if (timer.current) clearTimeout(timer.current);
       setToast(t);
+      // iOS VoiceOver ignores live regions: say the message out loud (Android and the web use the live region).
+      if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(t.message);
       if (t.tone === 'error') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       Animated.spring(anim, { toValue: 1, useNativeDriver: true }).start();
       timer.current = setTimeout(() => {
@@ -54,7 +56,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       {toast ? (
         <Animated.View
-          accessibilityLiveRegion="polite"
+          accessibilityLiveRegion={toast.tone === 'error' ? 'assertive' : 'polite'}
           style={{
             position: 'absolute',
             left: space.lg,
@@ -76,7 +78,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               gap: 12,
             }}
           >
-            <Text style={{ flex: 1, fontFamily: fonts.sansMedium, fontSize: 14, color: toast.tone === 'error' ? '#fff' : theme.bg }}>
+            <Text style={{ flex: 1, fontFamily: fonts.sansMedium, fontSize: 14, color: toast.tone === 'error' ? readableOn(theme.critical, '#FFFFFF', theme.bg) : theme.bg }}>
               {toast.message}
             </Text>
             {toast.action ? (
@@ -119,7 +121,7 @@ export function ConfirmSheet({
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={{ flex: 1, backgroundColor: theme.overlay }} onPress={onCancel} accessibilityLabel="ปิด" />
+      <Pressable style={{ flex: 1, backgroundColor: theme.overlay }} onPress={onCancel} accessibilityRole="button" accessibilityLabel="ปิด" />
       <View
         style={{
           backgroundColor: theme.surface,

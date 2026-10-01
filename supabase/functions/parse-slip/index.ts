@@ -12,11 +12,13 @@
 // database or to storage, and only images that already looked like slips on
 // the phone are sent here. The AI service (Claude or Gemini, see
 // _shared/common.ts) receives the image to read it.
-import { aiProvider, BusyError, callAI, corsHeaders, fail, json, NotConfiguredError, requireUser, takeQuota } from '../_shared/common.ts';
+import { aiProvider, BusyError, callAIWithModel, corsHeaders, envLimit, fail, json, NotConfiguredError, requireUser, takeQuota } from '../_shared/common.ts';
 import { mergeReadings, normalizeReading, parseJsonText, type SlipReadingOut } from '../_shared/helpers.ts';
 
-const DAILY_LIMIT = Number(Deno.env.get('SLIP_DAILY_LIMIT') ?? '300');
+const DAILY_LIMIT = envLimit('SLIP_DAILY_LIMIT', 300);
 const MAX_BASE64_CHARS = 6_000_000; // about 4.5 MB of image
+/** Checked before the body is read, so a huge upload is refused without filling memory. */
+const MAX_BODY_BYTES = MAX_BASE64_CHARS + 100_000;
 
 const nullableString = { type: ['string', 'null'] };
 
@@ -76,8 +78,8 @@ Fields:
 - confidence: for amount, date and counterparty, your certainty from 0 to 1 that the value is exactly right, character for character. Use below 0.8 if any character is blurred, cropped, covered, small, or could be read two ways (1 or 7, 3 or 8, 5 or 6, 0 or 8, comma or dot). Use 0 when the value is null.
 - Never guess, and never compute a value that is not printed. If a field cannot be read, return null.`;
 
-async function readOnce(variant: 'primary' | 'verify', image: string, mediaType: string): Promise<SlipReadingOut> {
-  const text = await callAI({
+async function readOnce(variant: 'primary' | 'verify', image: string, mediaType: string): Promise<{ reading: SlipReadingOut; model: string }> {
+  const { text, model } = await callAIWithModel({
     task: 'slip',
     variant,
     system: SYSTEM,
@@ -88,7 +90,7 @@ async function readOnce(variant: 'primary' | 'verify', image: string, mediaType:
       { type: 'text', text: 'Extract the slip fields from this image.' },
     ],
   });
-  return normalizeReading(parseJsonText(text));
+  return { reading: normalizeReading(parseJsonText(text)), model };
 }
 
 Deno.serve(async (req) => {
@@ -98,12 +100,14 @@ Deno.serve(async (req) => {
   const userId = await requireUser(req);
   if (!userId) return fail('unauthorized', 'Sign in again', 401);
 
+  if (Number(req.headers.get('content-length') ?? 0) > MAX_BODY_BYTES) return fail('too_large', 'Image is too large', 413);
   let body: { imageBase64?: string; mediaType?: string };
   try {
     body = await req.json();
   } catch {
     return fail('bad_request', 'Body must be JSON', 400);
   }
+  if (!body || typeof body !== 'object') return fail('bad_request', 'Body must be a JSON object', 400);
   const image = body.imageBase64;
   const mediaType = body.mediaType ?? 'image/jpeg';
   if (!image || typeof image !== 'string') return fail('bad_request', 'imageBase64 is required', 400);
@@ -130,8 +134,10 @@ Deno.serve(async (req) => {
       const why = (!a ? first : second) as PromiseRejectedResult;
       console.warn(JSON.stringify({ slip: 'single_read', failed: !a ? 'primary' : 'verify', error: String(why.reason?.message ?? why.reason).slice(0, 200) }));
     }
-    const { reading, check } = mergeReadings(a, b);
-    console.log(JSON.stringify({ slip: 'checked', reads: check.reads, verified: check.verified, disagree: Object.keys(check.disagree) }));
+    // Both reads by the same model (no separate verifier configured) are not independent.
+    const sameModel = !!a && !!b && a.model === b.model;
+    const { reading, check } = mergeReadings(a?.reading ?? null, b?.reading ?? null, { sameModel });
+    console.log(JSON.stringify({ slip: 'checked', reads: check.reads, verified: check.verified, sameModel, disagree: Object.keys(check.disagree) }));
     return json({ reading, check });
   } catch (e) {
     if (e instanceof NotConfiguredError) {

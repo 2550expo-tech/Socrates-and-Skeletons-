@@ -7,7 +7,7 @@
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BUDDY_NAME } from '../domain/buddy';
 import type { Mission } from '../domain/missions';
@@ -75,18 +75,18 @@ export default function Achievements() {
                       borderRadius: 34,
                       backgroundColor: alpha(theme.heroAccent, 0.14),
                       borderWidth: 2,
-                      borderColor: streak.today ? theme.heroAccent : 'rgba(244,241,230,0.35)',
+                      borderColor: streak.today ? theme.heroAccent : alpha(theme.heroInk, 0.35),
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
-                    <Ionicons name="flame" size={38} color={streak.today ? '#F29E4C' : 'rgba(244,241,230,0.55)'} />
+                    <Ionicons name="flame" size={38} color={streak.today ? '#F29E4C' : theme.heroInkSoft} />
                   </View>
                 </View>
                 <View style={{ flex: 1 }}>
                   <T v="small" color={theme.heroInkSoft}>จดต่อเนื่อง</T>
                   <T v="h1" color={theme.heroAccent}>
-                    {shown} <T v="body" color="#F4F1E6">วัน</T>
+                    {shown} <T v="body" color={theme.heroInk}>วัน</T>
                   </T>
                   <T v="small" color={theme.heroInkSoft}>สถิติสูงสุด {streak.best} วัน</T>
                 </View>
@@ -108,10 +108,10 @@ export default function Achievements() {
                           borderRadius: 8,
                           backgroundColor: d.active ? theme.heroAccent : 'transparent',
                           borderWidth: isToday ? 2 : 1.5,
-                          borderColor: d.active ? theme.heroAccent : isToday ? '#F4F1E6' : 'rgba(244,241,230,0.3)',
+                          borderColor: d.active ? theme.heroAccent : isToday ? theme.heroInk : alpha(theme.heroInk, 0.3),
                         }}
                       />
-                      <T v="micro" color={isToday ? '#F4F1E6' : 'rgba(244,241,230,0.55)'}>
+                      <T v="micro" color={isToday ? theme.heroInk : theme.heroInkSoft}>
                         {WEEKDAY[weekday]}
                       </T>
                     </View>
@@ -154,7 +154,7 @@ export default function Achievements() {
               <View style={{ alignItems: 'center', width: 100, gap: 2 }}>
                 <Medal badge={b} shine={b.earned} />
                 {!b.earned ? (
-                  <T v="micro" center color={theme.inkFaint} numberOfLines={2}>
+                  <T v="micro" center numberOfLines={2}>
                     {b.progress ? `${b.progress.value}/${b.progress.target} · ` : ''}
                     {b.how}
                   </T>
@@ -185,7 +185,8 @@ function MissionCard({ mission: m, onPress }: { mission: Mission; onPress: () =>
         gap: space.md,
         backgroundColor: theme.surface,
         borderRadius: radius.lg,
-        borderWidth: 1,
+        // Like Card: a hairline, and the accent at 1.5pt for what is done.
+        borderWidth: m.done ? 1.5 : StyleSheet.hairlineWidth,
         borderColor: m.done ? theme.accent : theme.line,
         padding: space.md,
         opacity: pressed ? 0.88 : 1,
@@ -201,7 +202,7 @@ function MissionCard({ mission: m, onPress }: { mission: Mission; onPress: () =>
           backgroundColor: m.done ? theme.accentSoft : theme.surfaceAlt,
         }}
       >
-        <Ionicons name={(m.done ? 'checkmark' : m.icon) as IconName} size={20} color={m.done ? (theme.dark ? theme.accent : '#7A5A0E') : theme.inkSoft} />
+        <Ionicons name={(m.done ? 'checkmark' : m.icon) as IconName} size={20} color={m.done ? theme.accentInk : theme.inkSoft} />
       </View>
       <View style={{ flex: 1, gap: 3 }}>
         <Row justify="space-between" gap={space.sm}>

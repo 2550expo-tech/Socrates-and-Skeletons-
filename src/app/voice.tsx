@@ -20,12 +20,13 @@ import type { TxKind } from '../domain/types';
 import { parseSpokenEntry, spokenCategory, type SpokenItem } from '../domain/voice';
 import { askMicPermission, listen, speechAvailable } from '../services/speech';
 import { BuddySays } from '../ui/Buddy';
-import { Button, Card, Chip, IconButton, Ionicons, Row, T } from '../ui/components';
+import { Button, Card, Chip, IconButton, Ionicons, Money, Row, T } from '../ui/components';
+import { inputBox, inputText } from '../ui/inputs';
 import { Aurora, PulseRing, Reveal, useCelebrate, usePressSpring } from '../ui/effects';
 import { useToast } from '../ui/feedback';
 import { useNative, useReduceMotion } from '../ui/motion';
-import { goBack } from '../ui/nav';
-import { fonts, palette, radius, space, useTheme } from '../ui/theme';
+import { goBack, useLeaveWhenDone } from '../ui/nav';
+import { fonts, radius, space, useTheme } from '../ui/theme';
 import { HeaderDecor } from '../ui/halloween';
 
 const EXAMPLES = ['ข้าว 50 บาท', 'ค่ารถ 25 กาแฟ 65', 'ได้เงินจากแม่ 500', 'เมื่อวาน หมูกระทะ 299'];
@@ -43,6 +44,7 @@ const SPEECH_ERRORS: Record<string, string> = {
 
 /** Five bars that dance with the voice while listening. */
 function VoiceBars({ level, active }: { level: Animated.Value; active: boolean }) {
+  const theme = useTheme();
   const reduce = useReduceMotion();
   const [wave] = useState(() => new Animated.Value(0));
   useEffect(() => {
@@ -64,7 +66,7 @@ function VoiceBars({ level, active }: { level: Animated.Value; active: boolean }
               width: 6,
               height: 30,
               borderRadius: 3,
-              backgroundColor: i % 2 ? palette.goldBright : '#7FD1A8',
+              backgroundColor: i % 2 ? theme.heroAccent : theme.heroInkSoft,
               opacity: active ? 1 : 0.35,
               transform: [{ scaleY: active && !reduce ? Animated.multiply(bounce, loud) : 0.35 }],
             }}
@@ -78,6 +80,7 @@ function VoiceBars({ level, active }: { level: Animated.Value; active: boolean }
 export default function VoiceEntry() {
   const theme = useTheme();
   const toast = useToast();
+  const leaveWhenDone = useLeaveWhenDone();
   const celebrate = useCelebrate();
   const { addTx, today } = useApp();
   const [canListen] = useState(() => speechAvailable());
@@ -142,7 +145,8 @@ export default function VoiceEntry() {
     setBusy(true);
     try {
       const time = bkkTime(new Date());
-      for (const { item } of items) {
+      let saved = 0;
+      for (const { item, key } of items) {
         await addTx({
           kind: item.kind,
           amountSatang: item.amountSatang,
@@ -157,12 +161,15 @@ export default function VoiceEntry() {
           ocrConfidence: null,
           reviewFlags: [],
         });
+        // Saved: take it off the list, so trying again after a failure never saves it twice.
+        saved += 1;
+        setRemoved((r) => new Set(r).add(key));
       }
       celebrate();
-      toast({ message: `บันทึก ${items.length} รายการแล้ว` });
-      goBack();
+      toast({ message: `บันทึก ${saved} รายการแล้ว` });
+      leaveWhenDone();
     } catch {
-      toast({ message: 'บันทึกไม่สำเร็จ ลองอีกครั้ง', tone: 'error' });
+      toast({ message: 'บันทึกบางรายการไม่สำเร็จ รายการที่เหลือยังอยู่ในรายการ ลองอีกครั้งได้', tone: 'error' });
     } finally {
       setBusy(false);
     }
@@ -221,14 +228,14 @@ export default function VoiceEntry() {
                       </Animated.View>
                     </View>
                     <VoiceBars level={level} active={listening} />
-                    <T v="body" color="#F4F1E6" center>
+                    <T v="body" color={theme.heroInk} center>
                       {listening ? 'กำลังฟัง… พูดได้เลย แล้วแตะอีกครั้งเมื่อพูดจบ' : 'แตะไมค์แล้วพูด เช่น “ข้าว 50 บาท”'}
                     </T>
                   </>
                 ) : (
                   <>
                     <Ionicons name="mic-outline" size={40} color={theme.heroAccent} />
-                    <T v="body" color="#F4F1E6" center>
+                    <T v="body" color={theme.heroInk} center>
                       เครื่องนี้ยังฟังเสียงในแอปไม่ได้ พิมพ์แบบที่พูดด้านล่างได้เลย หรือกดไมค์บนคีย์บอร์ดแล้วพูด
                     </T>
                   </>
@@ -254,27 +261,18 @@ export default function VoiceEntry() {
           {/* Type instead */}
           <View style={{ gap: space.sm }}>
             <T v="small">หรือพิมพ์แบบที่พูด</T>
-            <TextInput
-              nativeID="voice-text"
-              value={text}
-              onChangeText={changeText}
-              placeholder="เช่น ข้าว 50 น้ำ 15"
-              placeholderTextColor={theme.inkFaint}
-              accessibilityLabel="พิมพ์รายการแบบที่พูด"
-              multiline
-              style={{
-                fontFamily: fonts.sans,
-                fontSize: 16,
-                color: theme.ink,
-                backgroundColor: theme.surface,
-                borderWidth: 1,
-                borderColor: theme.line,
-                borderRadius: radius.md,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                minHeight: 52,
-              }}
-            />
+            <View style={[inputBox(theme), { paddingHorizontal: 0 }]}>
+              <TextInput
+                nativeID="voice-text"
+                value={text}
+                onChangeText={changeText}
+                placeholder="เช่น ข้าว 50 น้ำ 15"
+                placeholderTextColor={theme.inkFaint}
+                accessibilityLabel="พิมพ์รายการแบบที่พูด"
+                multiline
+                style={[inputText(theme), { paddingHorizontal: 14, minHeight: 52, textAlignVertical: 'top' }]}
+              />
+            </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }} keyboardShouldPersistTaps="handled">
               {EXAMPLES.map((e) => (
                 <Chip key={e} label={e} onPress={() => changeText(e)} />
@@ -314,9 +312,12 @@ export default function VoiceEntry() {
                           accessibilityLabel={`${item.kind === 'income' ? 'รายรับ' : 'รายจ่าย'} แตะเพื่อสลับ`}
                           hitSlop={6}
                         >
-                          <T v="h3" color={item.kind === 'income' ? theme.income : theme.ink}>
-                            {formatBaht(item.kind === 'income' ? item.amountSatang : -item.amountSatang, { sign: true })}
-                          </T>
+                          <Money
+                            satang={item.kind === 'income' ? item.amountSatang : -item.amountSatang}
+                            sign
+                            size="h3"
+                            color={item.kind === 'income' ? theme.income : theme.ink}
+                          />
                           <T v="micro" style={{ textAlign: 'right' }}>
                             {item.kind === 'income' ? 'รายรับ' : 'รายจ่าย'} ⇄
                           </T>
@@ -335,7 +336,7 @@ export default function VoiceEntry() {
             <BuddySays mood="happy">{`พูดได้หลายรายการในทีเดียว เช่น “ข้าว 50 น้ำ 15” หรือ “ได้เงินจากแม่ 500” ${BUDDY_NAME}จะแยกให้เอง`}</BuddySays>
           )}
 
-          <T v="micro" center color={theme.inkFaint}>
+          <T v="micro" center>
             เสียงถูกแปลงเป็นข้อความโดยระบบของมือถือหรือเบราว์เซอร์ MindPay เก็บเฉพาะรายการที่คุณกดบันทึก
           </T>
         </ScrollView>

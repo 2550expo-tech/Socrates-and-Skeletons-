@@ -13,7 +13,7 @@ import { BUDDY_NAME } from '../domain/buddy';
 import { goalLine, goalProgress, reservedSatang, type SavingsGoal } from '../domain/goals';
 import { formatBaht, parseBahtToSatang } from '../domain/money';
 import { BuddySays } from '../ui/Buddy';
-import { Button, Card, Chip, IconButton, Row, T } from '../ui/components';
+import { Button, Card, Chip, IconButton, Money, Row, T } from '../ui/components';
 import { Reveal, useCelebrate } from '../ui/effects';
 import { useToast } from '../ui/feedback';
 import { Field } from '../ui/inputs';
@@ -30,6 +30,7 @@ function GoalCard({ goal, index }: { goal: SavingsGoal; index: number }) {
   const { depositToGoal, today } = useApp();
   const [open, setOpen] = useState<'in' | 'out' | null>(null);
   const [custom, setCustom] = useState('');
+  const [customError, setCustomError] = useState<string | null>(null);
   const [drop, setDrop] = useState(0);
   const [busy, setBusy] = useState(false);
   const done = goal.savedSatang >= goal.targetSatang;
@@ -58,7 +59,7 @@ function GoalCard({ goal, index }: { goal: SavingsGoal; index: number }) {
 
   return (
     <Reveal index={index} zoom>
-      <Card style={{ gap: space.md, borderColor: done ? theme.accent : theme.line, borderWidth: done ? 1.5 : 1 }}>
+      <Card style={[{ gap: space.md }, done && { borderColor: theme.accent, borderWidth: 1.5 }]}>
         <Row gap={space.lg} align="center">
           <Jar progress={goalProgress(goal)} size={84} drop={drop} label={`${goal.title} ${Math.round(goalProgress(goal) * 100)}%`} />
           <View style={{ flex: 1, gap: 2 }}>
@@ -68,10 +69,10 @@ function GoalCard({ goal, index }: { goal: SavingsGoal; index: number }) {
               </T>
               <IconButton icon="create-outline" label={`แก้ ${goal.title}`} onPress={() => router.push({ pathname: '/goal', params: { id: goal.id } })} />
             </Row>
-            <T v="h2" color={theme.ink} style={{ fontVariant: ['tabular-nums'] }}>
-              {formatBaht(goal.savedSatang, { decimals: false })}
-              <T v="small">{` / ${formatBaht(goal.targetSatang, { decimals: false })}`}</T>
-            </T>
+            <Row gap={space.xs} align="flex-end">
+              <Money satang={goal.savedSatang} size="h2" decimals={false} />
+              <T v="small" style={{ paddingBottom: 3 }}>{`/ ${formatBaht(goal.targetSatang, { decimals: false })}`}</T>
+            </Row>
             <T v="small">{goalLine(goal, today)}</T>
           </View>
         </Row>
@@ -87,9 +88,25 @@ function GoalCard({ goal, index }: { goal: SavingsGoal; index: number }) {
             </Row>
             <Row gap={space.sm} align="flex-end">
               <View style={{ flex: 1 }}>
-                <Field id={`goal-custom-${goal.id}`} label="จำนวนอื่น (บาท)" value={custom} onChangeText={setCustom} keyboardType="decimal-pad" placeholder="เช่น 250" />
+                <Field
+                  id={`goal-custom-${goal.id}`}
+                  label="จำนวนอื่น (บาท)"
+                  value={custom}
+                  onChangeText={(v) => {
+                    setCustom(v);
+                    setCustomError(null);
+                  }}
+                  keyboardType="decimal-pad"
+                  placeholder="เช่น 250"
+                  error={customError}
+                />
               </View>
-              <Button label={open === 'in' ? 'หยอด' : 'ถอน'} kind={open === 'in' ? 'gold' : 'ghost'} loading={busy} onPress={() => move(parseBahtToSatang(custom) ?? 0)} />
+              <Button label={open === 'in' ? 'หยอด' : 'ถอน'} kind={open === 'in' ? 'gold' : 'ghost'} loading={busy} onPress={() => {
+                  const satang = parseBahtToSatang(custom);
+                  if (satang === null) setCustomError('ใส่จำนวนเงิน เช่น 250 หรือ 99.50');
+                  else move(satang);
+                }}
+              />
             </Row>
             <Button label="เสร็จ" kind="soft" small onPress={() => setOpen(null)} style={{ alignSelf: 'flex-start' }} />
           </View>

@@ -5,6 +5,28 @@ import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 
+
+/** PostgREST-style column filters on a GET (?status=eq.confirmed&occurred_at=lt.2026-...). */
+function matchesFilters(row, params) {
+  for (const [key, raw] of params) {
+    if (['select', 'order', 'offset', 'limit', 'on_conflict', 'columns'].includes(key)) continue;
+    const m = raw.match(/^(eq|neq|lt|lte|gt|gte|in)\.(.*)$/);
+    if (!m) continue;
+    const [, op, value] = m;
+    const v = row[key];
+    const ok =
+      op === 'eq' ? String(v) === value
+      : op === 'neq' ? String(v) !== value
+      : op === 'lt' ? v < value
+      : op === 'lte' ? v <= value
+      : op === 'gt' ? v > value
+      : op === 'gte' ? v >= value
+      : value.replace(/^\(|\)$/g, '').split(',').includes(String(v));
+    if (!ok) return false;
+  }
+  return true;
+}
+
 export const BASE_PATH = '/Socrates-and-Skeletons-';
 export const SUPA = 'https://dufvcdwswcaqsfbxjwat.supabase.co';
 export const ZXING_WASM = new URL('../node_modules/zxing-wasm/dist/reader/zxing_reader.wasm', import.meta.url).pathname;
@@ -151,7 +173,7 @@ export function createFakeSupabase() {
         changed.forEach((r) => Object.assign(r, body));
         return reply({ body: changed.length === 1 ? changed[0] : changed });
       }
-      return reply({ body: state.txRows.filter((r) => r.user_id === u.id) });
+      return reply({ body: state.txRows.filter((r) => r.user_id === u.id && matchesFilters(r, url.searchParams)) });
     }
     if (p === '/rest/v1/savings_goals') {
       const u = byToken(req.headers().authorization);

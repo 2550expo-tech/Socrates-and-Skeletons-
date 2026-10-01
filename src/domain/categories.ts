@@ -55,23 +55,56 @@ export function defaultCategory(kind: TxKind): string {
   return kind === 'income' ? 'transfer_in' : 'other_expense';
 }
 
+/** A slip counterparty that is a person ("นาย สมชาย", "MR. JOHN"). */
+const PERSON_TITLE = /^\s*(?:นาย|นางสาว|นาง|น\.ส\.|ด\.ช\.|ด\.ญ\.|mr\.?|mrs\.?|ms\.?|miss)(?:\s|$)/i;
+
 /**
- * Keywords are matched as substrings, so avoid very short Thai words:
- * "ชา" (tea) would match the name "สมชาย". A unit test (TC-25) guards this.
- *
- * Suggest a category from free text (a slip's counterparty or a title).
- * Specific shops win over the generic "person" rule, so "ร้านข้าว นายสมชาย"
- * becomes food, not a transfer to a person.
+ * Where a keyword matches and how long it is (null = no match).
+ * - Latin keywords match whole words only: "ais" is not in "PAISAN", "rent" is not in "LAURENT".
+ * - After a person title, short Thai keywords are skipped: "วิน" is not in "นาย วินัย".
+ *   (Keywords are substrings in Thai, which has no spaces between words; a unit test, TC-25, guards
+ *   against short words like "ชา" matching the name "สมชาย".)
+ */
+function findKeyword(text: string, keyword: string, person: boolean): { at: number; len: number } | null {
+  if (/^[a-z0-9 .&'-]+$/.test(keyword)) {
+    const re = new RegExp(`(^|[^a-z])(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})s?(?=[^a-z]|$)`);
+    const m = re.exec(text);
+    return m ? { at: m.index + m[1].length, len: keyword.length } : null;
+  }
+  if (person && keyword.length < 5) return null;
+  const at = text.indexOf(keyword);
+  return at < 0 ? null : { at, len: keyword.length };
+}
+
+/**
+ * Suggest a category from free text (a slip's counterparty or a title). The keyword that comes
+ * first wins ("KFC Central" is food), and the longer one where two start together ("ร้านยา" is
+ * health, not the "ร้าน" of food; "mini big c" is convenience, not the "big c" of shopping).
+ * Specific shops win over the generic "person" rule, so "ร้านข้าว นายสมชาย" becomes food, not a
+ * transfer to a person.
  */
 export function suggestCategory(text: string | null | undefined, kind: TxKind): string {
   if (!text) return defaultCategory(kind);
   const t = text.toLowerCase();
-  const pool = categoriesFor(kind);
-  const specific = pool.filter((c) => c.key !== 'transfer_out');
-  for (const c of specific) if (c.keywords.some((k) => t.includes(k))) return c.key;
+  const person = PERSON_TITLE.test(t);
+  let best: string | null = null;
+  let bestAt = Infinity;
+  let bestLen = 0;
+  for (const c of categoriesFor(kind)) {
+    if (c.key === 'transfer_out') continue;
+    for (const k of c.keywords) {
+      const m = findKeyword(t, k, person);
+      if (m && (m.at < bestAt || (m.at === bestAt && m.len > bestLen))) {
+        best = c.key;
+        bestAt = m.at;
+        bestLen = m.len;
+      }
+    }
+  }
+  if (best) return best;
   if (kind === 'expense') {
-    const person = BY_KEY.get('transfer_out')!;
-    if (person.keywords.some((k) => t.includes(k))) return person.key;
+    const persons = BY_KEY.get('transfer_out')!;
+    if (person || persons.keywords.some((k) => t.includes(k))) return persons.key;
   }
   return defaultCategory(kind);
 }

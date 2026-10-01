@@ -38,6 +38,8 @@ export async function processSlipImage(opts: {
   requireQr: boolean;
   range: { from: string; to: string };
   index: DuplicateIndex;
+  /** Checked right before saving: false when the account changed meanwhile (nothing is saved then). */
+  stillValid?: () => boolean;
   repo: Repo;
   autoConfirm: boolean;
   /** Used as the transaction time when the slip date could not be read. */
@@ -74,6 +76,7 @@ export async function processSlipImage(opts: {
   if (c.amountSatang === null) return { status: 'failed', label, message: 'อ่านยอดเงินไม่ได้ ลองจดรายการนี้เอง' };
 
   const status = initialStatus(outcome, opts.autoConfirm);
+  if (opts.stillValid && !opts.stillValid()) throw new SlipReaderError('cancelled', 'หยุดอ่านสลิปแล้ว');
   try {
     const tx = await opts.repo.insert({
       kind: c.kind,

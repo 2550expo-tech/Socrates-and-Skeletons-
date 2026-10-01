@@ -323,23 +323,26 @@ export type SlipOutcome = 'ready' | 'needs_review' | 'duplicate' | 'out_of_range
 export interface DuplicateIndex {
   refs: Set<string>;
   hashes: Set<string>;
-  composite: Set<string>;
+  /** Amount + day + minute -> the payees seen with it ('' = none read). */
+  composite: Map<string, Set<string>>;
 }
 
-/** Amount + day + minute + counterparty. Only used when a slip has no reference. */
-export function compositeKey(p: {
-  amountSatang: number | null;
-  dayKey: string | null;
-  time: string | null;
-  counterparty: string | null;
-}): string | null {
+/** Titles the app gives a slip when no payee was read: they say nothing about who was paid. */
+const NO_PAYEE_TITLES = new Set(['รายการจากสลิป', 'โอนระหว่างบัญชีตัวเอง']);
+
+const payeeKey = (who: string | null | undefined) => {
+  const w = (who ?? '').toLowerCase().replace(/\s+/g, '');
+  return NO_PAYEE_TITLES.has(w) ? '' : w;
+};
+
+/** Amount + day + minute, the part of the duplicate check that must always match. */
+export function compositeKey(p: { amountSatang: number | null; dayKey: string | null; time: string | null }): string | null {
   if (!p.amountSatang || !p.dayKey || !p.time) return null;
-  const who = (p.counterparty ?? '').toLowerCase().replace(/\s+/g, '');
-  return `${p.amountSatang}|${p.dayKey}|${p.time}|${who}`;
+  return `${p.amountSatang}|${p.dayKey}|${p.time}`;
 }
 
 export function buildDuplicateIndex(existing: Transaction[]): DuplicateIndex {
-  const idx: DuplicateIndex = { refs: new Set(), hashes: new Set(), composite: new Set() };
+  const idx: DuplicateIndex = { refs: new Set(), hashes: new Set(), composite: new Map() };
   for (const t of existing) addToIndex(idx, t);
   return idx;
 }
@@ -355,18 +358,29 @@ export function addToIndex(
       amountSatang: t.amountSatang,
       dayKey: bkkDayKey(t.occurredAt),
       time: new Date(new Date(t.occurredAt).getTime() + 7 * 3600e3).toISOString().slice(11, 16),
-      counterparty: t.title,
     });
-    if (key) idx.composite.add(key);
+    if (!key) return;
+    const who = idx.composite.get(key) ?? new Set<string>();
+    who.add(payeeKey(t.title));
+    idx.composite.set(key, who);
   }
 }
 
+/**
+ * The same slip seen again: same reference, same image, or (for slips without a reference) the
+ * same amount, day and minute with the same payee. A payee missing on either side still matches,
+ * since the saved title may be the app's own "รายการจากสลิป".
+ */
 export function isDuplicate(c: SlipCandidate, idx: DuplicateIndex): boolean {
   if (c.ref && idx.refs.has(c.ref)) return true;
   if (c.imageHash && idx.hashes.has(c.imageHash)) return true;
   if (!c.ref) {
     const key = compositeKey(c);
-    if (key && idx.composite.has(key)) return true;
+    const seen = key ? idx.composite.get(key) : undefined;
+    if (seen) {
+      const who = c.ownTransfer ? '' : payeeKey(c.counterparty);
+      if (!who || seen.has('') || seen.has(who)) return true;
+    }
   }
   return false;
 }

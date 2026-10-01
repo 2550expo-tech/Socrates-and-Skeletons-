@@ -13,7 +13,7 @@ import { useApp } from '../data/AppProvider';
 import { supabase } from '../data/supabase';
 import { useAutoScan } from '../services/AutoScanProvider';
 import { forgetScanned } from '../services/slips';
-import { formatSatang, parseBahtToSatang } from '../domain/money';
+import { amountToInput, parseBahtToSatang } from '../domain/money';
 import { Button, Card, IconButton, Ionicons, Row, Segmented, T } from '../ui/components';
 import { setKlaSound, useKlaSound } from '../ui/kla/useKlaTalk';
 import { ThemePicker } from '../ui/ThemePicker';
@@ -39,14 +39,15 @@ export default function Settings() {
   const themeMode = useThemeMode();
   const klaSound = useKlaSound();
   const [name, setName] = useState(profile?.displayName ?? '');
-  const [opening, setOpening] = useState(formatSatang(profile?.openingBalanceSatang ?? 0, { decimals: false }).replace(/,/g, ''));
-  const [floor, setFloor] = useState(formatSatang(profile?.runwayFloorSatang ?? 50_000, { decimals: false }).replace(/,/g, ''));
-  const [budget, setBudget] = useState(profile?.monthlyBudgetSatang ? String(profile.monthlyBudgetSatang / 100) : '');
+  const [opening, setOpening] = useState(amountToInput(profile?.openingBalanceSatang ?? 0));
+  const [floor, setFloor] = useState(amountToInput(profile?.runwayFloorSatang ?? 50_000));
+  const [budget, setBudget] = useState(amountToInput(profile?.monthlyBudgetSatang));
   const [busy, setBusy] = useState(false);
   const [askOut, setAskOut] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const money = (s: string) => (s.trim() === '0' ? 0 : parseBahtToSatang(s));
+  // Satang are kept (the fields show them), and ฿0 is a fine balance or reserve.
+  const money = (s: string) => parseBahtToSatang(s, { allowZero: true });
 
   async function save() {
     const e: Record<string, string> = {};
@@ -115,7 +116,8 @@ export default function Settings() {
                 <Switch
                   value={auto.prefs.autoScan}
                   onValueChange={(v) => auto.setPrefs({ autoScan: v })}
-                  trackColor={{ true: theme.primary, false: theme.line }}
+                  trackColor={{ true: theme.primary, false: theme.inkFaint }}
+                  ios_backgroundColor={theme.inkFaint}
                   accessibilityLabel="หาสลิปใหม่ทุกครั้งที่เปิดแอป"
                 />
               </Row>
@@ -127,7 +129,8 @@ export default function Settings() {
                 <Switch
                   value={auto.prefs.autoConfirm}
                   onValueChange={(v) => auto.setPrefs({ autoConfirm: v })}
-                  trackColor={{ true: theme.primary, false: theme.line }}
+                  trackColor={{ true: theme.primary, false: theme.inkFaint }}
+                  ios_backgroundColor={theme.inkFaint}
                   accessibilityLabel="รวมยอดทันทีเมื่ออ่านชัด"
                 />
               </Row>
@@ -144,7 +147,8 @@ export default function Settings() {
               <Switch
                 value={klaSound}
                 onValueChange={setKlaSound}
-                trackColor={{ true: theme.primary, false: theme.line }}
+                trackColor={{ true: theme.primary, false: theme.inkFaint }}
+                  ios_backgroundColor={theme.inkFaint}
                 accessibilityLabel="เสียงน้องกล้า"
               />
             </Row>

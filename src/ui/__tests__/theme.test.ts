@@ -31,6 +31,32 @@ describe('TC-78 colour themes stay readable', () => {
     }
   }
 
+  for (const spec of COLOR_THEMES) {
+    for (const dark of [false, true]) {
+      it(`${spec.key} ${dark ? 'dark' : 'light'}: every text colour reads on the background it is used on`, () => {
+        const t = buildTheme(spec.key, dark);
+        const pairs: [string, string, string][] = [
+          ['inkSoft on bg', t.inkSoft, t.bg],
+          ['inkSoft on surface', t.inkSoft, t.surface],
+          ['onPrimary on primary', t.onPrimary, t.primary],
+          ['onAccent on accent', t.onAccent, t.accent],
+          ['accentInk on surface', t.accentInk, t.surface],
+          ['accentInk on accentSoft', t.accentInk, t.accentSoft],
+          ['good on goodSoft', t.good, t.goodSoft],
+          ['watch on watchSoft', t.watch, t.watchSoft],
+          ['critical on criticalSoft', t.critical, t.criticalSoft],
+          ['good on bg', t.good, t.bg],
+          ['watch on bg', t.watch, t.bg],
+          ['critical on bg', t.critical, t.bg],
+          ['heroInkSoft on hero', t.heroInkSoft, t.hero],
+          ['heroInk on heroTop', t.heroInk, t.heroTop],
+        ];
+        const low = pairs.filter(([, a, b]) => contrast(a, b) < 4.5).map(([n, a, b]) => `${n} ${contrast(a, b).toFixed(2)}`);
+        expect(low).toEqual([]);
+      });
+    }
+  }
+
   it('the Halloween theme is one of the choices', () => {
     expect(COLOR_THEMES.map((t) => t.key)).toContain('halloween');
   });

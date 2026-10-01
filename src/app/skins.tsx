@@ -7,7 +7,7 @@
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../data/AppProvider';
 import { missionForSkin } from '../domain/missions';
@@ -120,7 +120,7 @@ export default function Skins() {
                 <Row justify="space-between">
                   <Row gap={space.sm}>
                     <PumpkinArt size={30} />
-                    <T v="h3" color="#F4F1E6">
+                    <T v="h3" color={theme.heroInk}>
                       ฮาโลวีน 2569
                     </T>
                   </Row>
@@ -239,7 +239,7 @@ function SkinAction({
       <View style={{ alignSelf: 'stretch', gap: 6, marginTop: space.xs, backgroundColor: 'rgba(0,0,0,0.18)', borderRadius: radius.md, padding: space.md }}>
         <Row gap={6}>
           <CandyArt size={18} />
-          <T v="small" color="#F4F1E6" style={{ flex: 1, fontFamily: fonts.sansSemi }}>
+          <T v="small" color={theme.heroInk} style={{ flex: 1, fontFamily: fonts.sansSemi }}>
             สะสมลูกอม {state.need} เม็ดเพื่อปลดล็อก
           </T>
           <T v="small" color={theme.heroAccent}>
@@ -259,7 +259,7 @@ function SkinAction({
       <View style={{ alignSelf: 'stretch', gap: 6, marginTop: space.xs, backgroundColor: 'rgba(0,0,0,0.18)', borderRadius: radius.md, padding: space.md }}>
         <Row gap={6}>
           <Ionicons name="lock-closed" size={16} color={theme.heroAccent} />
-          <T v="small" color="#F4F1E6" style={{ flex: 1, fontFamily: fonts.sansSemi }}>
+          <T v="small" color={theme.heroInk} style={{ flex: 1, fontFamily: fonts.sansSemi }}>
             ปลดล็อก: {mission.how}
           </T>
           <T v="small" color={theme.heroAccent}>
@@ -279,7 +279,7 @@ function SkinAction({
     <View style={{ alignSelf: 'stretch', gap: 4, marginTop: space.xs, backgroundColor: 'rgba(0,0,0,0.18)', borderRadius: radius.md, padding: space.md }}>
       <Row gap={6}>
         <Ionicons name={state.kind === 'limited_ended' ? 'time-outline' : 'sparkles'} size={16} color={theme.heroAccent} />
-        <T v="small" color="#F4F1E6" style={{ flex: 1, fontFamily: fonts.sansSemi }}>
+        <T v="small" color={theme.heroInk} style={{ flex: 1, fontFamily: fonts.sansSemi }}>
           {skinStatusLine(skin, state)}
         </T>
       </Row>
@@ -337,7 +337,7 @@ function SkinCard({
         aria-selected={picked}
         style={({ pressed }) => ({
           borderRadius: radius.lg,
-          borderWidth: picked ? 2 : 1,
+          borderWidth: picked ? 2 : StyleSheet.hairlineWidth,
           borderColor: picked ? theme.accent : theme.line,
           backgroundColor: theme.surface,
           paddingTop: 2,
@@ -354,10 +354,8 @@ function SkinCard({
           <KlaPicture skin={skin.id} mood={locked ? 'calm' : 'happy'} width={76} onDark={theme.dark} extras={false} />
         </View>
         {skin.kind === 'limited' ? (
-          <View style={{ position: 'absolute', top: 6, left: 6, backgroundColor: theme.dark ? '#3A2C12' : '#FFF3D6', borderRadius: radius.pill, paddingHorizontal: 6, paddingVertical: 1 }}>
-            <T v="micro" color={theme.dark ? theme.accent : '#7A5A0E'} style={{ fontSize: 10, lineHeight: 14 }}>
-              ลิมิเต็ด
-            </T>
+          <View style={{ position: 'absolute', top: 6, left: 6 }}>
+            <Badge label="ลิมิเต็ด" tone="gold" />
           </View>
         ) : null}
         {locked ? (
@@ -373,7 +371,7 @@ function SkinCard({
             <GrowBar value={progress.value / progress.target} color={theme.primary} track={theme.surfaceAlt} height={5} />
           </View>
         ) : null}
-        <T v="micro" center color={worn ? theme.primary : theme.inkFaint} numberOfLines={1}>
+        <T v="micro" center color={worn ? theme.primary : theme.inkSoft} numberOfLines={1}>
           {worn ? '✓ ' : ''}
           {label}
         </T>

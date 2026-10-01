@@ -2,10 +2,12 @@
 // CONFIRMED numbers in one calm, friendly voice; the app reads the answer
 // aloud, so it is written to be spoken. The app sends only totals by category
 // (no slip images, no names of people, no account numbers).
-import { aiProvider, BusyError, callAI, corsHeaders, fail, json, NotConfiguredError, requireUser, takeQuota } from '../_shared/common.ts';
+import { aiProvider, BusyError, callAI, corsHeaders, envLimit, fail, json, NotConfiguredError, requireUser, takeQuota } from '../_shared/common.ts';
 import { plainText } from '../_shared/helpers.ts';
 
-const DAILY_LIMIT = Number(Deno.env.get('COACH_DAILY_LIMIT') ?? '60');
+const DAILY_LIMIT = envLimit('COACH_DAILY_LIMIT', 60);
+/** A question and a summary of totals: far below this. */
+const MAX_BODY_BYTES = 64_000;
 
 const SYSTEM = `You are น้องกล้า (Nong Kla), the mascot of MindPay, a Thai personal finance app for students and first-jobbers.
 You are a small golden money-tree sapling and the user's personal money coach.
@@ -30,12 +32,14 @@ Deno.serve(async (req) => {
   const userId = await requireUser(req);
   if (!userId) return fail('unauthorized', 'Sign in again', 401);
 
+  if (Number(req.headers.get('content-length') ?? 0) > MAX_BODY_BYTES) return fail('too_large', 'Request is too large', 413);
   let body: { context?: unknown; question?: string };
   try {
     body = await req.json();
   } catch {
     return fail('bad_request', 'Body must be JSON', 400);
   }
+  if (!body || typeof body !== 'object') return fail('bad_request', 'Body must be a JSON object', 400);
   const question = (body.question ?? '').toString().slice(0, 400).trim();
   const data = JSON.stringify(body.context ?? {}).slice(0, 6000);
 

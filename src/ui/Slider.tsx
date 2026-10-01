@@ -152,7 +152,7 @@ export function Slider({
       {ticks ? (
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 }}>
           {ticks.map((t) => (
-            <T key={t} v="micro" color={t === value ? theme.ink : theme.inkFaint}>
+            <T key={t} v="micro" color={t === value ? theme.ink : theme.inkSoft}>
               {format(t)}
             </T>
           ))}

@@ -18,6 +18,13 @@ import { HeaderDecor } from '../ui/halloween';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
+/** Tabs already sit under this screen: go back to them (pushing would open a second set of tabs). */
+const TAB_ROUTES = new Set(['/', '/coach', '/runway', '/transactions']);
+function openFeature(href: Href) {
+  if (typeof href === 'string' && TAB_ROUTES.has(href)) router.dismissTo(href);
+  else router.push(href);
+}
+
 const FEATURES: { icon: IconName; colors: [string, string]; title: string; body: string; action?: { label: string; href: Href } }[] = [
   {
     icon: 'moon',
@@ -137,7 +144,7 @@ export default function WhatsNew() {
                 </View>
               </Row>
               {f.action ? (
-                <Button label={f.action.label} kind="soft" small icon="arrow-forward" onPress={() => router.push(f.action!.href)} style={{ alignSelf: 'flex-end' }} />
+                <Button label={f.action.label} kind="soft" small icon="arrow-forward" onPress={() => openFeature(f.action!.href)} style={{ alignSelf: 'flex-end' }} />
               ) : null}
             </Card>
           </Reveal>

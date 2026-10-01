@@ -42,7 +42,8 @@ const NUMBER_WORDS_RE = new RegExp(`(?:${NUMBER_WORD})+`, 'g');
 
 /**
  * "ห้าสิบ" -> 50, "ยี่สิบห้า" -> 25, "หนึ่งร้อยห้า" -> 105, "ร้อยห้า" -> 150 (spoken short form),
- * "สองพันห้า" -> 2500, "ร้อยครึ่ง" -> 150, "พันนึง" -> 1000. Returns null when it is not a number.
+ * "สองพันห้า" -> 2500, "ร้อยครึ่ง" -> 150, "พันนึง" -> 1000, "ร้อยหนึ่ง" -> 101, "ยี่สิบนึง" -> 21.
+ * Returns null when it is not a number.
  */
 export function thaiNumberWords(words: string): number | null {
   const tokens = words.match(new RegExp(NUMBER_WORD, 'g'));
@@ -53,11 +54,14 @@ export function thaiNumberWords(words: string): number | null {
   let lastMultiplier = 0;
   let startsWithDigit = false;
   let digitRightAfterMultiplier = false;
+  let digitWord = '';
   tokens.forEach((tok, i) => {
     if (tok in DIGIT_WORDS) {
-      // "นึง" right after a multiplier means "one of it" ("ร้อยนึง" = 100), not another digit.
-      if (tok === 'นึง' && lastMultiplier && i === tokens.length - 1) return;
+      // "นึง" right after ร้อย or more means "one of it" ("ร้อยนึง" = 100), not another digit
+      // (after สิบ it is a digit: "ยี่สิบนึง" = 21).
+      if (tok === 'นึง' && lastMultiplier >= 100 && i === tokens.length - 1) return;
       digit = DIGIT_WORDS[tok];
+      digitWord = tok;
       if (i === 0) startsWithDigit = true;
       digitRightAfterMultiplier = i > 0 && tokens[i - 1] in MULTIPLIERS;
     } else if (tok === 'ครึ่ง') {
@@ -76,7 +80,9 @@ export function thaiNumberWords(words: string): number | null {
   });
   if (digit !== null) {
     // Spoken short form: "สองพันห้า" = 2,500 and "ร้อยห้า" = 150 (but "หนึ่งร้อยห้า" = 105).
-    const short = digitRightAfterMultiplier && (lastMultiplier >= 1000 || (lastMultiplier === 100 && !startsWithDigit));
+    // A trailing one is never short: "ร้อยหนึ่ง" / "ร้อยเอ็ด" = 101.
+    const one = digitWord === 'หนึ่ง' || digitWord === 'เอ็ด' || digitWord === 'นึง';
+    const short = !one && digitRightAfterMultiplier && (lastMultiplier >= 1000 || (lastMultiplier === 100 && !startsWithDigit));
     total += short ? digit * (lastMultiplier / 10) : digit;
   }
   return millions + total;
@@ -88,10 +94,16 @@ export function thaiNumberWords(words: string): number | null {
 
 /** Words after a number that make it a quantity, not money ("ข้าว 2 จาน"). */
 const UNIT = 'จาน|แก้ว|ขวด|ชิ้น|อัน|ห่อ|ถุง|กล่อง|ลูก|คน|ที่|ตัว|คู่|เล่ม|ใบ|ครั้ง|โมง|นาที|ชั่วโมง|วัน|เดือน|ปี|กิโล|กก\\.?|ลิตร|ชาม|ถ้วย|เม็ด|แผ่น|ซอง|แพ็ค|หลอด|คัน|รอบ';
-const INCOME_WORDS = ['ได้เงิน', 'ได้รับ', 'รับเงิน', 'เงินเข้า', 'เงินเดือน', 'ค่าจ้าง', 'แม่ให้', 'พ่อให้', 'โอนมาให้', 'โอนเข้า', 'รายรับ', 'รายได้', 'ขายของได้', 'ได้ค่าขนม', 'ได้ค่า', 'คืนเงิน', 'เงินคืน'];
-const CONNECTORS = /^(?:และ|กับ|แล้วก็|แล้ว|ก็|อีก|ต่อ|,|\+)+\s*/;
-/** Polite endings at the end of a word ("บาทครับ"); a lone "นะ" only as its own word (so "ชนะ" stays). */
-const POLITE = /(?:นะคะ|นะครับ|ครับผม|ครับ|คับ|ค่ะ|คะ|จ้ะ|จ้า)(?=\s|$)/g;
+const INCOME_WORDS = ['ได้เงิน', 'ได้รับ', 'รับเงิน', 'เงินเข้า', 'เงินเดือน', 'ค่าจ้าง', 'แม่ให้', 'พ่อให้', 'โอนมาให้', 'โอนเข้า', 'รายรับ', 'รายได้', 'ขายของได้', 'ได้ค่าขนม', 'ได้ค่า', 'ได้เงินคืน', 'เงินคืน'];
+/** Paying words win over income words: "จ่ายค่าจ้างช่างแอร์" is spending, "คืนเงินเพื่อน" is paying back. */
+const PAYING = /จ่าย|ซื้อ|คืนเงิน|โอนให้|โอนไป/;
+// "กับข้าว" (side dishes) and "ต่อเติม" are words, not "and" + something.
+const CONNECTORS = /^(?:และ|กับ(?!ข้าว|แกล้ม)|แล้วก็|แล้ว|ก็|อีก|ต่อ(?!เติม|ภาษี|ทะเบียน)|,|\+)+\s*/;
+/**
+ * Polite endings at the end of a word ("บาทครับ"); a lone "นะ" only as its own word (so "ชนะ" stays).
+ * Not after a leading vowel, where the letters belong to a word: "ข้าวเจ้า" keeps its "จ้า".
+ */
+const POLITE = /(^|[^เแโใไ])(?:นะคะ|นะครับ|ครับผม|ครับ|คับ|ค่ะ|คะ|จ้ะ|จ้า)(?=\s|$)/g;
 const LONE_NA = /\sนะ(?=\s|$)/g;
 
 /** Spoken things and their category (longest match wins: "ค่าน้ำ" is a bill, "น้ำ" is a drink). */
@@ -122,7 +134,7 @@ export function spokenCategory(title: string, kind: TxKind): string {
 function cleanTitle(raw: string, kind: TxKind): string {
   let t = raw.trim().replace(CONNECTORS, '').replace(/\s+/g, ' ').trim();
   t = t.replace(/^(?:ซื้อ|จ่ายเงิน|จ่าย(?=ค่า)|จ่าย|กิน|เติม(?!เงิน))\s*/, '');
-  if (kind === 'income') t = t.replace(/^(?:ได้รับ|ได้เงิน|ได้|รับ)\s*/, '').replace(/^จาก/, 'เงินจาก');
+  if (kind === 'income') t = t.replace(/^ได้เงินคืน/, 'เงินคืน').replace(/^(?:ได้รับ|ได้เงิน|ได้|รับ)\s*/, '').replace(/^จาก/, 'เงินจาก');
   t = t.replace(/\s*(?:บาท|บ\.)$/, '').trim();
   return t;
 }
@@ -131,8 +143,13 @@ function cleanTitle(raw: string, kind: TxKind): string {
 // Whole sentence
 // ---------------------------------------------------------------------------
 
-/** Numbers as digits: Thai digits, number words, "5 ร้อย", "2k", "1,250". */
-export function normalizeSpoken(text: string): { text: string; dayOffset: number } {
+const DIGIT_NAMES = ['ศูนย์', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'];
+/** Day words become these markers while parsing, so each item keeps its own day. */
+const DAY_MARK = { '-2': ' §วานซืน§ ', '-1': ' §วาน§ ', '0': ' §วันนี้§ ' } as const;
+const DAY_MARK_RE = /§(วานซืน|วาน|วันนี้)§/g;
+const markOffset = (m: string) => (m === 'วานซืน' ? -2 : m === 'วาน' ? -1 : 0);
+
+function normalizeMarked(text: string): string {
   let t = ` ${text} `
     .replace(/[๐-๙]/g, (d) => String('๐๑๒๓๔๕๖๗๘๙'.indexOf(d)))
     .toLowerCase()
@@ -141,16 +158,26 @@ export function normalizeSpoken(text: string): { text: string; dayOffset: number
     .replace(/[!?,]/g, ' ')
     .replace(/฿\s*(\d)/g, '$1')
     .replace(/(\d)\s*฿/g, '$1 บาท ')
-    .replace(/7\s*-?\s*(?:eleven|11)|เซเว่นอีเลฟเว่น|เซเว่น/g, 'เซเว่น')
-    .replace(POLITE, ' ')
+    // 7-Eleven, but never the "711" inside an amount ("ค่าไฟ 711", "1711").
+    .replace(/(^|[^\d.,])7\s*-\s*11(?!\d)|(^|[^\d.,])7\s*-?\s*eleven/g, (_, a?: string, b?: string) => `${a ?? b ?? ''}เซเว่น`)
+    .replace(/เซเว่นอีเลฟเว่น|เซเว่น/g, 'เซเว่น')
+    .replace(POLITE, '$1 ')
     .replace(LONE_NA, ' ');
-  let dayOffset = 0;
-  if (/เมื่อวานซืน/.test(t)) dayOffset = -2;
-  else if (/เมื่อวาน/.test(t)) dayOffset = -1;
-  t = t.replace(/เมื่อวานซืน|เมื่อวานนี้|เมื่อวาน|วันนี้|ตอนนี้/g, ' ');
+  t = t
+    .replace(/เมื่อวานซืน/g, DAY_MARK['-2'])
+    .replace(/เมื่อวานนี้|เมื่อวาน/g, DAY_MARK['-1'])
+    .replace(/วันนี้|ตอนนี้/g, DAY_MARK['0']);
   // "2k", "2 เค" -> 2000
   t = t.replace(/(\d+(?:\.\d+)?)\s*(?:k|เค)(?=\s|$|บาท)/g, (_, n: string) => String(Math.round(Number(n) * 1000)));
-  // "5 ร้อย", "1.5 พัน", "2 พันครึ่ง" -> digits
+  // One digit before a multiplier joins the number words after it: "2 พันห้า" = สองพันห้า = 2,500,
+  // "5 ร้อยห้าสิบ" = 550.
+  t = t.replace(/(^|[^\d.])(\d)\s*(?=สิบ|ร้อย|พัน|หมื่น|แสน|ล้าน)/g, (_, pre: string, d: string) => `${pre}${DIGIT_NAMES[Number(d)]}`);
+  // "สามพัน สองร้อย" is one number when the second part is smaller: 3,200.
+  t = t.replace(
+    new RegExp(`(สิบ|ร้อย|พัน|หมื่น|แสน|ล้าน)\\s+(?=(?:${Object.keys(DIGIT_WORDS).join('|')})(สิบ|ร้อย|พัน|หมื่น|แสน))`, 'g'),
+    (m, a: string, next: string) => (MULTIPLIERS[next] < MULTIPLIERS[a] ? a : m),
+  );
+  // "15 ร้อย", "1.5 พัน", "2 พันครึ่ง" -> digits
   t = t.replace(/(\d+(?:\.\d+)?)\s*(สิบ|ร้อย|พัน|หมื่น|แสน|ล้าน)(\s*ครึ่ง)?/g, (_, n: string, w: string, half?: string) => {
     const m = MULTIPLIERS[w];
     return ` ${Math.round(Number(n) * m + (half ? m / 2 : 0))} `;
@@ -169,12 +196,20 @@ export function normalizeSpoken(text: string): { text: string; dayOffset: number
     if (!alone && !money && !(endsHere && multiPart)) return words;
     return ` ${n} `;
   });
-  return { text: t.replace(/\s+/g, ' ').trim(), dayOffset };
+  return t.replace(/\s+/g, ' ').trim();
+}
+
+/** Numbers as digits: Thai digits, number words, "5 ร้อย", "2k", "1,250". dayOffset = the first day word said. */
+export function normalizeSpoken(text: string): { text: string; dayOffset: number } {
+  const marked = normalizeMarked(text);
+  const first = marked.match(/§(วานซืน|วาน|วันนี้)§/);
+  return { text: marked.replace(DAY_MARK_RE, ' ').replace(/\s+/g, ' ').trim(), dayOffset: first ? markOffset(first[1]) : 0 };
 }
 
 /** Understand one spoken (or typed) sentence. Items with no amount are left out. */
 export function parseSpokenEntry(input: string): SpokenEntry {
-  const { text, dayOffset } = normalizeSpoken(input);
+  const text = normalizeMarked(input);
+  const marks = [...text.matchAll(DAY_MARK_RE)].map((m) => ({ at: m.index ?? 0, offset: markOffset(m[1]) }));
   // A number, whole (never part of a longer one), not followed by a unit word ("2 จาน").
   const amountRe = new RegExp(`(\\d+(?:\\.\\d{1,2})?)(?![\\d.])(?!\\s*(?:${UNIT})(?![ก-๙]))(?:\\s*(?:บาท|บ\\.))?(?:\\s*(\\d{1,2})\\s*สตางค์)?`, 'g');
   const found: { start: number; end: number; satang: number }[] = [];
@@ -187,24 +222,30 @@ export function parseSpokenEntry(input: string): SpokenEntry {
     if (satang <= 0 || satang >= 1_000_000_000) continue;
     found.push({ start: m.index ?? 0, end: (m.index ?? 0) + m[0].length, satang });
   }
+  const bare = (s: string) => s.replace(DAY_MARK_RE, ' ').trim().replace(CONNECTORS, '').trim();
+  // Amounts said first ("50 บาท ค่าข้าว 30 บาท ค่าน้ำ"): every title comes after its amount.
+  const amountFirst = found.length > 0 && !bare(text.slice(0, found[0].start));
   const items: SpokenItem[] = [];
   found.forEach((f, i) => {
-    let title = text.slice(i === 0 ? 0 : found[i - 1].end, f.start);
-    // Amount said first ("50 บาท ค่าข้าว"): take the words after it instead.
-    if (!title.trim().replace(CONNECTORS, '').trim() && (i === found.length - 1 || found.length === 1)) {
-      title = text.slice(f.end, found[i + 1]?.start ?? text.length);
-    }
+    let title = amountFirst
+      ? text.slice(f.end, found[i + 1]?.start ?? text.length)
+      : text.slice(i === 0 ? 0 : found[i - 1].end, f.start);
+    // Only the last amount has nothing before it ("ข้าว 50 บาท 30 ค่าน้ำ"): take the words after it.
+    if (!amountFirst && !bare(title) && i === found.length - 1) title = text.slice(f.end);
+    title = title.replace(DAY_MARK_RE, ' ');
     const lower = title.toLowerCase();
-    const kind: TxKind = INCOME_WORDS.some((w) => lower.includes(w)) ? 'income' : 'expense';
+    const kind: TxKind = !PAYING.test(lower) && INCOME_WORDS.some((w) => lower.includes(w)) ? 'income' : 'expense';
     const clean = cleanTitle(title, kind);
     const categoryKey = spokenCategory(clean, kind);
+    // The day said last before this item's amount; if none was said before it, the first one said.
+    const before = marks.filter((m) => m.at < f.end).pop();
     items.push({
       title: clean || getCategory(categoryKey).label,
       amountSatang: f.satang,
       kind,
       categoryKey,
-      dayOffset,
+      dayOffset: before?.offset ?? marks[0]?.offset ?? 0,
     });
   });
-  return { items, heard: text };
+  return { items, heard: text.replace(DAY_MARK_RE, ' ').replace(/\s+/g, ' ').trim() };
 }

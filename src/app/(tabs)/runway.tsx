@@ -84,18 +84,18 @@ export default function RunwayScreen() {
             </ProgressRing>
             {runway.status === 'no_spending' ? (
               <>
-                <T v="h2" color="#F4F1E6" center>ยังคำนวณไม่ได้</T>
+                <T v="h2" color={theme.heroInk} center>ยังคำนวณไม่ได้</T>
                 <T v="small" color={theme.heroInkSoft} center>ไม่มีรายจ่ายที่ยืนยันใน {RUNWAY_WINDOW_DAYS} วันล่าสุด จึงยังหาค่าเฉลี่ยไม่ได้</T>
               </>
             ) : runway.status === 'below_floor' ? (
               <>
-                <T v="h2" color="#F4F1E6" center>ยอดเงินแตะเส้นสำรองแล้ว</T>
+                <T v="h2" color={theme.heroInk} center>ยอดเงินแตะเส้นสำรองแล้ว</T>
                 <T v="small" color={theme.heroInkSoft} center>คงเหลือ {formatBaht(balance)} · เส้นสำรอง {formatBaht(runway.floorSatang, { decimals: false })}</T>
               </>
             ) : (
               <>
                 <T v="display" color={theme.heroAccent}>{runway.capped ? '365+' : daysShown}</T>
-                <T v="h3" color="#F4F1E6" center>วัน · ถึงประมาณ {formatThaiDay(runway.depletionDay!)}</T>
+                <T v="h3" color={theme.heroInk} center>วัน · ถึงประมาณ {formatThaiDay(runway.depletionDay!)}</T>
               </>
             )}
             <Badge
@@ -177,7 +177,7 @@ export default function RunwayScreen() {
           <T v="h3">ลองปรับ: ถ้าใช้น้อยลงวันละ</T>
           <Row gap={space.md} align="center">
             <View style={{ flex: 1, gap: 2 }}>
-              <T v="display" color={reduce ? theme.primary : theme.inkFaint} style={{ fontVariant: ['tabular-nums'] }}>
+              <T v="display" color={reduce ? theme.primary : theme.inkSoft} style={{ fontVariant: ['tabular-nums'] }}>
                 {reduce}%
               </T>
               <T v="small">
@@ -239,7 +239,7 @@ export default function RunwayScreen() {
               kind="soft"
               small
               icon="chatbubble-ellipses-outline"
-              onPress={() => router.navigate({ pathname: '/coach', params: { ask: `ถ้าฉันซื้อของราคา ${formatBaht(priceSatang!, { decimals: false })} วันนี้ จะเป็นยังไง` , price: String(priceSatang) } })}
+              onPress={() => router.navigate({ pathname: '/coach', params: { ask: `ถ้าฉันซื้อของราคา ${formatBaht(priceSatang!, { decimals: false })} วันนี้ จะเป็นยังไง` , price: String(priceSatang), at: String(Date.now()) } })}
             />
           </View>
         ) : null}

@@ -32,17 +32,27 @@ export interface GalleryImage {
 /**
  * Photos created since `sinceMs`, newest first. Landscape photos are skipped:
  * bank slips are always portrait, which removes most camera photos cheaply.
+ * Read page by page, so a busy gallery is not cut off at the newest few hundred.
  */
-export async function findGalleryImages(sinceMs: number, max = 3000): Promise<GalleryImage[]> {
-  const rows = await new Query()
-    .eq(AssetField.MEDIA_TYPE, MediaType.IMAGE)
-    .gte(AssetField.CREATION_TIME, sinceMs)
-    .orderBy({ key: AssetField.CREATION_TIME, ascending: false })
-    .limit(max)
-    .exeForMetadata();
-  return rows
-    .filter((r) => !r.width || !r.height || r.height >= r.width * 1.1)
-    .map((r) => ({ assetId: r.id, createdAt: r.creationTime ?? sinceMs, width: r.width, height: r.height }));
+export async function findGalleryImages(sinceMs: number, max = 20000): Promise<GalleryImage[]> {
+  const PAGE = 1000;
+  const out: GalleryImage[] = [];
+  for (let offset = 0; offset < max; offset += PAGE) {
+    const rows = await new Query()
+      .eq(AssetField.MEDIA_TYPE, MediaType.IMAGE)
+      .gte(AssetField.CREATION_TIME, sinceMs)
+      .orderBy({ key: AssetField.CREATION_TIME, ascending: false })
+      .offset(offset)
+      .limit(Math.min(PAGE, max - offset))
+      .exeForMetadata();
+    for (const r of rows) {
+      if (!r.width || !r.height || r.height >= r.width * 1.1) {
+        out.push({ assetId: r.id, createdAt: r.creationTime ?? sinceMs, width: r.width, height: r.height });
+      }
+    }
+    if (rows.length < PAGE) break;
+  }
+  return out;
 }
 
 export function galleryUri(assetId: string): Promise<string> {

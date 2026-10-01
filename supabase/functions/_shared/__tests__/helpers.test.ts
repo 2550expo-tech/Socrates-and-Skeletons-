@@ -9,6 +9,7 @@ import {
   isInvalidKey,
   isZeroQuota,
   mergeReadings,
+  MAX_TEXT,
   normalizeReading,
   similarName,
   UNCHECKED_MAX,
@@ -169,6 +170,31 @@ describe('Slip read twice (accuracy)', () => {
     // The second read uses other models first.
     expect(verifierModels(null)[0]).not.toBe(geminiModels(null)[0]);
     expect(verifierModels('my-model')[0]).toBe('my-model');
+  });
+
+  it('TC-87 two reads: a value only one read found is kept (unsure), and same-model reads are never sure', () => {
+    // The first read missed the amount and date; the second (larger) model had them.
+    const merged = mergeReadings(slip({ amount: null, amountPrinted: null, dateText: null, dateIso: null }), slip());
+    expect(merged.reading.amount).toBe('1250.00');
+    expect(merged.reading.dateIso).toBe(slip().dateIso);
+    expect(merged.reading.confidence.amount).toBeLessThan(0.8);
+    expect(merged.check.verified).toBe(false);
+    const payee = mergeReadings(slip({ counterparty: null }), slip());
+    expect(payee.reading.counterparty).toBe('ร้านข้าวมันไก่ป้าแดง');
+    // Agreeing amounts, but one read doubted its own: stay unsure.
+    const doubted = mergeReadings(slip({ amountPrinted: '1,520.00' }), slip());
+    expect(doubted.reading.confidence.amount).toBeLessThan(0.5);
+    // Same model twice: their mistakes would agree, so nothing is counted without a look.
+    const same = mergeReadings(slip(), slip(), { sameModel: true });
+    expect(same.reading.confidence.amount).toBeLessThanOrEqual(UNCHECKED_MAX);
+    expect(same.check.verified).toBe(false);
+  });
+
+  it('TC-88 model output is capped to what the database takes', () => {
+    const long = 'ร้าน'.repeat(80);
+    expect((slip({ counterparty: long, toName: long }).counterparty ?? '').length).toBeLessThanOrEqual(MAX_TEXT);
+    expect(slip({ amount: '99999999999999999999.00', amountPrinted: '99999999999999999999.00' }).amount).toBeNull();
+    expect(slip({ amount: '1000000000.00', amountPrinted: '1,000,000,000.00' }).amount).toBe('1000000000.00');
   });
 
   it('TC-63 two reads: agreement is kept, any disagreement on a key field waits for the user', () => {

@@ -22,7 +22,11 @@ export interface Repo {
   mode: 'cloud' | 'demo';
   getProfile(): Promise<Profile>;
   updateProfile(patch: Partial<Omit<Profile, 'id'>>): Promise<Profile>;
-  listTransactions(): Promise<Transaction[]>;
+  /**
+   * Transactions of about the last 13 months, plus the net of confirmed money before them
+   * (it still counts in the balance, but is not needed as a list).
+   */
+  listTransactions(): Promise<{ txs: Transaction[]; carrySatang: number }>;
   insert(input: TransactionInput): Promise<Transaction>;
   update(id: string, patch: Partial<TransactionInput>): Promise<Transaction>;
   remove(id: string): Promise<void>;
@@ -188,7 +192,23 @@ export function createCloudRepo(userId: string): Repo {
         all.push(...(data as TxRow[]).map(fromRow));
         if (!data || data.length < 1000) break;
       }
-      return all;
+      // Older confirmed money still counts in the balance: add it up (two columns only).
+      let carrySatang = 0;
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await db
+          .from('transactions')
+          .select('kind,amount_satang')
+          .eq('status', 'confirmed')
+          .lt('occurred_at', since)
+          .order('occurred_at', { ascending: false })
+          .range(from, from + 999);
+        if (error) throw error;
+        for (const r of (data ?? []) as Pick<TxRow, 'kind' | 'amount_satang'>[]) {
+          carrySatang += r.kind === 'income' ? Number(r.amount_satang) : -Number(r.amount_satang);
+        }
+        if (!data || data.length < 1000) break;
+      }
+      return { txs: all, carrySatang };
     },
     async insert(input) {
       const { data, error } = await db.from('transactions').insert(toRow(input)).select().single();
@@ -305,7 +325,8 @@ export function createDemoRepo(): Repo {
       return s.profile;
     },
     async listTransactions() {
-      return [...(await load()).txs];
+      // Everything is on the phone: nothing is carried over.
+      return { txs: [...(await load()).txs], carrySatang: 0 };
     },
     async insert(input) {
       const s = await load();

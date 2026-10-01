@@ -149,19 +149,24 @@ export interface SlipReadingOut {
   confidence: { amount: number; date: number; counterparty: number };
 }
 
+/** Longest text kept from a reading: names become the transaction title (the database allows 120). */
+export const MAX_TEXT = 100;
+/** Largest amount a slip can carry, in baht (the app takes up to ฿1,000,000,000). */
+export const MAX_AMOUNT_BAHT = 1_000_000_000;
+
 function text(v: unknown): string | null {
   if (typeof v === 'number' && Number.isFinite(v)) return String(v);
   if (typeof v !== 'string') return null;
   const s = v.trim();
-  return s && s.toLowerCase() !== 'null' ? s : null;
+  return s && s.toLowerCase() !== 'null' ? s.slice(0, MAX_TEXT).trim() : null;
 }
 
 function amountText(v: unknown): string | null {
-  if (typeof v === 'number') return Number.isFinite(v) && v > 0 ? v.toFixed(2) : null;
+  if (typeof v === 'number') return Number.isFinite(v) && v > 0 && v <= MAX_AMOUNT_BAHT ? v.toFixed(2) : null;
   const s = text(v);
   if (!s) return null;
   const cleaned = s.replace(/฿|บาท|THB|,|\s/gi, '').replace(/^[+\-−]/, '');
-  return /^\d+(\.\d{1,2})?$/.test(cleaned) && Number(cleaned) > 0 ? cleaned : null;
+  return /^\d+(\.\d{1,2})?$/.test(cleaned) && Number(cleaned) > 0 && Number(cleaned) <= MAX_AMOUNT_BAHT ? cleaned : null;
 }
 
 function isoDate(v: unknown): string | null {
@@ -340,10 +345,25 @@ const higher = (x: number, y: number) => Math.max(x, y);
  * value is kept (with the higher confidence); where they disagree on the
  * amount, date, direction or who was paid, the field is marked unsure so the
  * slip waits for the user, and both values are returned to choose from.
- * One reading only (the second could not be made): confidences are capped so
- * nothing is counted without a look.
+ * One reading only (the second could not be made), or both made by the same model
+ * (their mistakes would agree): confidences are capped so nothing is counted
+ * without a look.
  */
-export function mergeReadings(a: SlipReadingOut | null, b: SlipReadingOut | null): { reading: SlipReadingOut; check: SlipCheck } {
+export function mergeReadings(
+  a: SlipReadingOut | null,
+  b: SlipReadingOut | null,
+  opts: { sameModel?: boolean } = {},
+): { reading: SlipReadingOut; check: SlipCheck } {
+  const merged = mergeTwo(a, b);
+  if (!opts.sameModel || merged.check.reads < 2) return merged;
+  const c = merged.reading.confidence;
+  return {
+    reading: { ...merged.reading, confidence: { amount: Math.min(c.amount, UNCHECKED_MAX), date: Math.min(c.date, UNCHECKED_MAX), counterparty: Math.min(c.counterparty, UNCHECKED_MAX) } },
+    check: { ...merged.check, verified: false },
+  };
+}
+
+function mergeTwo(a: SlipReadingOut | null, b: SlipReadingOut | null): { reading: SlipReadingOut; check: SlipCheck } {
   const only = a ?? b;
   if (!only) throw new Error('No reading to merge');
   if (!a || !b) {
@@ -367,7 +387,9 @@ export function mergeReadings(a: SlipReadingOut | null, b: SlipReadingOut | null
   const conf = { ...a.confidence };
 
   const amountAgrees = !!a.amount && !!b.amount && Number(a.amount) === Number(b.amount);
-  if (amountAgrees) conf.amount = higher(a.confidence.amount, b.confidence.amount);
+  // Agreeing reads keep the higher confidence, unless one of them doubted its own amount.
+  const lowest = Math.min(a.confidence.amount, b.confidence.amount);
+  if (amountAgrees) conf.amount = lowest < UNSURE ? lowest : higher(a.confidence.amount, b.confidence.amount);
   else {
     conf.amount = Math.min(a.confidence.amount, UNSURE);
     if (a.amount || b.amount) disagree.amount = [a.amount, b.amount];
@@ -388,7 +410,7 @@ export function mergeReadings(a: SlipReadingOut | null, b: SlipReadingOut | null
     }
   }
 
-  let counterparty = a.counterparty;
+  let counterparty = a.counterparty ?? b.counterparty;
   if (similarName(a.counterparty, b.counterparty)) {
     conf.counterparty = higher(a.confidence.counterparty, b.confidence.counterparty);
     // Prefer the fuller spelling when one of them is masked or cut short.
@@ -399,8 +421,13 @@ export function mergeReadings(a: SlipReadingOut | null, b: SlipReadingOut | null
     disagree.counterparty = [a.counterparty, b.counterparty];
   }
 
+  // A value only one read found is kept (still unsure, so the user checks it) instead of lost.
+  const dateFrom = a.dateIso || a.dateText ? a : b;
   const reading: SlipReadingOut = {
     ...a,
+    amount: a.amount ?? b.amount,
+    dateText: dateFrom.dateText,
+    dateIso: dateFrom.dateIso,
     direction,
     counterparty,
     time: a.time ?? b.time,

@@ -13,13 +13,14 @@ import { parseBahtToSatang, satangToInput } from '../domain/money';
 import { Button, Chip, IconButton, Row, T } from '../ui/components';
 import { ConfirmSheet, useToast } from '../ui/feedback';
 import { AmountField, Field } from '../ui/inputs';
-import { goBack } from '../ui/nav';
+import { goBack, useLeaveWhenDone } from '../ui/nav';
 import { fonts, radius, space, useTheme } from '../ui/theme';
 import { HeaderDecor } from '../ui/halloween';
 
 export default function GoalForm() {
   const theme = useTheme();
   const toast = useToast();
+  const leaveWhenDone = useLeaveWhenDone();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { goals, addGoal, updateGoal, removeGoal, today } = useApp();
   const existing = useMemo(() => goals.find((g) => g.id === id), [goals, id]);
@@ -47,7 +48,7 @@ export default function GoalForm() {
         await addGoal({ title: title.trim(), emoji, targetSatang: target!, savedSatang: 0, dueDay: due, doneAt: null });
         toast({ message: `ตั้งกระปุก "${title.trim()}" แล้ว เริ่มหยอดได้เลย` });
       }
-      goBack();
+      leaveWhenDone();
     } catch {
       toast({ message: 'บันทึกไม่สำเร็จ ลองอีกครั้ง', tone: 'error' });
     } finally {
@@ -125,8 +126,12 @@ export default function GoalForm() {
         onConfirm={async () => {
           setAskDelete(false);
           if (!existing) return;
-          await removeGoal(existing.id).catch(() => toast({ message: 'ลบไม่สำเร็จ', tone: 'error' }));
-          goBack();
+          try {
+            await removeGoal(existing.id);
+            leaveWhenDone();
+          } catch {
+            toast({ message: 'ลบไม่สำเร็จ ลองอีกครั้ง', tone: 'error' });
+          }
         }}
       />
     </SafeAreaView>

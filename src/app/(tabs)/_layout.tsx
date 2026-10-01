@@ -18,7 +18,7 @@ import { useKlaSync } from '../../services/kla';
 import { Ionicons, type IconName } from '../../ui/components';
 import { PulseRing, usePressSpring } from '../../ui/effects';
 import { useNative, useReduceMotion } from '../../ui/motion';
-import { alpha, fonts, useTheme } from '../../ui/theme';
+import { alpha, fonts, type, useTheme } from '../../ui/theme';
 
 const TABS: Record<string, { label: string; icon: IconName; iconActive: IconName }> = {
   index: { label: 'หน้าหลัก', icon: 'home-outline', iconActive: 'home' },
@@ -94,8 +94,8 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
         }}
         style={{ flex: 1, alignItems: 'center', paddingVertical: 8, gap: 2 }}
       >
-        <TabIcon name={focused ? meta.iconActive : meta.icon} focused={focused} color={focused ? theme.primary : theme.inkFaint} />
-        <Text style={{ fontFamily: focused ? fonts.sansSemi : fonts.sans, fontSize: 11, color: focused ? theme.ink : theme.inkFaint }}>
+        <TabIcon name={focused ? meta.iconActive : meta.icon} focused={focused} color={focused ? theme.primary : theme.inkSoft} />
+        <Text style={[type.micro, { fontFamily: focused ? fonts.sansSemi : fonts.sans, color: focused ? theme.ink : theme.inkSoft }]}>
           {meta.label}
         </Text>
       </Pressable>
@@ -134,7 +134,7 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
       {routes.slice(0, half).map((r, i) => tab(r, i))}
       <View style={{ width: 76, alignItems: 'center' }}>
         <View style={{ width: 60, height: 60, marginTop: -26, alignItems: 'center', justifyContent: 'center' }}>
-          <PulseRing size={60} active times={auto.state.phase === 'scanning' ? 'always' : 3} />
+          <PulseRing size={60} active times={auto.state.phase === 'scanning' ? 'always' : 3} color={theme.accent} />
           <Animated.View style={{ transform: [{ scale: press.scale }] }}>
             <Pressable
               accessibilityRole="button"
@@ -165,7 +165,7 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
             </Pressable>
           </Animated.View>
         </View>
-        <Text style={{ fontFamily: fonts.sansSemi, fontSize: 11, color: theme.ink, marginTop: 4 }}>สแกนสลิป</Text>
+        <Text style={[type.micro, { fontFamily: fonts.sansSemi, color: theme.ink, marginTop: 4 }]}>สแกนสลิป</Text>
       </View>
       {routes.slice(half).map((r, i) => tab(r, i + half))}
     </View>

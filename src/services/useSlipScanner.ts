@@ -24,6 +24,7 @@ import {
   galleryUri,
   loadScannedIds,
   rememberScanned,
+  scanLock,
   requestGalleryAccess,
   SlipReaderError,
   type GalleryAccess,
@@ -129,7 +130,7 @@ export function useSlipScanner(initialRange: RangeKey = '1m') {
   async function processOne(item: ScanItem): Promise<Omit<Finished, 'type' | 'runId' | 'assetId'>> {
     const picked = pickedRef.current.get(item.assetId);
     const size = picked ?? sizesRef.current.get(item.assetId);
-    const prefs = await loadScanPrefs();
+    const prefs = await loadScanPrefs(userId);
     const r = await processSlipImage({
       uri: picked ? item.assetId : await galleryUri(item.assetId),
       width: size?.width,
@@ -164,6 +165,7 @@ export function useSlipScanner(initialRange: RangeKey = '1m') {
   const runLoop = useCallback(async () => {
     if (loopRef.current) return;
     loopRef.current = true;
+    scanLock.manual = true;
     indexRef.current = buildDuplicateIndex(txsRef.current);
     try {
       while (stateRef.current.phase === 'running') {
@@ -198,6 +200,7 @@ export function useSlipScanner(initialRange: RangeKey = '1m') {
       }
     } finally {
       loopRef.current = false;
+      scanLock.manual = false;
       if (userId) rememberScanned(userId, scannedRef.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

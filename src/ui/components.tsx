@@ -78,7 +78,8 @@ export function T({
           color: color ?? (v === 'small' || v === 'micro' ? theme.inkSoft : theme.ink),
           textAlign: center ? 'center' : undefined,
         },
-        v === 'label' && { letterSpacing: 0.8, textTransform: 'uppercase', color: color ?? theme.inkFaint },
+        // Labels are text: inkSoft (inkFaint is for placeholders, rules and quiet icons, below 4.5:1).
+        v === 'label' && { letterSpacing: 0.8, textTransform: 'uppercase', color: color ?? theme.inkSoft },
         style,
       ]}
     >
@@ -158,6 +159,8 @@ export function Screen({
         <Animated.ScrollView
           contentContainerStyle={[pad, { paddingBottom: 120, gap: space.lg }, contentStyle]}
           keyboardShouldPersistTaps="handled"
+          // iOS: scroll a focused field above the keyboard (e.g. the price in "เช็กก่อนจ่าย").
+          automaticallyAdjustKeyboardInsets
           refreshControl={refreshControl}
           scrollEventThrottle={16}
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: useNative })}
@@ -168,6 +171,8 @@ export function Screen({
         <ScrollView
           contentContainerStyle={[pad, { paddingBottom: 120, gap: space.lg }, contentStyle]}
           keyboardShouldPersistTaps="handled"
+          // iOS: scroll a focused field above the keyboard (e.g. the price in "เช็กก่อนจ่าย").
+          automaticallyAdjustKeyboardInsets
           refreshControl={refreshControl}
         >
           {children}
@@ -278,7 +283,7 @@ export function Button({
   const press = usePressSpring(0.95);
   const colors = {
     primary: { bg: theme.primary, fg: theme.onPrimary, border: theme.primary },
-    gold: { bg: theme.accent, fg: '#1D1405', border: theme.accent },
+    gold: { bg: theme.accent, fg: theme.onAccent, border: theme.accent },
     ghost: { bg: 'transparent', fg: theme.ink, border: theme.line },
     danger: { bg: 'transparent', fg: theme.critical, border: theme.critical },
     soft: { bg: theme.surfaceAlt, fg: theme.ink, border: theme.surfaceAlt },
@@ -294,6 +299,8 @@ export function Button({
       onPressIn={off ? undefined : press.onPressIn}
       onPressOut={press.onPressOut}
       disabled={off}
+      // Small buttons are about 40pt tall: the touch area reaches 44pt and more.
+      hitSlop={small ? 6 : undefined}
       accessibilityRole="button"
       aria-disabled={!!off}
       aria-busy={!!loading}
@@ -303,7 +310,7 @@ export function Button({
           borderColor: colors.border,
           borderWidth: 1.5,
           borderRadius: radius.pill,
-          paddingVertical: small ? 8 : 14,
+          paddingVertical: small ? 8 : 12,
           paddingHorizontal: small ? 14 : 20,
           flexDirection: 'row',
           alignItems: 'center',
@@ -322,7 +329,7 @@ export function Button({
       ) : icon ? (
         <Ionicons name={icon} size={small ? 16 : 19} color={colors.fg} />
       ) : null}
-      <Text style={{ fontFamily: fonts.sansSemi, fontSize: small ? 13 : 15, color: colors.fg }}>{label}</Text>
+      <Text style={[small ? type.small : type.body, { fontFamily: fonts.sansSemi, color: colors.fg }]}>{label}</Text>
     </AnimatedPressable>
   );
 }
@@ -407,7 +414,10 @@ export function Segmented<K extends string>({
             bottom: 4,
             width: seg,
             borderRadius: radius.pill,
-            backgroundColor: theme.surface,
+            // Light: a white pill with a soft shadow. Dark: shadows do not show, so a tint of the theme colour.
+            backgroundColor: theme.dark ? alpha(theme.primary, 0.26) : theme.surface,
+            borderWidth: theme.dark ? 1 : 0,
+            borderColor: alpha(theme.primary, 0.5),
             shadowColor: '#000',
             shadowOpacity: 0.1,
             shadowRadius: 6,
@@ -427,6 +437,7 @@ export function Segmented<K extends string>({
               Haptics.selectionAsync().catch(() => {});
               onChange(o.key);
             }}
+            hitSlop={{ top: 6, bottom: 6 }}
             accessibilityRole="tab"
             // aria-* (not accessibilityState) so screen readers on the web also hear which one is chosen
             aria-selected={active}
@@ -437,16 +448,12 @@ export function Segmented<K extends string>({
               borderRadius: radius.pill,
               alignItems: 'center',
               // Before the first layout the pill is not drawn yet: show the choice the plain way.
-              backgroundColor: active && width === 0 ? theme.surface : 'transparent',
+              backgroundColor: active && width === 0 ? (theme.dark ? alpha(theme.primary, 0.26) : theme.surface) : 'transparent',
             }}
           >
             <Text
               numberOfLines={1}
-              style={{
-                fontFamily: active ? fonts.sansSemi : fonts.sansMedium,
-                fontSize: 13,
-                color: active ? theme.ink : theme.inkSoft,
-              }}
+              style={[type.small, { fontFamily: active ? fonts.sansSemi : fonts.sansMedium, color: active ? theme.ink : theme.inkSoft }]}
             >
               {o.label}
             </Text>
@@ -475,6 +482,7 @@ export function Chip({
       onPress={onPress}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
+      hitSlop={6}
       accessibilityRole="button"
       aria-selected={!!selected}
       style={{
@@ -491,7 +499,7 @@ export function Chip({
       }}
     >
       {glyph ? <Text style={{ fontSize: 14 }}>{glyph}</Text> : null}
-      <Text style={{ fontFamily: selected ? fonts.sansSemi : fonts.sans, fontSize: 13, color: theme.ink }}>{label}</Text>
+      <Text style={[type.small, { fontFamily: selected ? fonts.sansSemi : fonts.sans, color: theme.ink }]}>{label}</Text>
     </AnimatedPressable>
   );
 }
@@ -511,10 +519,10 @@ export function Badge({
   const theme = useTheme();
   const map = {
     neutral: { bg: theme.surfaceAlt, fg: theme.inkSoft },
-    good: { bg: theme.dark ? '#153B2A' : '#E3F1E8', fg: theme.good },
-    watch: { bg: theme.dark ? '#3A2C12' : '#FBEBD0', fg: theme.watch },
-    critical: { bg: theme.dark ? '#3D1C15' : '#F8E1DB', fg: theme.critical },
-    gold: { bg: theme.accentSoft, fg: theme.dark ? theme.accent : '#7A5A0E' },
+    good: { bg: theme.goodSoft, fg: theme.good },
+    watch: { bg: theme.watchSoft, fg: theme.watch },
+    critical: { bg: theme.criticalSoft, fg: theme.critical },
+    gold: { bg: theme.accentSoft, fg: theme.accentInk },
   }[tone];
   const dark = {
     neutral: { bg: 'rgba(244,241,230,0.14)', fg: '#F4F1E6' },
@@ -526,7 +534,7 @@ export function Badge({
   const c = onDark ? dark : map;
   return (
     <View style={{ backgroundColor: c.bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4, alignSelf: center ? 'center' : 'flex-start' }}>
-      <Text style={{ fontFamily: fonts.sansSemi, fontSize: 12, lineHeight: 17, color: c.fg }}>{label}</Text>
+      <Text style={[type.micro, { fontFamily: fonts.sansSemi, color: c.fg }]}>{label}</Text>
     </View>
   );
 }

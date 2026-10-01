@@ -46,16 +46,27 @@ const IDLE = `สงสัยอะไรเรื่องเงิน ถา�
 /** น้องกล้า says hello once each time the app is opened, not on every visit to the tab. */
 let greeted = false;
 
-/** Find a price in a question like "ซื้อของ 500 บาท" or "฿1,290". */
+const NUM = '((?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d{1,2})?)';
+const PRICE_PATTERNS = [
+  new RegExp(`฿\\s?${NUM}`),
+  new RegExp(`${NUM}\\s*บาท`),
+  // "ซื้อรองเท้า 1290 ได้ไหม", but not "อีก 30 วัน" or "ซื้อ 2 ชิ้น".
+  new RegExp(`(?:ซื้อ|ราคา|จ่าย)[^\\d]{0,24}?${NUM}(?![\\d.,]|\\s*(?:วัน|เดือน|ปี|ชิ้น|อัน|คน|ครั้ง|%|เปอร์))`),
+];
+
+/** A price in a question: "ซื้อของ 500 บาท", "฿1,290", "ซื้อรองเท้า 1290 ได้ไหม". Other numbers ("อีก 30 วัน") are not prices. */
 function priceInQuestion(q: string): number | null {
-  const m = q.match(/฿?\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?\s*(?:บาท)?/);
-  return m ? parseBahtToSatang(m[0]) : null;
+  for (const re of PRICE_PATTERNS) {
+    const m = q.match(re);
+    if (m) return parseBahtToSatang(m[1]);
+  }
+  return null;
 }
 
 export default function Coach() {
   const theme = useTheme();
   const { width: screenW } = useWindowDimensions();
-  const params = useLocalSearchParams<{ ask?: string; price?: string }>();
+  const params = useLocalSearchParams<{ ask?: string; price?: string; at?: string }>();
   const { profile, txs, repo } = useApp();
   const { balance, runway } = useMoney();
   const skin = useEquippedSkin();
@@ -75,9 +86,11 @@ export default function Coach() {
   const seq = useRef(0);
 
   // Prefill the question when opened from "เช็กก่อนจ่าย" (adjust state during render, no effect needed).
-  const [lastAsk, setLastAsk] = useState(params.ask);
-  if (params.ask !== lastAsk) {
-    setLastAsk(params.ask);
+  // `at` changes on every tap, so asking about the same price twice fills it in again.
+  const askKey = params.ask ? `${params.ask}|${params.at ?? ''}` : undefined;
+  const [lastAsk, setLastAsk] = useState(askKey);
+  if (askKey !== lastAsk) {
+    setLastAsk(askKey);
     if (params.ask) setInput(params.ask);
   }
 
@@ -178,8 +191,13 @@ export default function Coach() {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bg }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={80}>
-        <ScrollView ref={scroll} contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xl }} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          ref={scroll}
+          // Same header spacing as the other tabs (title starts `sm` below the safe area).
+          contentContainerStyle={{ paddingHorizontal: space.lg, paddingTop: space.sm, gap: space.lg, paddingBottom: space.xl }}
+          keyboardShouldPersistTaps="handled"
+        >
           <Row justify="space-between" align="flex-end">
             <View style={{ gap: 2 }}>
               <T v="label">โค้ชส่วนตัว</T>
@@ -261,7 +279,7 @@ export default function Coach() {
                           })}
                         >
                           <KlaPicture skin={s.id} mood="happy" width={50} onDark extras={false} ground={false} />
-                          <T v="micro" color="#F4F1E6" numberOfLines={1} style={{ fontSize: 11 }}>
+                          <T v="micro" color={theme.heroInk} numberOfLines={1}>
                             {s.name}
                           </T>
                         </Pressable>
@@ -284,7 +302,7 @@ export default function Coach() {
                       })}
                     >
                       <Ionicons name="grid" size={20} color={theme.heroAccent} />
-                      <T v="micro" color="#F4F1E6" center style={{ fontSize: 11 }}>
+                      <T v="micro" color={theme.heroInk} center>
                         ตู้สกิน{'\n'}ทั้งหมด
                       </T>
                     </Pressable>
@@ -362,11 +380,12 @@ export default function Coach() {
                               tell(m.text, { msgId: m.id });
                               toTop();
                             }}
-                            hitSlop={8}
+                            // A 44pt target around the small icon.
+                            hitSlop={14}
                             accessibilityRole="button"
                             accessibilityLabel={live ? `น้อง${BUDDY_NAME}กำลังพูดข้อความนี้` : 'ฟังข้อความนี้'}
                           >
-                            <Ionicons name={live ? 'volume-high' : 'volume-medium-outline'} size={16} color={live ? theme.accent : theme.inkFaint} />
+                            <Ionicons name={live ? 'volume-high' : 'volume-medium-outline'} size={16} color={live ? theme.accent : theme.inkSoft} />
                           </Pressable>
                         </Row>
                       ) : null}
@@ -495,7 +514,7 @@ function StageButton({ icon, label, a11y, onPress }: { icon: IconName; label: st
       })}
     >
       <Ionicons name={icon} size={16} color={theme.heroAccent} />
-      <T v="small" color="#F4F1E6">
+      <T v="small" color={theme.heroInk}>
         {label}
       </T>
     </Pressable>

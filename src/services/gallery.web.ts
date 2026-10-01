@@ -34,7 +34,7 @@ export async function requestGalleryAccess(): Promise<GalleryAccess> {
   return testGallery() ? 'all' : 'denied';
 }
 
-export async function findGalleryImages(sinceMs = 0, max = 3000): Promise<GalleryImage[]> {
+export async function findGalleryImages(sinceMs = 0, max = 20000): Promise<GalleryImage[]> {
   const gallery = testGallery();
   if (!gallery) return [];
   return gallery.images

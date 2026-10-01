@@ -226,22 +226,25 @@ export function parseSlipDate(text: string | null | undefined, now: Date = new D
   let m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (m) {
     const y = normalizeYear(Number(m[1]), now);
-    return y ? validDay(y, Number(m[2]), Number(m[3])) : null;
+    const day = y ? validDay(y, Number(m[2]), Number(m[3])) : null;
+    if (day) return day;
   }
 
-  // Numeric: 27/09/2569, 27-09-69, 27.09.69
-  m = s.match(/(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})/);
-  if (m) {
-    const y = normalizeYear(Number(m[3]), now);
-    return y ? validDay(y, Number(m[2]), Number(m[1])) : null;
-  }
-
-  // Day + month name + year: 27 ก.ย. 69 / 27ก.ย.2569 / 27 Sep 2026
+  // Day + month name + year: 27 ก.ย. 69 / 27ก.ย.2569 / 27 Sep 2026. Tried before the numeric form,
+  // because a time printed with dots ("14.30.25", "12.10.25") looks like a numeric date.
   m = s.match(/(\d{1,2})\s*([ก-๙a-zA-Z][ก-๙a-zA-Z.\s]{0,12}?)\s*(\d{2,4})(?!\d)/);
   if (m) {
     const month = monthFromToken(m[2]);
     const y = normalizeYear(Number(m[3]), now);
-    if (month && y) return validDay(y, month, Number(m[1]));
+    const day = month && y ? validDay(y, month, Number(m[1])) : null;
+    if (day) return day;
+  }
+
+  // Numeric: 27/09/2569, 27-09-69, 27.09.69
+  for (const n of s.matchAll(/(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})(?!\d)/g)) {
+    const y = normalizeYear(Number(n[3]), now);
+    const day = y ? validDay(y, Number(n[2]), Number(n[1])) : null;
+    if (day) return day;
   }
   return null;
 }

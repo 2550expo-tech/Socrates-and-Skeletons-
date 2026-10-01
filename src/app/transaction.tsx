@@ -5,7 +5,7 @@
  */
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useLocalSearchParams } from 'expo-router';
-import { goBack } from '../ui/nav';
+import { goBack, useLeaveWhenDone } from '../ui/nav';
 import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,6 +24,7 @@ import { HeaderDecor } from '../ui/halloween';
 export default function TransactionForm() {
   const theme = useTheme();
   const toast = useToast();
+  const leaveWhenDone = useLeaveWhenDone();
   const { id, kind: kindParam } = useLocalSearchParams<{ id?: string; kind?: string }>();
   const { txs, addTx, updateTx, removeTx } = useApp();
   const existing = useMemo(() => txs.find((t) => t.id === id), [txs, id]);
@@ -46,6 +47,11 @@ export default function TransactionForm() {
   // Web only: the browser build has no native date picker, so dates are typed.
   const [dayText, setDayText] = useState(() => { const [y, m, d] = day.split('-'); return `${d}/${m}/${Number(y) + 543}`; });
   const [timeText, setTimeText] = useState(time);
+  // What is wrong with the typed date/time (web); saving waits until both are fine.
+  const typedDay = parseSlipDate(dayText);
+  const dayError =
+    Platform.OS !== 'web' ? null : !typedDay ? 'เช่น 27/09/2569' : typedDay > bkkDayKey(new Date()) ? 'วันนี้หรือก่อนหน้าเท่านั้น' : null;
+  const timeError = Platform.OS !== 'web' || parseSlipTime(timeText) ? null : 'เช่น 08:30';
 
   const cats = categoriesFor(kind);
   const pickerDate = new Date(bkkToIso(day, time));
@@ -79,12 +85,14 @@ export default function TransactionForm() {
   }
 
   async function save(confirm: boolean) {
+    if (busy) return;
     const satang = parseBahtToSatang(amount);
     if (satang === null) {
       setAmountError('ใส่จำนวนเงินมากกว่า 0 เช่น 85 หรือ 85.50');
       return;
     }
     setAmountError(null);
+    if (dayError || timeError) return;
     const input = {
       kind,
       amountSatang: satang,
@@ -113,7 +121,7 @@ export default function TransactionForm() {
         });
         toast({ message: kind === 'income' ? 'เพิ่มเงินเข้าแล้ว' : 'บันทึกรายการแล้ว' });
       }
-      goBack();
+      leaveWhenDone();
     } catch (e) {
       toast({ message: e instanceof Error && e.name === 'DuplicateSlipError' ? 'มีรายการจากสลิปนี้อยู่แล้ว' : 'บันทึกไม่สำเร็จ ลองอีกครั้ง', tone: 'error' });
     } finally {
@@ -127,7 +135,7 @@ export default function TransactionForm() {
     setBusy(true);
     try {
       const removed = await removeTx(existing.id);
-      goBack();
+      leaveWhenDone();
       toast({
         message: 'ลบรายการแล้ว',
         action: removed
@@ -186,7 +194,7 @@ export default function TransactionForm() {
           {isDraft ? (
             <Card tone="accent">
               <Row gap={space.sm} align="flex-start">
-                <Ionicons name="receipt-outline" size={20} color={theme.dark ? theme.accent : '#7A5A0E'} />
+                <Ionicons name="receipt-outline" size={20} color={theme.accentInk} />
                 <View style={{ flex: 1, gap: 4 }}>
                   <T v="body" style={{ fontFamily: fonts.sansSemi }}>
                     {flags.length === 0 ? 'อ่านสลิปได้ครบ ตรวจอีกครั้งแล้วกดยืนยัน' : `ช่วยตรวจ: ${flags.map((f) => FLAG_LABEL[f]).join(', ')}`}
@@ -289,7 +297,7 @@ export default function TransactionForm() {
                       const parsed = parseSlipDate(s);
                       if (parsed && parsed <= bkkDayKey(new Date())) setDay(parsed);
                     }}
-                    error={parseSlipDate(dayText) ? null : 'เช่น 27/09/2569'}
+                    error={dayError}
                   />
                 </View>
                 <View style={{ width: 110 }}>
@@ -302,6 +310,7 @@ export default function TransactionForm() {
                       const t = parseSlipTime(s);
                       if (t) setTime(t);
                     }}
+                    error={timeError}
                   />
                 </View>
               </Row>
