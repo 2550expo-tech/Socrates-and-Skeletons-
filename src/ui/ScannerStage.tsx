@@ -4,12 +4,12 @@
  * with a few sparkles. Everything stops when reading stops.
  */
 import { LinearGradient } from 'expo-linear-gradient';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Svg, { G, Rect } from 'react-native-svg';
-import { formatBaht } from '../domain/money';
 import type { Transaction } from '../domain/types';
 import { Aurora, Reveal, ScanBeam, Sparkles } from './effects';
-import { fonts, palette, radius, space, useTheme } from './theme';
+import { Money, T } from './components';
+import { alpha, palette, radius, space, useTheme } from './theme';
 
 const PAPER_W = 84;
 const PAPER_H = 116;
@@ -53,19 +53,17 @@ export function ScannerStage({ active, latest }: { active: boolean; latest: Tran
       <View style={{ position: 'absolute', left: PAPER_W + space.xl * 2, right: space.lg, top: 0, bottom: 0, justifyContent: 'center' }}>
         {latest ? (
           <Reveal key={latest.id} zoom from={14}>
-            <View style={{ backgroundColor: 'rgba(244,241,230,0.12)', borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(226,182,74,0.45)', padding: space.md, gap: 2 }}>
-              <Text style={{ fontFamily: fonts.serif, fontSize: 22, lineHeight: 32, color: sign > 0 ? '#9BE8BF' : theme.heroAccent }}>
-                {formatBaht(sign * latest.amountSatang, { sign: true, decimals: false })}
-              </Text>
-              <Text numberOfLines={1} style={{ fontFamily: fonts.sansMedium, fontSize: 13, lineHeight: 20, color: '#E8E1CC' }}>
+            <View style={{ backgroundColor: alpha(theme.heroInk, 0.12), borderRadius: radius.lg, borderWidth: 1, borderColor: alpha(theme.heroAccent, 0.45), padding: space.md, gap: 2 }}>
+              <Money satang={sign * latest.amountSatang} sign decimals={false} size="h2" color={sign > 0 ? theme.heroIncome : theme.heroAccent} />
+              <T v="small" numberOfLines={1} color={theme.heroInk}>
                 {latest.title}
-              </Text>
+              </T>
             </View>
           </Reveal>
         ) : (
-          <Text style={{ fontFamily: fonts.sansMedium, fontSize: 14, lineHeight: 22, color: theme.heroInkSoft }}>
+          <T v="small" color={theme.heroInkSoft}>
             {active ? 'กำลังส่องหาสลิป…' : 'พร้อมอ่านสลิป'}
-          </Text>
+          </T>
         )}
       </View>
     </View>

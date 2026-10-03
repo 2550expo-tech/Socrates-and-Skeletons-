@@ -18,7 +18,7 @@ import { useCelebrate } from './effects';
 import { useToast } from './feedback';
 import { PasswordField } from './inputs';
 import { useReduceMotion } from './motion';
-import { palette, radius, space, useTheme } from './theme';
+import { palette, radius, readableOn, space, useTheme } from './theme';
 
 const useNative = Platform.OS !== 'web';
 
@@ -151,15 +151,16 @@ function Celebration() {
           width: 34,
           height: 34,
           borderRadius: 17,
-          backgroundColor: palette.leaf,
+          // Done = the meaning colour "good", ringed in the dialog's own surface.
+          backgroundColor: theme.good,
           borderWidth: 3,
-          borderColor: '#FFFFFF',
+          borderColor: theme.surface,
           alignItems: 'center',
           justifyContent: 'center',
           transform: [{ scale: pop.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0, 1] }) }],
         }}
       >
-        <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+        <Ionicons name="checkmark" size={20} color={readableOn(theme.good, '#FFFFFF', theme.bg)} />
       </Animated.View>
     </View>
   );

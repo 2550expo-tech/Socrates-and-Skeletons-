@@ -72,7 +72,8 @@ export function DayBars({ days, averageSatang, height = 140 }: { days: DayTotal[
                 width={barW}
                 height={h}
                 color={isToday ? theme.accent : theme.primary}
-                opacity={isToday ? 1 : 0.85}
+                // Today stands out by brightness as well as colour (in some dark themes the two are close).
+                opacity={isToday ? 1 : 0.5}
                 delay={120 + i * 55}
               />
             );
@@ -154,7 +155,7 @@ export function CategoryBars({ items, limit = 5 }: { items: CategoryTotal[]; lim
           <GrowBar
             value={c.totalSatang / max}
             color={i === 0 ? theme.accent : theme.primary}
-            opacity={i === 0 ? 1 : 0.75 - i * 0.08}
+            opacity={i === 0 ? 1 : Math.max(0.3, 0.55 - i * 0.06)}
             track={theme.surfaceAlt}
             delay={100 + i * 90}
           />

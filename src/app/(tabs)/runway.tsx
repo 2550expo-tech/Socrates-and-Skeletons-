@@ -161,6 +161,7 @@ export default function RunwayScreen() {
                   <GrowBar
                     value={p.balance / maxBal}
                     color={below ? theme.critical : p.d === 0 ? theme.accent : theme.primary}
+                    opacity={below || p.d === 0 ? 1 : 0.55}
                     track={theme.surfaceAlt}
                     delay={200 + timeline.indexOf(p) * 120}
                   />

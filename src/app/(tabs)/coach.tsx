@@ -31,7 +31,8 @@ import { KlaBackdrop } from '../../ui/kla/KlaBackdrop';
 import { KlaPicture } from '../../ui/kla/KlaPicture';
 import { KlaStage } from '../../ui/kla/KlaStage';
 import { setKlaSound, useKlaTalk } from '../../ui/kla/useKlaTalk';
-import { fonts, radius, space, useTheme } from '../../ui/theme';
+import { alpha, fonts, radius, space, useTheme } from '../../ui/theme';
+import { inputBox, inputText } from '../../ui/inputs';
 
 interface Msg {
   id: number;
@@ -81,6 +82,8 @@ export default function Coach() {
   const [speakingId, setSpeakingId] = useState<number | null>(null);
   const [hop, setHop] = useState(0);
   const [focused, setFocused] = useState(false);
+  /** The question box has the keyboard (its border turns to the theme colour). */
+  const [typing, setTyping] = useState(false);
   const pokes = useRef(0);
   const scroll = useRef<ScrollView>(null);
   const seq = useRef(0);
@@ -419,17 +422,9 @@ export default function Coach() {
             accessibilityLabel={`คำถามถึงน้อง${BUDDY_NAME}`}
             multiline
             maxLength={400}
-            style={{
-              flex: 1,
-              maxHeight: 100,
-              fontFamily: fonts.sans,
-              fontSize: 15,
-              color: theme.ink,
-              backgroundColor: theme.bg,
-              borderRadius: radius.lg,
-              paddingHorizontal: 14,
-              paddingVertical: 10,
-            }}
+            onFocus={() => setTyping(true)}
+            onBlur={() => setTyping(false)}
+            style={[inputBox(theme, { focused: typing }), inputText(theme), { maxHeight: 100, paddingVertical: 10 }]}
           />
           <Pressable
             onPress={() => send(input)}
@@ -505,15 +500,15 @@ function StageButton({ icon, label, a11y, onPress }: { icon: IconName; label: st
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
+        paddingHorizontal: 14,
+        minHeight: 44,
         borderRadius: radius.pill,
-        backgroundColor: pressed ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.12)',
+        backgroundColor: alpha(theme.heroInk, pressed ? 0.22 : 0.12),
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.18)',
+        borderColor: alpha(theme.heroInk, 0.3),
       })}
     >
-      <Ionicons name={icon} size={16} color={theme.heroAccent} />
+      <Ionicons name={icon} size={18} color={theme.heroAccent} />
       <T v="small" color={theme.heroInk}>
         {label}
       </T>

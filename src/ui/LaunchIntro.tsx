@@ -198,7 +198,7 @@ export function LaunchIntro({ ready, fontsReady, onDone }: { ready: boolean; fon
                 fontFamily: fonts.sans,
                 fontSize: 14,
                 lineHeight: 22,
-                color: '#B9CEC2',
+                color: Platform.OS === 'web' ? theme.heroInkSoft : '#B9CEC2',
                 opacity: v.word.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0, 1] }),
               }}
             >

@@ -58,6 +58,8 @@ export interface Theme {
   heroBare: string;
   heroInk: string;
   heroInkSoft: string;
+  /** Money in, on hero surfaces (light green that reads on every hero gradient). */
+  heroIncome: string;
   overlay: string;
 }
 
@@ -245,6 +247,7 @@ export function buildTheme(key: ColorThemeKey, dark: boolean): Theme {
     heroBare: spec.heroBare,
     heroInk: '#F4F1E6',
     heroInkSoft: spec.heroInkSoft,
+    heroIncome: '#9BE8BF',
   };
 }
 

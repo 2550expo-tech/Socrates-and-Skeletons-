@@ -19,7 +19,7 @@ import { CelebrationProvider } from '../ui/effects';
 import { ToastProvider } from '../ui/feedback';
 import { LaunchIntro } from '../ui/LaunchIntro';
 import { UpdateBanner } from '../ui/UpdateBanner';
-import { useTheme } from '../ui/theme';
+import { mix, useTheme } from '../ui/theme';
 
 // The native splash stays until the opening animation (LaunchIntro) takes over.
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -55,7 +55,7 @@ function WebFrame({ children }: { children: ReactNode }) {
   const theme = useTheme();
   if (Platform.OS !== 'web') return <>{children}</>;
   return (
-    <View style={{ flex: 1, alignItems: 'center', backgroundColor: theme.dark ? '#050B08' : '#DDE6DF' }}>
+    <View style={{ flex: 1, alignItems: 'center', backgroundColor: theme.dark ? mix(theme.bg, '#000000', 0.55) : theme.surfaceAlt }}>
       <View
         style={{
           flex: 1,
@@ -63,7 +63,7 @@ function WebFrame({ children }: { children: ReactNode }) {
           maxWidth: 440,
           backgroundColor: theme.bg,
           overflow: 'hidden',
-          boxShadow: '0 0 40px rgba(8, 30, 22, 0.18)',
+          boxShadow: '0 0 40px rgba(0, 0, 0, 0.18)',
         }}
       >
         {children}
