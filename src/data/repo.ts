@@ -187,6 +187,8 @@ export function createCloudRepo(userId: string): Repo {
           .select('*')
           .gte('occurred_at', since)
           .order('occurred_at', { ascending: false })
+          // A unique tiebreaker, so rows with the same time are never skipped or read twice across pages.
+          .order('id', { ascending: true })
           .range(from, from + 999);
         if (error) throw error;
         all.push(...(data as TxRow[]).map(fromRow));
@@ -201,6 +203,8 @@ export function createCloudRepo(userId: string): Repo {
           .eq('status', 'confirmed')
           .lt('occurred_at', since)
           .order('occurred_at', { ascending: false })
+          // A unique tiebreaker, so rows with the same time are never skipped or read twice across pages.
+          .order('id', { ascending: true })
           .range(from, from + 999);
         if (error) throw error;
         for (const r of (data ?? []) as Pick<TxRow, 'kind' | 'amount_satang'>[]) {

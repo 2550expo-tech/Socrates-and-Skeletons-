@@ -7,14 +7,14 @@ import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { goBack } from '../ui/nav';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Switch, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../data/AppProvider';
 import { supabase } from '../data/supabase';
 import { useAutoScan } from '../services/AutoScanProvider';
 import { forgetScanned } from '../services/slips';
 import { amountToInput, parseBahtToSatang } from '../domain/money';
-import { Button, Card, IconButton, Ionicons, Row, Segmented, T } from '../ui/components';
+import { Button, Card, IconButton, Ionicons, Row, Segmented, T, Toggle } from '../ui/components';
 import { setKlaSound, useKlaSound } from '../ui/kla/useKlaTalk';
 import { ThemePicker } from '../ui/ThemePicker';
 import { setThemeMode, useThemeMode, type ThemeMode } from '../ui/themeMode';
@@ -113,26 +113,14 @@ export default function Settings() {
                   <T v="body">หาสลิปใหม่ทุกครั้งที่เปิดแอป</T>
                   <T v="micro">ตรวจเฉพาะรูปที่มี QR ของสลิปธนาคาร ย้อนหลังตั้งแต่ครั้งล่าสุดที่เปิดแอป</T>
                 </View>
-                <Switch
-                  value={auto.prefs.autoScan}
-                  onValueChange={(v) => auto.setPrefs({ autoScan: v })}
-                  trackColor={{ true: theme.primary, false: theme.inkFaint }}
-                  ios_backgroundColor={theme.inkFaint}
-                  accessibilityLabel="หาสลิปใหม่ทุกครั้งที่เปิดแอป"
-                />
+                <Toggle value={auto.prefs.autoScan} onValueChange={(v) => auto.setPrefs({ autoScan: v })} label="หาสลิปใหม่ทุกครั้งที่เปิดแอป" />
               </Row>
               <Row justify="space-between" gap={space.md}>
                 <View style={{ flex: 1 }}>
                   <T v="body">รวมยอดทันทีเมื่ออ่านชัด</T>
                   <T v="micro">สลิปที่อ่านได้มั่นใจ 80% ขึ้นไปทุกช่องจะเข้ายอดเงินเลย ส่วนที่ไม่ชัดรอให้ตรวจก่อน</T>
                 </View>
-                <Switch
-                  value={auto.prefs.autoConfirm}
-                  onValueChange={(v) => auto.setPrefs({ autoConfirm: v })}
-                  trackColor={{ true: theme.primary, false: theme.inkFaint }}
-                  ios_backgroundColor={theme.inkFaint}
-                  accessibilityLabel="รวมยอดทันทีเมื่ออ่านชัด"
-                />
+                <Toggle value={auto.prefs.autoConfirm} onValueChange={(v) => auto.setPrefs({ autoConfirm: v })} label="รวมยอดทันทีเมื่ออ่านชัด" />
               </Row>
             </Card>
           ) : null}
@@ -144,13 +132,7 @@ export default function Settings() {
                 <T v="body">เสียงน้องกล้า</T>
                 <T v="micro">น้องกล้าพูดคำแนะนำออกเสียงในหน้าโค้ช ปิดไว้ก็ยังมีตัวหนังสือขึ้นให้อ่าน</T>
               </View>
-              <Switch
-                value={klaSound}
-                onValueChange={setKlaSound}
-                trackColor={{ true: theme.primary, false: theme.inkFaint }}
-                  ios_backgroundColor={theme.inkFaint}
-                accessibilityLabel="เสียงน้องกล้า"
-              />
+              <Toggle value={klaSound} onValueChange={setKlaSound} label="เสียงน้องกล้า" />
             </Row>
             <Button label="ตู้สกินน้องกล้า" kind="soft" small icon="shirt-outline" onPress={() => router.push('/skins')} />
           </Card>

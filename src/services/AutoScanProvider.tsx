@@ -11,8 +11,10 @@
  * - Nothing is skipped for good by accident: when the phone is offline or the AI
  *   is unavailable the run stops without moving its window forward, and a photo
  *   that could not be read is tried again next run (MAX_AUTO_ATTEMPTS in all).
- *   Two unreadable photos in a row look like the reader being down, not the
- *   photos: the run stops and neither counts as a failed attempt.
+ *   Two unreadable photos in a row look like the reader being down: the run stops
+ *   early (each still counts as one try). A photo that keeps stopping whole runs
+ *   (busy or timed-out reader) is left for the scan screen after STALL_LIMIT runs,
+ *   so one bad photo can never hold up the photos behind it.
  * - Each account has its own window, and a run stops (saving nothing more) when
  *   the account changes. It also waits while the scan screen is reading photos.
  */
@@ -45,6 +47,8 @@ const NETWORK_RETRY_MS = 3000;
 const START_DELAY_MS = 1800;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const READER_DOWN = 'ระบบอ่านสลิปขัดข้องชั่วคราว สลิปที่เหลือจะอ่านต่อตอนเปิดแอปครั้งหน้า';
+/** Runs one photo may stop (busy or timed-out reader) before the automatic scan leaves it for the scan screen. */
+const STALL_LIMIT = 3;
 
 export type AutoScanPhase = 'idle' | 'needs_permission' | 'scanning' | 'done' | 'error';
 
@@ -171,7 +175,9 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
                 stillValid: current,
               });
               unreadable = [];
-              if (r.tx) {
+              delete failures[`stall:${img.assetId}`];
+              // Saved for an account that is no longer open: do not show it in this one.
+              if (r.tx && current()) {
                 upsertRef.current(r.tx);
                 if (r.confirmed) confirmed.push(r.tx);
                 else drafts += 1;
@@ -191,18 +197,24 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
               if (code === 'network') {
                 // Offline: stop without moving the window, so nothing found this time is skipped.
                 stoppedBy = 'เชื่อมต่ออินเทอร์เน็ตไม่ได้ สลิปที่เหลือจะอ่านต่อตอนเปิดแอปครั้งหน้า';
+              } else if (code === 'busy' || code === 'server') {
+                // The reader is busy or down. Usually that passes; but if this same photo stopped
+                // STALL_LIMIT runs, it is probably the photo (it times out): leave it for the scan screen.
+                const key = `stall:${img.assetId}`;
+                failures[key] = (failures[key] ?? 0) + 1;
+                if (failures[key] >= STALL_LIMIT) {
+                  delete failures[key];
+                  failures[img.assetId] = MAX_AUTO_ATTEMPTS;
+                } else stoppedBy = (e as Error).message;
               } else if (code && code !== 'reader_error' && code !== 'too_large') {
-                stoppedBy = (e as Error).message; // affects every photo (not configured, AI busy, quota, signed out)
+                stoppedBy = (e as Error).message; // affects every photo (not configured, quota, signed out)
               } else {
                 // This photo could not be read: try it again next run, up to MAX_AUTO_ATTEMPTS times.
                 failures[img.assetId] = (failures[img.assetId] ?? 0) + 1;
                 if (failures[img.assetId] < MAX_AUTO_ATTEMPTS) retryFrom = Math.min(retryFrom ?? img.createdAt, img.createdAt);
                 if (code === 'reader_error') unreadable.push(img.assetId);
-                if (unreadable.length >= 2) {
-                  // Two in a row: more likely the reader is down than the photos. They do not count as tries.
-                  for (const id of unreadable) failures[id] = Math.max(0, (failures[id] ?? 1) - 1);
-                  stoppedBy = READER_DOWN;
-                }
+                // Two in a row: more likely the reader is down than the photos; stop and try later.
+                if (unreadable.length >= 2) stoppedBy = READER_DOWN;
               }
             }
             break;

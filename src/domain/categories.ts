@@ -60,18 +60,19 @@ const PERSON_TITLE = /^\s*(?:นาย|นางสาว|นาง|น\.ส\.|�
 
 /**
  * Where a keyword matches and how long it is (null = no match).
- * - Latin keywords match whole words only: "ais" is not in "PAISAN", "rent" is not in "LAURENT".
- * - After a person title, short Thai keywords are skipped: "วิน" is not in "นาย วินัย".
- *   (Keywords are substrings in Thai, which has no spaces between words; a unit test, TC-25, guards
- *   against short words like "ชา" matching the name "สมชาย".)
+ * - Latin keywords must start a word: "ais" is not in "PAISAN", "rent" is not in "LAURENT"; brands
+ *   written together still match ("GRABPAY", "SHOPEEPAY", "TRUEMOVE", "CENTRALWORLD").
+ * - After a person title, short keywords are skipped: "วิน" is not in "นาย วินัย", "ais" not in
+ *   "MS AISHA". (Thai has no spaces between words, so keywords are substrings; a unit test,
+ *   TC-25, guards against short words like "ชา" matching the name "สมชาย".)
  */
 function findKeyword(text: string, keyword: string, person: boolean): { at: number; len: number } | null {
+  if (person && keyword.length < 5) return null;
   if (/^[a-z0-9 .&'-]+$/.test(keyword)) {
-    const re = new RegExp(`(^|[^a-z])(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})s?(?=[^a-z]|$)`);
+    const re = new RegExp(`(^|[^a-z])(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`);
     const m = re.exec(text);
     return m ? { at: m.index + m[1].length, len: keyword.length } : null;
   }
-  if (person && keyword.length < 5) return null;
   const at = text.indexOf(keyword);
   return at < 0 ? null : { at, len: keyword.length };
 }

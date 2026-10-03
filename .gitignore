@@ -49,3 +49,4 @@ node_modules
 demo-video/
 .scratch/
 e2e-shots-*/
+/theme-shots

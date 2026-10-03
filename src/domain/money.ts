@@ -13,8 +13,8 @@ export function toAsciiDigits(s: string): string {
 /**
  * Parse what a user (or a slip) wrote into satang.
  * Accepts "1,234.50", "1234.5", "฿85", "85 บาท", " 1 234.00 ", Thai digits "๘๕", and a decimal
- * comma as typed on phones set to such regions ("85,50" = 85.50). Commas elsewhere must group
- * thousands ("12,34" is refused rather than read as 1,234).
+ * comma as typed on phones set to such regions ("85,50" = 85.50, "12,34" = 12.34; never 1,234).
+ * Other commas must group thousands ("1,234.50"); anything else ("1,23,4") is refused.
  * Returns null for anything that is not a positive amount with at most 2 decimals, or above
  * MAX_SATANG. With `allowZero`, "0" and "0.00" give 0 (an opening balance may be zero).
  */

@@ -18,7 +18,8 @@ import { BUDDY_NAME, buddyPoke, type BuddyMood } from '../../domain/buddy';
 import { buildCoachContext, buildInsights } from '../../domain/insights';
 import { HALLOWEEN_LINES } from '../../domain/halloween';
 import { KLA_AFTER, KLA_GREETING, KLA_GREETING_HALLOWEEN, KLA_THINKING, REPEAT_MAX } from '../../domain/klaTalk';
-import { formatBaht, parseBahtToSatang } from '../../domain/money';
+import { formatBaht } from '../../domain/money';
+import { priceInQuestion } from '../../domain/price';
 import { runwayAfterPurchase } from '../../domain/runway';
 import { SKINS, skinById, type SkinId } from '../../domain/skins';
 import { askCoach, CoachError } from '../../services/coach';
@@ -46,23 +47,6 @@ const IDLE = `สงสัยอะไรเรื่องเงิน ถา�
 
 /** น้องกล้า says hello once each time the app is opened, not on every visit to the tab. */
 let greeted = false;
-
-const NUM = '((?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d{1,2})?)';
-const PRICE_PATTERNS = [
-  new RegExp(`฿\\s?${NUM}`),
-  new RegExp(`${NUM}\\s*บาท`),
-  // "ซื้อรองเท้า 1290 ได้ไหม", but not "อีก 30 วัน" or "ซื้อ 2 ชิ้น".
-  new RegExp(`(?:ซื้อ|ราคา|จ่าย)[^\\d]{0,24}?${NUM}(?![\\d.,]|\\s*(?:วัน|เดือน|ปี|ชิ้น|อัน|คน|ครั้ง|%|เปอร์))`),
-];
-
-/** A price in a question: "ซื้อของ 500 บาท", "฿1,290", "ซื้อรองเท้า 1290 ได้ไหม". Other numbers ("อีก 30 วัน") are not prices. */
-function priceInQuestion(q: string): number | null {
-  for (const re of PRICE_PATTERNS) {
-    const m = q.match(re);
-    if (m) return parseBahtToSatang(m[1]);
-  }
-  return null;
-}
 
 export default function Coach() {
   const theme = useTheme();

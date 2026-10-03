@@ -12,6 +12,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
   type LayoutChangeEvent,
@@ -111,7 +112,8 @@ export function Money({
   const reduce = useReduceMotion();
   const value = useCountUp(satang, !!countUp && !reduce);
   const abs = Math.abs(value);
-  const whole = String(Math.floor(abs / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  // Whole baht only: round to the nearest baht, like formatBaht (฿99.99 shows ฿100).
+  const whole = String(decimals ? Math.floor(abs / 100) : Math.round(abs / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const frac = String(abs % 100).padStart(2, '0');
   const prefix = sign ? (value < 0 ? '−' : '+') : value < 0 ? '−' : '';
   const big = type[size];
@@ -299,8 +301,9 @@ export function Button({
       onPressIn={off ? undefined : press.onPressIn}
       onPressOut={press.onPressOut}
       disabled={off}
-      // Small buttons are about 40pt tall: the touch area reaches 44pt and more.
-      hitSlop={small ? 6 : undefined}
+      // Small buttons are about 40pt tall: the touch area reaches 44pt and more (up and down only,
+      // so buttons side by side never share a touch area).
+      hitSlop={small ? { top: 4, bottom: 4 } : undefined}
       accessibilityRole="button"
       aria-disabled={!!off}
       aria-busy={!!loading}
@@ -482,7 +485,7 @@ export function Chip({
       onPress={onPress}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
-      hitSlop={6}
+      hitSlop={{ top: 6, bottom: 6 }}
       accessibilityRole="button"
       aria-selected={!!selected}
       style={{
@@ -536,6 +539,26 @@ export function Badge({
     <View style={{ backgroundColor: c.bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4, alignSelf: center ? 'center' : 'flex-start' }}>
       <Text style={[type.micro, { fontFamily: fonts.sansSemi, color: c.fg }]}>{label}</Text>
     </View>
+  );
+}
+
+/**
+ * On/off switch. Track in the theme colour when on and in inkFaint when off (visible on every
+ * surface); a white knob on every platform (the web's default knob is Material teal).
+ */
+export function Toggle({ value, onValueChange, label }: { value: boolean; onValueChange: (v: boolean) => void; label: string }) {
+  const theme = useTheme();
+  const webKnob = { activeThumbColor: '#FFFFFF' } as Record<string, string>;
+  return (
+    <Switch
+      value={value}
+      onValueChange={onValueChange}
+      trackColor={{ true: theme.primary, false: theme.inkFaint }}
+      ios_backgroundColor={theme.inkFaint}
+      thumbColor="#FFFFFF"
+      accessibilityLabel={label}
+      {...webKnob}
+    />
   );
 }
 

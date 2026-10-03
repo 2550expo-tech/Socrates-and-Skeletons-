@@ -3,7 +3,6 @@
  * Balance = money now; the low line drives FR-6; the budget is optional.
  */
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform } from 'react-native';
 import { useApp } from '../data/AppProvider';
 import { amountToInput, parseBahtToSatang } from '../domain/money';
 import { Button, Card, Screen, T } from '../ui/components';
@@ -54,8 +53,8 @@ export default function Onboarding() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Screen edges={['top', 'bottom']} contentStyle={{ paddingTop: space.xl }}>
+    // Screen keeps the focused field above the keyboard (iOS), so no extra keyboard wrapper here.
+    <Screen edges={['top', 'bottom']} contentStyle={{ paddingTop: space.xl }}>
         <StepDots step={3} />
         <Reveal>
           <T v="h1">ตั้งค่า 1 นาที แล้วเริ่มเห็นภาพเงินของคุณ</T>
@@ -98,7 +97,6 @@ export default function Onboarding() {
         </Reveal>
         <Button label="เริ่มใช้ MindPay" kind="gold" shine onPress={finish} loading={busy} />
         <T v="micro" center>แก้ไขทุกค่าได้ภายหลังในหน้าตั้งค่า</T>
-      </Screen>
-    </KeyboardAvoidingView>
+    </Screen>
   );
 }

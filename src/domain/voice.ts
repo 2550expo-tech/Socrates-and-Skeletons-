@@ -80,8 +80,9 @@ export function thaiNumberWords(words: string): number | null {
   });
   if (digit !== null) {
     // Spoken short form: "สองพันห้า" = 2,500 and "ร้อยห้า" = 150 (but "หนึ่งร้อยห้า" = 105).
-    // A trailing one is never short: "ร้อยหนึ่ง" / "ร้อยเอ็ด" = 101.
-    const one = digitWord === 'หนึ่ง' || digitWord === 'เอ็ด' || digitWord === 'นึง';
+    // "เอ็ด" is always the units digit ("ร้อยเอ็ด" = 101), and so is "หนึ่ง" after ร้อย ("ร้อยหนึ่ง" = 101);
+    // after พัน or more it is the short form like any digit ("สองพันหนึ่ง" = 2,100).
+    const one = digitWord === 'เอ็ด' || digitWord === 'นึง' || (digitWord === 'หนึ่ง' && lastMultiplier === 100);
     const short = !one && digitRightAfterMultiplier && (lastMultiplier >= 1000 || (lastMultiplier === 100 && !startsWithDigit));
     total += short ? digit * (lastMultiplier / 10) : digit;
   }
@@ -94,9 +95,21 @@ export function thaiNumberWords(words: string): number | null {
 
 /** Words after a number that make it a quantity, not money ("ข้าว 2 จาน"). */
 const UNIT = 'จาน|แก้ว|ขวด|ชิ้น|อัน|ห่อ|ถุง|กล่อง|ลูก|คน|ที่|ตัว|คู่|เล่ม|ใบ|ครั้ง|โมง|นาที|ชั่วโมง|วัน|เดือน|ปี|กิโล|กก\\.?|ลิตร|ชาม|ถ้วย|เม็ด|แผ่น|ซอง|แพ็ค|หลอด|คัน|รอบ';
-const INCOME_WORDS = ['ได้เงิน', 'ได้รับ', 'รับเงิน', 'เงินเข้า', 'เงินเดือน', 'ค่าจ้าง', 'แม่ให้', 'พ่อให้', 'โอนมาให้', 'โอนเข้า', 'รายรับ', 'รายได้', 'ขายของได้', 'ได้ค่าขนม', 'ได้ค่า', 'ได้เงินคืน', 'เงินคืน'];
-/** Paying words win over income words: "จ่ายค่าจ้างช่างแอร์" is spending, "คืนเงินเพื่อน" is paying back. */
-const PAYING = /จ่าย|ซื้อ|คืนเงิน|โอนให้|โอนไป/;
+const INCOME_WORDS = ['ได้เงิน', 'ได้รับ', 'รับเงิน', 'เงินเข้า', 'เงินเดือน', 'ค่าจ้าง', 'แม่ให้', 'พ่อให้', 'โอนมาให้', 'โอนเข้า', 'รายรับ', 'รายได้', 'ขายของได้', 'ได้ค่าขนม', 'ได้ค่า', 'ได้เงินคืน', 'เงินคืน', 'คืนเงิน'];
+/**
+ * Paying words, when they come before any income word: "จ่ายค่าจ้างช่างแอร์" is spending, but
+ * "แม่ให้เงินซื้อขนม" is still money in. "คืนเงิน" pays back only at the start ("คืนเงินเพื่อน");
+ * after someone's name it is money coming back ("เพื่อนคืนเงิน").
+ */
+const PAYING = /^(?:คืนเงิน)|จ่าย|ซื้อ|โอนให้|โอนไป/;
+
+function isIncome(text: string): boolean {
+  const t = text.trim().replace(CONNECTORS, '');
+  const incomeAt = Math.min(...INCOME_WORDS.map((w) => t.indexOf(w)).filter((i) => i >= 0), Infinity);
+  if (incomeAt === Infinity) return false;
+  const pay = PAYING.exec(t);
+  return !pay || pay.index > incomeAt;
+}
 // "กับข้าว" (side dishes) and "ต่อเติม" are words, not "and" + something.
 const CONNECTORS = /^(?:และ|กับ(?!ข้าว|แกล้ม)|แล้วก็|แล้ว|ก็|อีก|ต่อ(?!เติม|ภาษี|ทะเบียน)|,|\+)+\s*/;
 /**
@@ -159,7 +172,11 @@ function normalizeMarked(text: string): string {
     .replace(/฿\s*(\d)/g, '$1')
     .replace(/(\d)\s*฿/g, '$1 บาท ')
     // 7-Eleven, but never the "711" inside an amount ("ค่าไฟ 711", "1711").
-    .replace(/(^|[^\d.,])7\s*-\s*11(?!\d)|(^|[^\d.,])7\s*-?\s*eleven/g, (_, a?: string, b?: string) => `${a ?? b ?? ''}เซเว่น`)
+    // "7 11" or "711" only when an amount follows (or the text ends): "ค่าไฟ 711 บาท" stays ฿711.
+    .replace(
+      /(^|[^\d.,])7\s*-\s*11(?!\d)|(^|[^\d.,])7\s*-?\s*eleven|(^|[^\d.,])7\s?11(?=\s+\d|\s*$)/g,
+      (_, a?: string, b?: string, c?: string) => `${a ?? b ?? c ?? ''}เซเว่น`,
+    )
     .replace(/เซเว่นอีเลฟเว่น|เซเว่น/g, 'เซเว่น')
     .replace(POLITE, '$1 ')
     .replace(LONE_NA, ' ');
@@ -234,7 +251,7 @@ export function parseSpokenEntry(input: string): SpokenEntry {
     if (!amountFirst && !bare(title) && i === found.length - 1) title = text.slice(f.end);
     title = title.replace(DAY_MARK_RE, ' ');
     const lower = title.toLowerCase();
-    const kind: TxKind = !PAYING.test(lower) && INCOME_WORDS.some((w) => lower.includes(w)) ? 'income' : 'expense';
+    const kind: TxKind = isIncome(lower) ? 'income' : 'expense';
     const clean = cleanTitle(title, kind);
     const categoryKey = spokenCategory(clean, kind);
     // The day said last before this item's amount; if none was said before it, the first one said.

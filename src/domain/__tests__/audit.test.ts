@@ -13,6 +13,7 @@ import { findRecurring, upcomingRecurring } from '../recurring';
 import { addToIndex, buildDuplicateIndex, isDuplicate, type SlipCandidate } from '../slip';
 import { addPayer, EMPTY_NAME_STATS, isMine } from '../slipNames';
 import type { Transaction } from '../types';
+import { priceInQuestion } from '../price';
 import { parseSpokenEntry, thaiNumberWords } from '../voice';
 
 let n = 0;
@@ -226,5 +227,58 @@ describe('TC-86 goal lines never say ฿0 while short', () => {
       createdAt: '2026-09-01T00:00:00Z',
     };
     expect(goalLine(g, '2026-09-30')).toBe('อีก ฿1 ก็ครบ');
+  });
+});
+
+describe('TC-80 review: what the first round of fixes must not break', () => {
+  const kind = (t: string) => parseSpokenEntry(t).items[0]?.kind;
+  it('money in stays money in, even when it is for buying something', () => {
+    for (const t of ['แม่ให้เงินซื้อขนม 100', 'ได้เงินจากแม่ไว้ซื้อหนังสือ 500', 'ได้ค่าขนมไปซื้อข้าว 100', 'พ่อให้เงินไปจ่ายค่าเทอม 5000', 'เพื่อนคืนเงิน 200', 'ลูกค้าคืนเงิน 300']) {
+      expect(kind(t)).toBe('income');
+    }
+    for (const t of ['จ่ายค่าจ้างช่างแอร์ 800', 'คืนเงินเพื่อน 200', 'ซื้อข้าว 50']) expect(kind(t)).toBe('expense');
+  });
+
+  it('keeps the short form after พัน and more', () => {
+    expect(thaiNumberWords('สองพันหนึ่ง')).toBe(2100);
+    expect(thaiNumberWords('หมื่นหนึ่ง')).toBe(11000);
+    expect(thaiNumberWords('ร้อยหนึ่ง')).toBe(101);
+    expect(thaiNumberWords('พันเอ็ด')).toBe(1001);
+  });
+
+  it('reads "7 11" before an amount as the shop, and 711 on its own as money', () => {
+    expect(parseSpokenEntry('7 11 120').items.map((i) => [i.amountSatang / 100, i.categoryKey])).toEqual([[120, 'convenience']]);
+    expect(parseSpokenEntry('711 89').items.map((i) => i.amountSatang / 100)).toEqual([89]);
+    expect(parseSpokenEntry('ค่าไฟ 711 บาท').items.map((i) => i.amountSatang / 100)).toEqual([711]);
+  });
+});
+
+describe('TC-82 review: brands written without spaces', () => {
+  it('still finds their category', () => {
+    const cases: [string, string][] = [
+      ['GRABPAY', 'transport'], ['GRABTAXI', 'transport'], ['SHOPEEPAY', 'shopping'], ['BTSC', 'transport'], ['PTTOR', 'transport'],
+      ['CENTRALWORLD', 'shopping'], ['TRUEMOVE', 'bills'], ['AISFIBRE', 'bills'], ['STEAMGAMES.COM', 'fun'], ['GRABFOOD', 'food'],
+    ];
+    for (const [name, key] of cases) expect([name, suggestCategory(name, 'expense')]).toEqual([name, key]);
+    expect(suggestCategory('MS AISHA', 'expense')).toBe('transfer_out');
+    expect(suggestCategory('MR. LAURENT', 'expense')).toBe('transfer_out');
+  });
+});
+
+describe('TC-89 prices in coach questions', () => {
+  it('finds the price, wherever the buying word is', () => {
+    expect(priceInQuestion('ซื้อของ 500 บาทวันนี้ได้ไหม')).toBe(50_000);
+    expect(priceInQuestion('฿1,290 แพงไหม')).toBe(129_000);
+    expect(priceInQuestion('ซื้อรองเท้า 1290 ได้ไหม')).toBe(129_000);
+    expect(priceInQuestion('กระเป๋า 2500 ซื้อได้ไหม')).toBe(250_000);
+    expect(priceInQuestion('หูฟัง 1,990 คุ้มไหม')).toBe(199_000);
+    expect(priceInQuestion('อยากได้มือถือ 15000 ควรซื้อไหม')).toBe(1_500_000);
+  });
+
+  it('does not take other numbers for a price', () => {
+    expect(priceInQuestion('ทำยังไงให้เงินพอถึงสิ้นเดือน อีก 30 วัน')).toBeNull();
+    expect(priceInQuestion('ลดกาแฟ 20% ได้ไหม')).toBeNull();
+    expect(priceInQuestion('สรุปสัปดาห์นี้ให้หน่อย')).toBeNull();
+    expect(priceInQuestion('อีก 120 วันจะเก็บได้เท่าไร')).toBeNull();
   });
 });

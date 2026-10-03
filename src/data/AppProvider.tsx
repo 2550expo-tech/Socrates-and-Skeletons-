@@ -219,14 +219,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const result = parseAuthLink(url);
     if (!url || !result || !supabase || handledLinks.current.has(url)) return false;
     handledLinks.current.add(url);
+    // Never leave sign-in tokens in the address bar (web), whatever happens next.
+    clearLinkFromAddressBar();
     // Android keeps handing back the link that opened the app, even after an update reloads it:
-    // a link used once is never used again (its tokens are spent, and reusing them signs out).
+    // a link that worked (or that the server refused) is never used again. One that failed only
+    // because the phone was offline can be tapped again.
     const fp = linkFingerprint(url);
     const used = await usedLinks();
     if (used.includes(fp)) return false;
-    Storage.setItem(USED_LINKS_KEY, JSON.stringify([...used, fp].slice(-20))).catch(() => {});
-    clearLinkFromAddressBar();
+    const remember = () => {
+      Storage.setItem(USED_LINKS_KEY, JSON.stringify([...used, fp].slice(-20))).catch(() => {});
+    };
+    const tryLater = () => handledLinks.current.delete(url);
     if (result.kind === 'error') {
+      remember();
       setAuthNotice({ kind: 'link_error', message: authLinkErrorMessage(result) });
       return false;
     }
@@ -236,9 +242,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ? await supabase.auth.setSession({ access_token: result.accessToken!, refresh_token: result.refreshToken! })
           : await supabase.auth.exchangeCodeForSession(result.code!);
       if (error || !data.session) {
+        // An answer from the server (expired, already used): final. No answer (offline): may work later.
+        if (error && typeof error.status === 'number' && error.status > 0) remember();
+        else tryLater();
         setAuthNotice({ kind: 'link_error', message: authErrorMessage(error) });
         return false;
       }
+      remember();
       // Sign in right away (the auth event may only say TOKEN_REFRESHED when a session already existed).
       const uid = data.session.user.id;
       if (activeUserRef.current !== uid) {
@@ -252,6 +262,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       return true;
     } catch (e) {
+      tryLater();
       setAuthNotice({ kind: 'link_error', message: authErrorMessage(e as Error) });
       return false;
     }
@@ -321,25 +332,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
       carrySatang,
       goals,
       async addGoal(input) {
-        const g = await need().insertGoal(input);
-        setGoals((list) => [...list, g]);
+        const r = need();
+        const g = await r.insertGoal(input);
+        if (repoRef.current === r) setGoals((list) => [...list, g]);
         return g;
       },
       async updateGoal(id, patch) {
-        const g = await need().updateGoal(id, patch);
-        setGoals((list) => list.map((x) => (x.id === id ? g : x)));
+        const r = need();
+        const g = await r.updateGoal(id, patch);
+        if (repoRef.current === r) setGoals((list) => list.map((x) => (x.id === id ? g : x)));
         return g;
       },
       async depositToGoal(id, deltaSatang) {
         const current = goals.find((x) => x.id === id);
         if (!current) throw new Error('ไม่พบเป้าหมาย');
-        const g = await need().updateGoal(id, applyDeposit(current, deltaSatang));
-        setGoals((list) => list.map((x) => (x.id === id ? g : x)));
+        const r = need();
+        const g = await r.updateGoal(id, applyDeposit(current, deltaSatang));
+        if (repoRef.current === r) setGoals((list) => list.map((x) => (x.id === id ? g : x)));
         return g;
       },
       async removeGoal(id) {
-        await need().removeGoal(id);
-        setGoals((list) => list.filter((x) => x.id !== id));
+        const r = need();
+        await r.removeGoal(id);
+        if (repoRef.current === r) setGoals((list) => list.filter((x) => x.id !== id));
       },
       loadError,
       refreshing,
@@ -360,31 +375,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (r?.mode === 'demo') await resetDemoData();
         clear();
       },
+      // After each save the result is shown only if the same account is still open
+      // (an account switch during the save must not mix the two).
       async saveProfile(patch) {
-        const p = await need().updateProfile(patch);
-        setProfile(p);
+        const r = need();
+        const p = await r.updateProfile(patch);
+        if (repoRef.current === r) setProfile(p);
       },
       async addTx(input) {
-        const tx = await need().insert(input);
+        const r = need();
+        const tx = await r.insert(input);
+        if (repoRef.current !== r) return tx;
         noteLocal(tx.id, tx);
         setTxs((list) => [tx, ...list]);
         return tx;
       },
       async updateTx(id, patch) {
-        const tx = await need().update(id, patch);
+        const r = need();
+        const tx = await r.update(id, patch);
+        if (repoRef.current !== r) return tx;
         noteLocal(id, tx);
         setTxs((list) => list.map((t) => (t.id === id ? tx : t)));
         return tx;
       },
       async removeTx(id) {
         const removed = txs.find((t) => t.id === id);
-        await need().remove(id);
+        const r = need();
+        await r.remove(id);
+        if (repoRef.current !== r) return removed;
         noteLocal(id, null);
         setTxs((list) => list.filter((t) => t.id !== id));
         return removed;
       },
       async confirmTxs(ids) {
-        await need().confirmMany(ids);
+        const r = need();
+        await r.confirmMany(ids);
+        if (repoRef.current !== r) return;
         const set = new Set(ids);
         setTxs((list) =>
           list.map((t) => {
