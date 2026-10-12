@@ -1,121 +1,227 @@
 /**
- * Home (MindPay ใหม่): three parts only, so it never feels crowded.
- * 1. The money card (FR-6 + FR-2): how many days the money lasts, compared with
- *    the end of the month (days left over to keep, or days short), the balance,
- *    today's spending, and "ดึงสลิปวันนี้" (FR-4). Tap it for Money Runway.
- * 2. งบเดือนนี้: this month's spending against the monthly budget.
- * 3. รายการล่าสุด: the last five transactions.
- * Cards that need an action (slips waiting, a new medal, a scan running) show
- * above them only while they matter. The breakdowns live in the สถิติ tab.
+ * Home (MindPay ใหม่): three parts, and the money always comes first.
+ * 1. The money card (FR-6 + FR-2): how many days the money lasts, a rail from
+ *    today to that day with the month end marked, whether it reaches the month
+ *    end ("เหลือเก็บได้อีก / ขาดอีก … วัน"), the balance and the 7-day average
+ *    the days come from. Tap it for Money Runway.
+ * 2. งบเดือนนี้: this month's budget, how far through the month we are, and
+ *    what is left for today (only with a budget).
+ * 3. รายการล่าสุด: the last three items.
+ * Above them, at most ONE attention card (src/domain/attention.ts): money
+ * matters first, then new rewards, then one promotion a day. Today's spending
+ * sits beside the (+) in the tab bar (Quick Access).
  */
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Animated, Pressable, RefreshControl, View } from 'react-native';
 import { useApp, useMoney } from '../../data/AppProvider';
-import { spentOnDay } from '../../domain/buddy';
-import { formatThaiDay } from '../../domain/dates';
+import { Storage } from '../../data/storage';
+import { pickAttention, type AttentionItem, type PromoItem, type PromoTurn } from '../../domain/attention';
+import { budgetToday } from '../../domain/budget';
+import type { BuddyMood } from '../../domain/buddy';
+import { bkkDayKey, formatThaiDay, formatThaiMonth, previousMonth, relativeDayLabel, thaiWeekday } from '../../domain/dates';
 import { halloweenOn } from '../../domain/halloween';
 import { formatBaht } from '../../domain/money';
-import { endOfMonthDay, monthEndCheck, safeDailySpend, type MonthEndCheck, type Runway } from '../../domain/runway';
+import { recapToOffer } from '../../domain/recap';
+import { monthEndCheck, type MonthEndCheck, type Runway } from '../../domain/runway';
 import { skinById } from '../../domain/skins';
-import { monthExpense } from '../../domain/summary';
 import { useAutoScan } from '../../services/AutoScanProvider';
-import { useKla } from '../../services/kla';
+import { useEquippedSkin, useKla } from '../../services/kla';
 import { useAchievements } from '../../services/useAchievements';
 import { markWhatsNewSeen, useWhatsNewPending } from '../../services/whatsNew';
-import { ContourLines } from '../../ui/art';
 import { AutoScanBanner } from '../../ui/AutoScanBanner';
 import { Buddy } from '../../ui/Buddy';
-import { Badge, Button, Card, Divider, EmptyState, IconButton, Ionicons, Money, ProgressBar, Row, Screen, T } from '../../ui/components';
-import { Aurora, Reveal, useCelebrate, usePressSpring } from '../../ui/effects';
-import { HalloweenBunting, HalloweenCard, HalloweenInvite, SpookyHeroDecor, useHalloween } from '../../ui/halloween';
+import { Divider, EmptyState, IconButton, Ionicons, Money, Row, Screen, T, type IconName } from '../../ui/components';
+import { Reveal, useCelebrate, usePressSpring } from '../../ui/effects';
+import { closeHalloweenInvite, GhostArt, HalloweenStrip, SpookyHeroDecor, useHalloween, useHalloweenInvitePending } from '../../ui/halloween';
 import { KlaPicture } from '../../ui/kla/KlaPicture';
 import { Medal } from '../../ui/Medal';
 import { useCountUp, useReduceMotion } from '../../ui/motion';
-import { SectionHead } from '../../ui/SectionHead';
+import { RunwayRail } from '../../ui/RunwayRail';
 import { TxRow } from '../../ui/TxRow';
+import { useToast } from '../../ui/feedback';
 import { alpha, fonts, radius, space, useTheme } from '../../ui/theme';
+import { setColorTheme } from '../../ui/themeMode';
 
 /** Badges already celebrated in this session (the home screen can mount again). */
 const celebrated = new Set<string>();
 
-/** The recording streak: a flame and the number of days; opens the achievements. */
-function StreakPill({ days, today }: { days: number; today: boolean }) {
+// ---------------------------------------------------------------- today's promotional turn (one a day)
+
+const TURN_KEY = 'mindpay.attention.turn';
+const RECAP_CLOSED_KEY = 'mindpay.recap.offerClosed';
+type Prefs = { turn: PromoTurn | null; recapClosed: string | null };
+let prefs: Prefs | undefined;
+const prefListeners = new Set<() => void>();
+const prefSub = (l: () => void) => {
+  prefListeners.add(l);
+  return () => {
+    prefListeners.delete(l);
+  };
+};
+const prefSnap = () => prefs;
+function setPrefs(next: Partial<Prefs>) {
+  prefs = { turn: null, recapClosed: null, ...prefs, ...next };
+  prefListeners.forEach((l) => l());
+  if ('turn' in next) Storage.setItem(TURN_KEY, JSON.stringify(next.turn)).catch(() => {});
+  if ('recapClosed' in next && next.recapClosed) Storage.setItem(RECAP_CLOSED_KEY, next.recapClosed).catch(() => {});
+}
+function usePrefs(): Prefs | undefined {
+  const value = useSyncExternalStore(prefSub, prefSnap, prefSnap);
+  useEffect(() => {
+    if (prefs) return;
+    Promise.all([Storage.getItem(TURN_KEY), Storage.getItem(RECAP_CLOSED_KEY)])
+      .then(([t, r]) => {
+        let turn: PromoTurn | null = null;
+        try {
+          turn = t ? (JSON.parse(t) as PromoTurn) : null;
+        } catch {
+          turn = null;
+        }
+        prefs = { turn, recapClosed: r };
+        prefListeners.forEach((l) => l());
+      })
+      .catch(() => {
+        prefs = { turn: null, recapClosed: null };
+        prefListeners.forEach((l) => l());
+      });
+  }, []);
+  return value;
+}
+
+// ---------------------------------------------------------------- header
+
+function moodOf(r: Runway): BuddyMood {
+  if (r.status === 'below_floor' || r.status === 'critical') return 'worried';
+  if (r.status === 'healthy') return 'happy';
+  return 'calm';
+}
+
+/** The recording streak: a small flame and the number of days; opens the achievements. */
+function Streak({ days, today }: { days: number; today: boolean }) {
   const theme = useTheme();
-  const press = usePressSpring(0.92);
   return (
-    <Animated.View style={{ transform: [{ scale: press.scale }] }}>
-      <Pressable
-        onPress={() => router.push('/achievements')}
-        onPressIn={press.onPressIn}
-        onPressOut={press.onPressOut}
-        hitSlop={6}
-        accessibilityRole="button"
-        accessibilityLabel={`จดต่อเนื่อง ${days} วัน ดูความสำเร็จ`}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 4,
-          paddingHorizontal: 12,
-          height: 36,
-          borderRadius: 18,
-          backgroundColor: theme.dark ? alpha(theme.accent, 0.14) : theme.accentSoft,
-          borderWidth: 1,
-          borderColor: today ? theme.accent : 'transparent',
-        }}
-      >
-        <Ionicons name="flame" size={18} color={today ? '#E07B2E' : theme.inkFaint} />
-        <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi }}>
-          {days}
-        </T>
-      </Pressable>
-    </Animated.View>
+    <Pressable
+      onPress={() => router.push('/achievements')}
+      hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel={`จดต่อเนื่อง ${days} วัน ดูความสำเร็จ`}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 2, height: 44, paddingHorizontal: 6 }}
+    >
+      <Ionicons name={today ? 'flame' : 'flame-outline'} size={20} color={today ? '#E07B2E' : theme.inkSoft} />
+      <T v="body" color={theme.ink} style={{ fontFamily: fonts.sansSemi, fontVariant: ['tabular-nums'] }}>
+        {days}
+      </T>
+    </Pressable>
   );
 }
 
-/** What the money card says about the month end. */
-function monthEndBadge(m: MonthEndCheck): { label: string; tone: 'good' | 'watch' | 'critical' | 'neutral' } {
+// ---------------------------------------------------------------- attention card
+
+function AttentionRow({
+  art,
+  icon,
+  title,
+  sub,
+  action,
+  onPress,
+  onClose,
+  closeLabel = 'ปิด',
+  emphasis,
+}: {
+  art?: React.ReactNode;
+  icon?: IconName;
+  title: string;
+  sub?: string;
+  action?: string;
+  onPress?: () => void;
+  onClose?: () => void;
+  closeLabel?: string;
+  emphasis?: boolean;
+}) {
+  const theme = useTheme();
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.md,
+        paddingLeft: space.md,
+        paddingRight: onClose ? space.xs : space.md,
+        paddingVertical: space.sm,
+        borderRadius: radius.lg,
+        backgroundColor: theme.surface,
+        borderWidth: emphasis ? 1.5 : 0,
+        borderColor: theme.accent,
+      }}
+    >
+      <Pressable
+        onPress={onPress}
+        disabled={!onPress}
+        accessibilityRole={onPress ? 'button' : undefined}
+        accessibilityLabel={onPress ? `${title}${sub ? ` ${sub}` : ''}${action ? ` ${action}` : ''}` : undefined}
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 48 }}
+      >
+        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: theme.surfaceAlt, alignItems: 'center', justifyContent: 'center', overflow: 'visible' }}>
+          {art ?? <Ionicons name={icon ?? 'notifications-outline'} size={20} color={theme.ink} />}
+        </View>
+        <View style={{ flex: 1, gap: 0 }}>
+          <T v="body" numberOfLines={2} style={{ fontFamily: fonts.sansSemi }}>
+            {title}
+          </T>
+          {sub ? (
+            <T v="small" numberOfLines={2}>
+              {sub}
+            </T>
+          ) : null}
+        </View>
+        {onPress ? <Ionicons name="chevron-forward" size={18} color={theme.inkSoft} /> : null}
+      </Pressable>
+      {onClose ? <IconButton icon="close" label={closeLabel} onPress={onClose} /> : null}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------- 1. the money card
+
+function statusOf(m: MonthEndCheck): { text: string; icon: IconName; tone: 'good' | 'bad' | 'plain' } {
   switch (m.kind) {
     case 'surplus':
-      return { label: `✓ เหลือเก็บได้อีก${m.capped ? 'มากกว่า' : ''} ${m.days} วัน`, tone: 'good' };
+      return { text: `เหลือเก็บได้อีก${m.capped ? 'มากกว่า' : ''} ${m.days} วัน`, icon: 'checkmark-circle', tone: 'good' };
     case 'exact':
-      return { label: 'พอดีถึงสิ้นเดือน', tone: 'watch' };
+      return { text: 'พอดีถึงสิ้นเดือน', icon: 'ellipse', tone: 'plain' };
     case 'short':
-      return { label: `! ขาดอีก ${m.days} วันถึงสิ้นเดือน`, tone: 'critical' };
+      return { text: `ขาดอีก ${m.days} วันถึงสิ้นเดือน`, icon: 'alert-circle', tone: 'bad' };
     case 'below':
-      return { label: '! แตะเส้นเงินสำรองแล้ว', tone: 'critical' };
+      return { text: 'แตะเส้นเงินสำรองแล้ว', icon: 'alert-circle', tone: 'bad' };
     default:
-      return { label: 'ยังไม่มีรายจ่าย 7 วัน', tone: 'neutral' };
+      return { text: 'ยังไม่มีรายจ่าย 7 วัน', icon: 'time-outline', tone: 'plain' };
   }
 }
 
-function MoneyCard({ runway, balance, spentToday, safeToday }: { runway: Runway; balance: number; spentToday: number; safeToday: number }) {
+function MoneyCard({ runway, balance, averageSatang }: { runway: Runway; balance: number; averageSatang: number }) {
   const theme = useTheme();
-  const { today } = useApp();
-  const auto = useAutoScan();
   const halloween = useHalloween();
   const reduce = useReduceMotion();
   const press = usePressSpring(0.985);
   const check = monthEndCheck(runway);
-  const badge = monthEndBadge(check);
-  const daysShown = useCountUp(runway.days ?? 0, !reduce && runway.days !== null && !runway.capped, 900);
-  const scanning = auto.state.phase === 'scanning';
+  const status = statusOf(check);
+  // Counts only when the number changes (after a save), never from 0 when the screen appears.
+  const daysShown = useCountUp(runway.days ?? 0, !reduce && runway.days !== null && !runway.capped, 700);
+  const statusColor = status.tone === 'good' ? theme.heroIncome : status.tone === 'bad' ? '#FFB4A8' : theme.heroInkSoft;
+  const railLabel =
+    check.kind === 'unknown'
+      ? ''
+      : `อีก ${check.daysToMonthEnd} วันถึงสิ้นเดือน ${check.kind === 'surplus' ? `เงินพอเกินสิ้นเดือนไปอีก ${check.days} วัน` : check.kind === 'short' ? `เงินหมดก่อนสิ้นเดือน ${check.days} วัน` : status.text}`;
 
-  function pullToday() {
-    Haptics.selectionAsync().catch(() => {});
-    // Phone app: read today's slips in the gallery now. Web and demo: pick slips by hand.
-    if (auto.available) auto.grantAndRun().catch(() => {});
-    else router.push('/scan');
-  }
-
-  const stat = (label: string, satang: number) => (
-    <View style={{ flex: 1, gap: 2 }}>
+  const figure = (label: string, children: React.ReactNode) => (
+    <View style={{ flex: 1, gap: 0 }}>
       <T v="micro" color={theme.heroInkSoft} numberOfLines={1}>
         {label}
       </T>
-      <Money satang={satang} size="body" decimals={false} color={theme.heroInk} style={{ fontFamily: fonts.sansSemi }} />
+      {children}
     </View>
   );
 
@@ -126,61 +232,54 @@ function MoneyCard({ runway, balance, spentToday, safeToday }: { runway: Runway;
         onPressIn={press.onPressIn}
         onPressOut={press.onPressOut}
         accessibilityRole="button"
-        accessibilityLabel={`เงินพอใช้อีก ${runway.days ?? '-'} วัน ${badge.label} ยอดคงเหลือ ${formatBaht(balance)} แตะเพื่อดูรายละเอียด`}
-        style={{
-          borderRadius: radius.xl,
-          overflow: 'hidden',
-          shadowColor: theme.heroDeep,
-          shadowOpacity: theme.dark ? 0 : 0.25,
-          shadowRadius: 16,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 6,
-        }}
+        accessibilityLabel={`เงินพอใช้อีก ${runway.days ?? '-'} วัน ${status.text} ยอดคงเหลือ ${formatBaht(balance)} แตะเพื่อดูรายละเอียด`}
+        style={{ borderRadius: radius.xl, overflow: 'hidden', borderWidth: theme.dark ? 1 : 0, borderColor: alpha(theme.heroInk, 0.08) }}
       >
-        <LinearGradient
-          colors={[theme.heroTop, theme.hero, theme.heroDeep]}
-          locations={[0, 0.55, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{ padding: space.xl, gap: space.sm }}
-        >
-          <Aurora />
-          <ContourLines width={420} height={260} color={theme.heroAccent} />
+        <LinearGradient colors={[theme.heroTop, theme.heroDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ paddingHorizontal: space.xl, paddingTop: space.lg, paddingBottom: space.lg, gap: space.sm }}>
           {halloween ? <SpookyHeroDecor /> : null}
-          <Row justify="space-between" align="flex-start">
-            <View style={{ gap: 2, flex: 1 }}>
-              <T v="label" color={theme.heroAccent}>{formatThaiDay(today)}</T>
-              <Row gap={4}>
-                <T v="body" color={theme.heroInk}>เงินพอใช้อีก</T>
-                <Ionicons name="chevron-forward" size={16} color={theme.heroInkSoft} />
-              </Row>
-            </View>
-            <Button label={scanning ? 'กำลังดึงสลิป…' : 'ดึงสลิปวันนี้'} small kind="onDark" icon="images-outline" onPress={pullToday} disabled={scanning} />
-          </Row>
-
-          {runway.status === 'below_floor' ? (
-            <T v="h1" color={theme.heroInk}>แตะเส้นเงินสำรองแล้ว</T>
-          ) : runway.days === null ? (
-            <T v="h1" color={theme.heroInk}>ยังคำนวณไม่ได้</T>
-          ) : (
-            <T v="display" color={theme.heroAccent} style={{ lineHeight: 64 }}>
-              {runway.capped ? '365+' : daysShown}
-              <T v="h3" color={theme.heroInk}>
-                {'  วัน · ถึง '}
-                {formatThaiDay(runway.depletionDay!, { year: false })}
-              </T>
+          <Row justify="space-between">
+            <T v="small" color={theme.heroInkSoft}>
+              เงินพอใช้อีก
             </T>
+            <Ionicons name="chevron-forward" size={18} color={theme.heroInkSoft} />
+          </Row>
+          {runway.days === null && runway.status !== 'below_floor' ? (
+            <T v="body" color={theme.heroInk}>
+              จดรายจ่ายสัก 2–3 วัน แล้วน้องกล้าจะบอกได้ว่าเงินพอใช้กี่วัน
+            </T>
+          ) : (
+            <Row gap={space.sm} align="flex-end">
+              <T v="display" color={theme.heroAccent} style={{ fontSize: 56, lineHeight: 64, fontVariant: ['tabular-nums'] }}>
+                {runway.status === 'below_floor' ? 0 : runway.capped ? '365+' : daysShown}
+              </T>
+              <View style={{ paddingBottom: 9, gap: 0 }}>
+                <T v="h3" color={theme.heroInk}>
+                  วัน
+                </T>
+              </View>
+              <View style={{ flex: 1, alignItems: 'flex-end', paddingBottom: 11 }}>
+                {runway.depletionDay && runway.status !== 'below_floor' ? (
+                  <T v="small" color={theme.heroInkSoft} numberOfLines={1}>
+                    ถึงประมาณ {formatThaiDay(runway.depletionDay, { year: false })}
+                  </T>
+                ) : null}
+              </View>
+            </Row>
           )}
-          <T v="small" color={theme.heroInkSoft}>
-            {check.daysToMonthEnd > 0 ? `อีก ${check.daysToMonthEnd} วันถึงสิ้นเดือน (${formatThaiDay(endOfMonthDay(), { year: false })})` : 'วันนี้วันสุดท้ายของเดือน'}
-          </T>
-          <Badge label={badge.label} tone={badge.tone} onDark />
-
-          <View style={{ height: 1, backgroundColor: alpha(theme.heroInk, 0.15), marginTop: space.sm }} />
+          <RunwayRail check={check} label={railLabel} />
+          <Row gap={6}>
+            <Ionicons name={status.icon} size={16} color={statusColor} />
+            <T v="small" color={statusColor} style={{ fontFamily: fonts.sansSemi, flex: 1 }}>
+              {status.text}
+            </T>
+          </Row>
+          <View style={{ height: 1, backgroundColor: alpha(theme.heroInk, 0.14), marginVertical: space.xs }} />
           <Row gap={space.md} align="flex-start">
-            {stat('ยอดคงเหลือ', balance)}
-            {stat('วันนี้ใช้ไป', spentToday)}
-            {stat('ใช้ได้วันละ', safeToday)}
+            {figure('ยอดคงเหลือ', <Money satang={balance} size="body" decimals={false} color={theme.heroInk} style={{ fontFamily: fonts.sansSemi, fontSize: 17, lineHeight: 26 }} />)}
+            {figure(
+              'ใช้เฉลี่ยต่อวัน (7 วัน)',
+              <Money satang={averageSatang} size="body" decimals={false} color={theme.heroInk} style={{ fontFamily: fonts.sansSemi, fontSize: 17, lineHeight: 26 }} />,
+            )}
           </Row>
         </LinearGradient>
       </Pressable>
@@ -188,26 +287,111 @@ function MoneyCard({ runway, balance, spentToday, safeToday }: { runway: Runway;
   );
 }
 
+// ---------------------------------------------------------------- 2. the budget
+
+function BudgetCard() {
+  const theme = useTheme();
+  const { txs, profile, today } = useApp();
+  const { runway } = useMoney();
+  const budget = profile?.monthlyBudgetSatang ?? null;
+  // `today` changes at 00:00 Bangkok time, so "today" and the pace start over.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const b = useMemo(() => (budget ? budgetToday({ txs, budgetSatang: budget, spendableSatang: runway.spendableSatang }) : null), [txs, budget, runway.spendableSatang, today]);
+  if (!b) {
+    return (
+      <Pressable
+        onPress={() => router.push('/settings')}
+        accessibilityRole="button"
+        accessibilityLabel="ตั้งงบรายเดือน รู้ว่าแต่ละวันใช้ได้เท่าไร"
+        style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.lg, backgroundColor: theme.surface }}
+      >
+        <Ionicons name="wallet-outline" size={22} color={theme.ink} />
+        <View style={{ flex: 1 }}>
+          <T v="body" style={{ fontFamily: fonts.sansSemi }}>
+            ตั้งงบรายเดือน
+          </T>
+          <T v="small">รู้ว่าแต่ละวันใช้ได้เท่าไร</T>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={theme.inkSoft} />
+      </Pressable>
+    );
+  }
+  const used = b.spentMonthSatang / b.budgetSatang;
+  const barColor = b.state === 'over_month' ? theme.critical : used > b.pace + 0.1 ? theme.watch : theme.primary;
+  const todayLine =
+    b.state === 'over_month'
+      ? { text: 'เกินงบเดือนนี้', color: theme.critical }
+      : b.state === 'over_today'
+        ? { text: `วันนี้เกินงบ ${formatBaht(-b.leftTodaySatang, { decimals: false })}`, color: theme.watch }
+        : { text: `งบวันนี้เหลือ ${formatBaht(b.leftTodaySatang, { decimals: false })}`, color: theme.ink };
+  return (
+    <Pressable
+      onPress={() => router.navigate('/stats')}
+      accessibilityRole="button"
+      accessibilityLabel={`งบเดือนนี้ ใช้ไป ${formatBaht(b.spentMonthSatang, { decimals: false })} จาก ${formatBaht(b.budgetSatang, { decimals: false })} ${todayLine.text} แตะเพื่อดูสถิติ`}
+      style={({ pressed }) => ({ padding: space.lg, gap: space.sm, borderRadius: radius.lg, backgroundColor: theme.surface, opacity: pressed ? 0.85 : 1 })}
+    >
+      <Row justify="space-between" align="flex-end">
+        <T v="h3" accessibilityRole="header">
+          งบเดือนนี้
+        </T>
+        {b.leftMonthSatang >= 0 ? (
+          <T v="small" color={theme.ink}>
+            เหลือ <T v="body" style={{ fontFamily: fonts.sansSemi, fontVariant: ['tabular-nums'] }}>{formatBaht(b.leftMonthSatang, { decimals: false })}</T>
+          </T>
+        ) : (
+          <T v="small" color={theme.critical} style={{ fontFamily: fonts.sansSemi }}>
+            เกินงบ {formatBaht(-b.leftMonthSatang, { decimals: false })}
+          </T>
+        )}
+      </Row>
+      <View style={{ height: 14, justifyContent: 'center' }}>
+        <View style={{ height: 8, borderRadius: 4, backgroundColor: theme.surfaceAlt, overflow: 'hidden' }}>
+          <View style={{ width: `${Math.min(100, used * 100)}%`, height: 8, borderRadius: 4, backgroundColor: barColor }} />
+        </View>
+        {/* How far through the month we are: spending left of this tick is on pace. */}
+        <View
+          accessible
+          accessibilityLabel={`เดือนนี้ผ่านไปแล้ว ${Math.round(b.pace * 100)}%`}
+          style={{ position: 'absolute', left: `${Math.min(100, b.pace * 100)}%`, marginLeft: -1, width: 2, height: 14, borderRadius: 1, backgroundColor: theme.ink }}
+        />
+      </View>
+      <Row justify="space-between" align="flex-start" gap={space.sm}>
+        <T v="small" style={{ flex: 1 }}>
+          ใช้ไป {formatBaht(b.spentMonthSatang, { decimals: false })} จาก {formatBaht(b.budgetSatang, { decimals: false })}
+        </T>
+        <T v="small" color={todayLine.color} style={{ fontFamily: fonts.sansSemi }}>
+          {todayLine.text}
+        </T>
+      </Row>
+    </Pressable>
+  );
+}
+
+// ---------------------------------------------------------------- the screen
+
 export default function Home() {
   const theme = useTheme();
-  const { profile, txs, repo, refresh, refreshing, loadError, today } = useApp();
-  const { balance, runway, drafts } = useMoney();
-  const recent = useMemo(
-    () => [...txs].filter((t) => t.status === 'confirmed').sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).slice(0, 5),
-    [txs],
-  );
-  // `today` changes at 00:00 Bangkok time, so "วันนี้" and "เดือนนี้" start over.
-  const spentToday = useMemo(() => spentOnDay(txs, today), [txs, today]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const spentMonth = useMemo(() => monthExpense(txs), [txs, today]);
-  const safeToday = safeDailySpend({ balanceSatang: balance, floorSatang: runway.floorSatang, targetDay: endOfMonthDay() });
-  const readyDrafts = drafts.filter((d) => d.reviewFlags.length === 0).length;
-  const budget = profile?.monthlyBudgetSatang ?? null;
+  const { profile, txs, repo, refresh, refreshing, loadError, today, status } = useApp();
+  const { balance, runway, drafts, average } = useMoney();
+  const auto = useAutoScan();
   const ach = useAchievements();
   const kla = useKla();
+  const skin = useEquippedSkin();
   const halloween = useHalloween();
   const whatsNew = useWhatsNewPending();
+  const invitePending = useHalloweenInvitePending();
+  const prefsNow = usePrefs();
   const celebrate = useCelebrate();
+  const toast = useToast();
+  const [, force] = useState(0);
+  const recent = useMemo(
+    () => [...txs].filter((t) => t.status === 'confirmed').sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).slice(0, 3),
+    [txs],
+  );
+  const readyDrafts = drafts.filter((d) => d.reviewFlags.length === 0).length;
+
+  // A badge or skin the user just earned gets one celebration.
   const freshIds = [...ach.fresh.map((b) => b.id), ...kla.fresh.map((id) => `skin:${id}`)].join(',');
   useEffect(() => {
     const ids = freshIds ? freshIds.split(',') : [];
@@ -216,185 +400,201 @@ export default function Home() {
     celebrate();
   }, [freshIds, celebrate]);
 
-  const used = budget ? spentMonth / budget : 0;
-  const budgetColor = used > 1 ? theme.critical : used >= 0.85 ? theme.watch : theme.primary;
+  // The month's story is offered on the first three days of the next month.
+  const recapMonth = useMemo(() => {
+    const m = recapToOffer(txs, today);
+    return m && m === previousMonth(today.slice(0, 7)) && Number(today.slice(8, 10)) <= 3 ? m : null;
+  }, [txs, today]);
+
+  const money = [
+    ...(loadError ? (['error'] as const) : []),
+    ...(auto.available && auto.state.phase !== 'idle' ? (['autoscan'] as const) : []),
+    ...(drafts.length > 0 ? (['drafts'] as const) : []),
+  ];
+  const promos: PromoItem[] = prefsNow
+    ? [
+        ...(recapMonth && prefsNow.recapClosed !== recapMonth ? (['recap'] as const) : []),
+        ...(halloweenOn(today) && !halloween && invitePending ? (['halloween'] as const) : []),
+        ...(whatsNew && txs.length > 0 ? (['whatsnew'] as const) : []),
+      ]
+    : [];
+  const rewards = ach.fresh.length + kla.fresh.length > 0;
+  const pick = pickAttention({ money: [...money], rewards, promos, turn: prefsNow?.turn ?? null, today });
+  const turnChanged = !!prefsNow && JSON.stringify(pick.turn) !== JSON.stringify(prefsNow.turn);
+  useEffect(() => {
+    if (turnChanged && status === 'ready') setPrefs({ turn: pick.turn });
+  }, [turnChanged, status, pick.turn]);
+  const closeTurn = () => {
+    setPrefs({ turn: { ...pick.turn, closed: true } });
+    force((n) => n + 1);
+  };
+
+  function attention(item: AttentionItem | null) {
+    switch (item) {
+      case 'error':
+        return (
+          <AttentionRow icon="cloud-offline-outline" title="โหลดข้อมูลล่าสุดไม่สำเร็จ" sub={loadError ?? undefined} action="ลองอีกครั้ง" onPress={refresh} emphasis />
+        );
+      case 'autoscan':
+        return <AutoScanBanner />;
+      case 'drafts':
+        return (
+          <AttentionRow
+            icon="receipt-outline"
+            title={`สลิปรอยืนยัน ${drafts.length} รายการ`}
+            sub={`พร้อมยืนยัน ${readyDrafts} · ต้องตรวจ ${drafts.length - readyDrafts} · ยังไม่รวมในยอดเงิน`}
+            onPress={() => router.push('/drafts')}
+            emphasis
+          />
+        );
+      case 'rewards': {
+        const medals = ach.fresh;
+        const skins = kla.fresh;
+        // Names only when there is one of a kind; otherwise counts (never a list).
+        const title = medals.length
+          ? medals.length === 1
+            ? `ได้เหรียญใหม่: ${medals[0].title}`
+            : `ได้เหรียญใหม่ ${medals.length} เหรียญ`
+          : skins.length === 1
+            ? `น้องกล้าได้ชุดใหม่: ${skinById(skins[0]).name}`
+            : `น้องกล้าได้ชุดใหม่ ${skins.length} ชุด`;
+        const sub = medals.length && skins.length ? `และชุดใหม่ของน้องกล้า ${skins.length} ชุด` : undefined;
+        return (
+          <AttentionRow
+            art={medals.length ? <Medal badge={medals[0]} size={34} /> : <KlaPicture skin={skins[0]} mood="cheer" width={34} extras={false} ground={false} />}
+            title={title}
+            sub={sub}
+            action="ดู"
+            onPress={() => {
+              if (medals.length) {
+                kla.markSeen(skins);
+                router.push('/achievements');
+              } else router.push({ pathname: '/skins', params: { skin: skins[0] } });
+            }}
+            onClose={() => {
+              ach.markSeen(medals.map((m) => m.id));
+              kla.markSeen(skins);
+            }}
+            closeLabel="ไว้ทีหลัง"
+          />
+        );
+      }
+      case 'recap':
+        return (
+          <AttentionRow
+            icon="sparkles-outline"
+            title={`สรุปเดือน${formatThaiMonth(recapMonth!)} พร้อมแล้ว`}
+            sub="เงินไปไหน วันไหนใช้เยอะ และเก่งขึ้นแค่ไหน"
+            onPress={() => router.push({ pathname: '/recap', params: { month: recapMonth! } })}
+            onClose={() => {
+              setPrefs({ recapClosed: recapMonth! });
+              closeTurn();
+            }}
+          />
+        );
+      case 'halloween':
+        return (
+          <AttentionRow
+            art={<GhostArt size={30} />}
+            title="ฮาโลวีนมาแล้ว!"
+            sub="แตะเพื่อเปิดธีมฮาโลวีน จับผีรับลูกอม แลกชุดผี (ถึง 2 พ.ย.)"
+            action="เปิดธีมฮาโลวีน"
+            onPress={() => {
+              setColorTheme('halloween');
+              toast({ message: 'เปิดธีมฮาโลวีนแล้ว เปลี่ยนกลับได้ในหน้าตั้งค่า' });
+            }}
+            onClose={() => {
+              closeHalloweenInvite();
+              closeTurn();
+            }}
+            closeLabel="ปิดการ์ดฮาโลวีน"
+          />
+        );
+      case 'whatsnew':
+        return (
+          <AttentionRow
+            icon="gift-outline"
+            title="มีอะไรใหม่ในอัปเดตนี้"
+            onPress={() => router.push('/whatsnew')}
+            action="ดู"
+            onClose={() => {
+              markWhatsNewSeen();
+              closeTurn();
+            }}
+            closeLabel="ไม่ต้องแสดงอีก"
+          />
+        );
+      default:
+        return null;
+    }
+  }
 
   return (
     <Screen refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.primary} />}>
-      {halloween ? <HalloweenBunting /> : null}
-      <Row justify="space-between" style={{ paddingTop: halloween ? 0 : space.sm, marginTop: halloween ? -space.md : 0 }}>
-        <View style={{ flex: 1, gap: 2 }}>
-          <T v="label" numberOfLines={1}>
+      <Row gap={space.sm} style={{ paddingTop: space.sm }}>
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {});
+            router.navigate('/coach');
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="น้องกล้า แตะเพื่อคุยกับโค้ช"
+          style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: theme.surfaceAlt, alignItems: 'center', justifyContent: 'flex-end', overflow: 'hidden' }}
+        >
+          <KlaPicture skin={skin} mood={moodOf(runway)} width={40} extras={false} ground={false} />
+        </Pressable>
+        <View style={{ flex: 1, gap: 0 }}>
+          <Row gap={6}>
+            <T v="small" numberOfLines={1}>
+              {thaiWeekday(today)} {formatThaiDay(today, { year: false })}
+            </T>
+            {repo?.mode === 'demo' ? (
+              <View style={{ paddingHorizontal: 8, borderRadius: radius.pill, backgroundColor: theme.surfaceAlt }}>
+                <T v="micro" color={theme.ink}>
+                  ทดลอง
+                </T>
+              </View>
+            ) : null}
+          </Row>
+          <T v="h3" numberOfLines={1}>
             สวัสดี {profile?.displayName || ''}
           </T>
-          <T v="h1">หน้าหลัก</T>
         </View>
-        <Row gap={space.xs}>
-          <StreakPill days={ach.streak.days} today={ach.streak.today} />
-          <IconButton icon="settings-outline" label="ตั้งค่า" onPress={() => router.push('/settings')} />
-        </Row>
+        <Streak days={ach.streak.days} today={ach.streak.today} />
+        <IconButton icon="settings-outline" label="ตั้งค่า" onPress={() => router.push('/settings')} />
       </Row>
 
-      {/* Only while they matter */}
-      {ach.fresh.length > 0 ? (
-        <Reveal zoom>
-          <Card style={{ borderColor: theme.accent, borderWidth: 1.5, paddingVertical: space.md }}>
-            <Row gap={space.md}>
-              <Medal badge={ach.fresh[0]} size={52} shine />
-              <View style={{ flex: 1, gap: 2 }}>
-                <T v="h3">{ach.fresh.length > 1 ? `ได้เหรียญใหม่ ${ach.fresh.length} เหรียญ!` : 'ได้เหรียญใหม่!'}</T>
-                <T v="small">{ach.fresh.map((b) => b.title).join(' · ')}</T>
-                <Row gap={space.sm} style={{ marginTop: space.xs }}>
-                  <Button label="ดูเหรียญ" small kind="gold" icon="ribbon" onPress={() => router.push('/achievements')} />
-                  <Button label="ไว้ทีหลัง" small kind="ghost" onPress={() => ach.markSeen(ach.fresh.map((b) => b.id))} />
-                </Row>
-              </View>
-            </Row>
-          </Card>
-        </Reveal>
-      ) : null}
-
-      {kla.fresh.length > 0 ? (
-        <Reveal zoom>
-          <Card style={{ borderColor: theme.accent, borderWidth: 1.5, paddingVertical: space.md }}>
-            <Row gap={space.md}>
-              <View style={{ width: 60, height: 60 }}>
-                <View style={{ position: 'absolute', top: -12 }}>
-                  <KlaPicture skin={kla.fresh[0]} mood="cheer" width={60} onDark={theme.dark} extras={false} />
-                </View>
-              </View>
-              <View style={{ flex: 1, gap: 2 }}>
-                <T v="h3">{kla.fresh.length > 1 ? `น้องกล้าได้ชุดใหม่ ${kla.fresh.length} ชุด!` : 'น้องกล้าได้ชุดใหม่!'}</T>
-                <T v="small">
-                  {kla.fresh
-                    .map((id) => {
-                      const s = skinById(id);
-                      return s.kind === 'limited' ? `${s.name} (สกินลิมิเต็ด)` : s.name;
-                    })
-                    .join(' · ')}
-                </T>
-                <Row gap={space.sm} style={{ marginTop: space.xs }}>
-                  <Button
-                    label="ใส่เลย"
-                    small
-                    kind="gold"
-                    icon="shirt"
-                    onPress={() => {
-                      kla.equip(kla.fresh[0]);
-                      kla.markSeen(kla.fresh);
-                      celebrate();
-                    }}
-                  />
-                  <Button label="ดูตู้สกิน" small kind="ghost" onPress={() => router.push({ pathname: '/skins', params: { skin: kla.fresh[0] } })} />
-                </Row>
-              </View>
-            </Row>
-          </Card>
-        </Reveal>
-      ) : null}
-
-      {whatsNew && txs.length > 0 ? (
-        <Card style={{ paddingVertical: space.xs }}>
-          <Row gap={space.sm}>
-            <Ionicons name="gift" size={20} color={theme.accentInk} />
-            <Pressable onPress={() => router.push('/whatsnew')} accessibilityRole="button" accessibilityLabel="ดูมีอะไรใหม่" style={{ flex: 1, paddingVertical: space.sm }}>
-              <T v="small" color={theme.ink}>
-                มีอะไรใหม่ในอัปเดตนี้ <T v="small" color={theme.primary} style={{ fontFamily: fonts.sansSemi }}>ดู →</T>
-              </T>
-            </Pressable>
-            <IconButton icon="close" label="ไม่ต้องแสดงอีก" onPress={() => markWhatsNewSeen()} />
-          </Row>
-        </Card>
-      ) : null}
-
-      {/* ฮาโลวีน: catch ghosts in the Halloween theme; other themes get an invitation (closable). */}
-      {halloweenOn(today) ? <Reveal zoom>{halloween ? <HalloweenCard /> : <HalloweenInvite />}</Reveal> : null}
-
-      {repo?.mode === 'demo' ? (
-        <Row gap={space.sm} style={{ marginTop: -space.sm }}>
-          <Ionicons name="flask-outline" size={16} color={theme.inkSoft} />
-          <T v="micro" style={{ flex: 1 }}>
-            โหมดทดลอง ข้อมูลตัวอย่างอยู่ในเครื่องนี้ ลองแก้หรือลบได้ตามสบาย
-          </T>
-        </Row>
-      ) : null}
-
-      {loadError ? (
-        <Card tone="alt">
-          <T v="body" color={theme.critical}>โหลดข้อมูลล่าสุดไม่สำเร็จ ({loadError})</T>
-          <Button label="ลองอีกครั้ง" kind="soft" small onPress={refresh} icon="refresh" />
-        </Card>
-      ) : null}
-
-      <AutoScanBanner />
-
-      {drafts.length > 0 ? (
-        <Card onPress={() => router.push('/drafts')} style={{ borderColor: theme.accent, borderWidth: 1.5, paddingVertical: space.md }}>
-          <Row gap={space.md}>
-            <Ionicons name="receipt-outline" size={22} color={theme.accentInk} />
-            <View style={{ flex: 1 }}>
-              <T v="h3">สลิปรอยืนยัน {drafts.length} รายการ</T>
-              <T v="small">พร้อมยืนยัน {readyDrafts} · ต้องตรวจ {drafts.length - readyDrafts} · ยังไม่รวมในยอดเงิน</T>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.inkFaint} />
-          </Row>
-        </Card>
-      ) : null}
+      {/* At most one card that needs attention. */}
+      {pick.item ? <Reveal from={-8}>{attention(pick.item)}</Reveal> : null}
 
       {/* 1. The money card */}
-      <Reveal index={1} zoom>
-        <MoneyCard runway={runway} balance={balance} spentToday={spentToday} safeToday={safeToday} />
+      <Reveal index={1}>
+        <MoneyCard runway={runway} balance={balance} averageSatang={average.averageSatang} />
       </Reveal>
+
+      {/* Halloween theme, during the event: today's ghost hunt, closable for the day. */}
+      {halloween && halloweenOn(today) ? <HalloweenStrip today={today} /> : null}
 
       {/* 2. This month's budget */}
       <Reveal index={2}>
-        <View style={{ gap: space.md }}>
-          <SectionHead kicker="BUDGET" title="งบเดือนนี้" />
-          {budget ? (
-            <Card onPress={() => router.push('/settings')}>
-              <Row justify="space-between">
-                <T v="small">ใช้ไปแล้ว</T>
-                <Badge label={`${Math.round(used * 100)}%`} tone={used > 1 ? 'critical' : used >= 0.85 ? 'watch' : 'good'} />
-              </Row>
-              <Row gap={6} align="flex-end">
-                <Money satang={spentMonth} size="h1" />
-                <T v="body" color={theme.inkSoft} style={{ marginBottom: 6 }}>
-                  / {formatBaht(budget)}
-                </T>
-              </Row>
-              <ProgressBar value={Math.min(1, used)} color={budgetColor} />
-              <Row justify="space-between">
-                <T v="small">ใช้ไป {Math.round(used * 100)}%</T>
-                {spentMonth > budget ? (
-                  <T v="small" color={theme.critical} style={{ fontFamily: fonts.sansSemi }}>
-                    เกินงบ {formatBaht(spentMonth - budget)}
-                  </T>
-                ) : (
-                  <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi }}>
-                    เหลือ {formatBaht(budget - spentMonth)}
-                  </T>
-                )}
-              </Row>
-            </Card>
-          ) : (
-            <Card>
-              <Row justify="space-between">
-                <View style={{ gap: 2 }}>
-                  <T v="small">เดือนนี้ใช้ไปแล้ว</T>
-                  <Money satang={spentMonth} size="h2" />
-                </View>
-                <Button label="ตั้งงบรายเดือน" small kind="soft" icon="wallet-outline" onPress={() => router.push('/settings')} />
-              </Row>
-            </Card>
-          )}
-        </View>
+        <BudgetCard />
       </Reveal>
 
       {/* 3. Latest transactions */}
       <Reveal index={3}>
-        <View style={{ gap: space.md }}>
-          <SectionHead kicker="ACTIVITY" title="รายการล่าสุด" action="ดูทั้งหมด" onAction={() => router.navigate('/transactions')} />
-          <Card style={{ paddingVertical: space.xs, gap: 0 }}>
+        <View style={{ gap: space.sm }}>
+          <Row justify="space-between">
+            <T v="h3" accessibilityRole="header">
+              รายการล่าสุด
+            </T>
+            <Pressable onPress={() => router.navigate('/transactions')} hitSlop={10} accessibilityRole="button" accessibilityLabel="ดูทั้งหมด" style={{ flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44 }}>
+              <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi }}>
+                ดูทั้งหมด
+              </T>
+              <Ionicons name="chevron-forward" size={16} color={theme.ink} />
+            </Pressable>
+          </Row>
+          <View style={{ borderRadius: radius.lg, backgroundColor: theme.surface, paddingHorizontal: space.lg, paddingVertical: space.xs }}>
             {recent.length === 0 ? (
               <EmptyState
                 icon="wallet-outline"
@@ -408,11 +608,11 @@ export default function Home() {
               recent.map((t, i) => (
                 <View key={t.id}>
                   {i > 0 ? <Divider /> : null}
-                  <TxRow tx={t} />
+                  <TxRow tx={t} dayLabel={bkkDayKey(t.occurredAt) === today ? null : relativeDayLabel(bkkDayKey(t.occurredAt))} />
                 </View>
               ))
             )}
-          </Card>
+          </View>
         </View>
       </Reveal>
     </Screen>

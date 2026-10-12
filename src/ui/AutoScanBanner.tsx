@@ -3,13 +3,12 @@
  * then what changed, with a way to review or undo.
  */
 import { router } from 'expo-router';
-import { useEffect } from 'react';
 import { View } from 'react-native';
 import { BUDDY_NAME } from '../domain/buddy';
 import { useAutoScan } from '../services/AutoScanProvider';
 import { Buddy } from './Buddy';
 import { Button, Card, IconButton, Money, ProgressBar, Row, T } from './components';
-import { Reveal, ScanBeam, useCelebrate } from './effects';
+import { Reveal, ScanBeam } from './effects';
 import { useToast } from './feedback';
 import { space, useTheme } from './theme';
 import { WaitNotice } from './WaitNotice';
@@ -18,11 +17,6 @@ export function AutoScanBanner() {
   const theme = useTheme();
   const toast = useToast();
   const { state, available, grantAndRun, undoLast, dismiss } = useAutoScan();
-  const celebrate = useCelebrate();
-  const counted = state.phase === 'done' ? state.confirmed.length : 0;
-  useEffect(() => {
-    if (counted > 0) celebrate();
-  }, [counted, celebrate]);
   if (!available || state.phase === 'idle') return null;
 
   if (state.phase === 'scanning') {

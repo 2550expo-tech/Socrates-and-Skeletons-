@@ -26,9 +26,11 @@ interface Wardrobe {
   opens: string[];
   /** Halloween ghosts caught per Bangkok day. */
   ghosts: GhostCatches;
+  /** False until the skins this account already had were recorded on this phone (no flood of "new" skins). */
+  seeded: boolean;
 }
 
-const EMPTY: Wardrobe = { owned: [DEFAULT_SKIN], seen: [DEFAULT_SKIN], equipped: DEFAULT_SKIN, opens: [], ghosts: {} };
+const EMPTY: Wardrobe = { owned: [DEFAULT_SKIN], seen: [DEFAULT_SKIN], equipped: DEFAULT_SKIN, opens: [], ghosts: {}, seeded: false };
 const key = (who: string) => `mindpay.kla.${who}`;
 
 type Snap = { who: string; data: Wardrobe } | null;
@@ -62,6 +64,8 @@ function clean(raw: unknown): Wardrobe {
             ),
           )
         : {},
+    // A wardrobe saved before this rule existed has already been announced.
+    seeded: true,
   };
 }
 
@@ -175,7 +179,7 @@ export function useKla() {
  * skins with enough candies).
  */
 export function useKlaSync() {
-  const { today, userId, repo } = useApp();
+  const { today, userId, repo, status } = useApp();
   const who = whoOf(repo, userId);
   const { missions, ready, candies } = useKla();
   const doneSkins = missions
@@ -183,13 +187,20 @@ export function useKlaSync() {
     .map((m) => m.skin)
     .join(',');
   useEffect(() => {
-    if (!who || !ready) return;
+    // Wait for the account's records, or a first visit would announce every mission skin as new.
+    if (!who || !ready || status !== 'ready') return;
     const give = new Set<SkinId>([...limitedOpenToday(today, candies.total), ...(doneSkins ? (doneSkins.split(',') as SkinId[]) : [])]);
+    // Free event skins (no candies needed) go into the closet quietly: they were not earned by doing something.
+    const quiet = new Set<SkinId>(limitedOpenToday(today, 0));
     save(who, (w) => {
       const opens = w.opens.includes(today) ? w.opens : recordOpen(w.opens, today);
       const owned = [...new Set([...w.owned, ...give])];
-      if (opens === w.opens && owned.length === w.owned.length) return w;
-      return { ...w, opens, owned };
+      const added = owned.filter((id) => !w.owned.includes(id));
+      // First visit on this phone: everything already owned counts as seen.
+      const seenAdd = w.seeded ? added.filter((id) => quiet.has(id)) : owned;
+      const seen = seenAdd.length ? [...new Set([...w.seen, ...seenAdd])] : w.seen;
+      if (opens === w.opens && owned.length === w.owned.length && seen === w.seen && w.seeded) return w;
+      return { ...w, opens, owned, seen, seeded: true };
     });
-  }, [who, ready, today, doneSkins, candies.total]);
+  }, [who, ready, status, today, doneSkins, candies.total]);
 }

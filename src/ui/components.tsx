@@ -105,7 +105,7 @@ export function Money({
   sign?: boolean;
   decimals?: boolean;
   style?: StyleProp<TextStyle>;
-  /** Count up to the amount when it first shows or changes (the balance on the home screen). */
+  /** Ease to new amounts when the value changes (it shows at once the first time). */
   countUp?: boolean;
 }) {
   const theme = useTheme();

@@ -46,6 +46,10 @@ export function seeded(seed: number) {
  * Content rises and fades in when it first appears. Give items in a list their
  * `index` for a cascade (capped, so long lists do not wait).
  */
+/** When the app started: content rises in only during the first seconds of a session. */
+const APP_STARTED_AT = Date.now();
+const REVEAL_WINDOW_MS = 6000;
+
 export function Reveal({
   children,
   index = 0,
@@ -64,9 +68,11 @@ export function Reveal({
   style?: StyleProp<ViewStyle>;
 }) {
   const reduce = useReduceMotion();
-  const [v] = useState(() => new Animated.Value(reduce ? 1 : 0));
+  // Only while the app is opening: later visits to a screen show it at once (calm, no replay).
+  const [still] = useState(() => reduce || Date.now() - APP_STARTED_AT > REVEAL_WINDOW_MS);
+  const [v] = useState(() => new Animated.Value(still ? 1 : 0));
   useEffect(() => {
-    if (reduce) {
+    if (still) {
       v.setValue(1);
       return;
     }
@@ -79,7 +85,7 @@ export function Reveal({
     });
     anim.start();
     return () => anim.stop();
-  }, [reduce, v, index, delay]);
+  }, [still, v, index, delay]);
   const rise = v.interpolate({ inputRange: [0, 1], outputRange: [from, 0] });
   const grow = v.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] });
   return (

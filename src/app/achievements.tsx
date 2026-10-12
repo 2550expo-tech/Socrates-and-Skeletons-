@@ -31,7 +31,7 @@ export default function Achievements() {
   const reduce = useReduceMotion();
   const { streak, badges, fresh, markSeen } = useAchievements();
   const { missions } = useKla();
-  const shown = useCountUp(streak.days, !reduce, 900);
+  const shown = useCountUp(streak.days, !reduce, 900, 0);
   const earned = badges.filter((b) => b.earned).length;
 
   // Opening this screen counts as seeing every badge earned so far.

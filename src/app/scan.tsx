@@ -27,7 +27,7 @@ import { useSlipScanner } from '../services/useSlipScanner';
 import { Buddy, BuddySays } from '../ui/Buddy';
 import { Button, Card, Divider, IconButton, Ionicons, ProgressBar, Row, T } from '../ui/components';
 import { useToast } from '../ui/feedback';
-import { useCelebrate, Reveal } from '../ui/effects';
+import { Reveal } from '../ui/effects';
 import { PeriodSummary } from '../ui/PeriodSummary';
 import { ScannerStage } from '../ui/ScannerStage';
 import { TxRow } from '../ui/TxRow';
@@ -70,12 +70,7 @@ export default function Scan() {
   const counted = recorded.filter((t) => t.status === 'confirmed').length;
   const latest = recorded.length > 0 ? recorded.find((t) => t.id === s.runTxIds[s.runTxIds.length - 1]) ?? null : null;
 
-  // Confetti once per scan that found slips.
-  const celebrate = useCelebrate();
-  const foundSlips = done && recorded.length > 0;
-  useEffect(() => {
-    if (foundSlips) celebrate();
-  }, [foundSlips, state.runId, celebrate]);
+  // (No confetti here: reading slips is routine. Confetti is kept for milestones.)
 
   async function confirmReady() {
     try {

@@ -11,7 +11,7 @@ import { useApp, useMoney } from '../data/AppProvider';
 import { formatBaht } from '../domain/money';
 import { Buddy } from '../ui/Buddy';
 import { Button, Card, Divider, EmptyState, IconButton, Row, T } from '../ui/components';
-import { Reveal, useCelebrate } from '../ui/effects';
+import { Reveal } from '../ui/effects';
 import { useToast } from '../ui/feedback';
 import { TxRow } from '../ui/TxRow';
 import { space, useTheme } from '../ui/theme';
@@ -20,7 +20,6 @@ export default function Drafts() {
   const theme = useTheme();
   const toast = useToast();
   const { confirmTxs } = useApp();
-  const celebrate = useCelebrate();
   const { drafts } = useMoney();
   const [busy, setBusy] = useState(false);
   const sorted = [...drafts].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
@@ -32,7 +31,6 @@ export default function Drafts() {
     setBusy(true);
     try {
       await confirmTxs(ready.map((d) => d.id));
-      celebrate();
       toast({ message: `ยืนยัน ${ready.length} รายการแล้ว` });
     } catch {
       toast({ message: 'ยืนยันไม่สำเร็จ ลองอีกครั้ง', tone: 'error' });

@@ -7,12 +7,13 @@ import * as Haptics from 'expo-haptics';
 import { router, type Href } from 'expo-router';
 import { Animated, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAutoScan } from '../services/AutoScanProvider';
 import { Ionicons, Row, T, type IconName } from '../ui/components';
 import { Reveal, usePressSpring } from '../ui/effects';
 import { goBack } from '../ui/nav';
 import { alpha, fonts, radius, space, useTheme } from '../ui/theme';
 
-function Option({ icon, color, title, sub, to, index }: { icon: IconName; color: string; title: string; sub: string; to: Href; index: number }) {
+function Option({ icon, color, title, sub, to, onPress, index }: { icon: IconName; color: string; title: string; sub: string; to?: Href; onPress?: () => void; index: number }) {
   const theme = useTheme();
   const press = usePressSpring(0.97);
   return (
@@ -25,7 +26,8 @@ function Option({ icon, color, title, sub, to, index }: { icon: IconName; color:
           onPressOut={press.onPressOut}
           onPress={() => {
             Haptics.selectionAsync().catch(() => {});
-            router.replace(to);
+            if (onPress) onPress();
+            else if (to) router.replace(to);
           }}
           style={{
             flexDirection: 'row',
@@ -54,6 +56,7 @@ function Option({ icon, color, title, sub, to, index }: { icon: IconName; color:
 
 export default function AddSheet() {
   const theme = useTheme();
+  const auto = useAutoScan();
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
       <Row justify="space-between" style={{ paddingHorizontal: space.lg, paddingTop: space.md }}>
@@ -68,13 +71,29 @@ export default function AddSheet() {
             ยกเลิก
           </T>
         </Pressable>
-        <T v="h3">เพิ่มรายการ</T>
+        <T v="h3" accessibilityRole="header">
+          เพิ่มรายการ
+        </T>
         <View style={{ width: 84 }} />
       </Row>
       <View style={{ flex: 1, justifyContent: 'flex-end', padding: space.lg, paddingBottom: space.xxl, gap: space.md }}>
         <T v="small" center style={{ marginBottom: space.sm }}>
           เลือกวิธีที่สะดวก ทุกทางรวมเข้ายอดเงินเดียวกัน
         </T>
+        {auto.available ? (
+          // Phone app: read today's slips in the gallery right now (the automatic scan, on demand).
+          <Option
+            index={0}
+            icon="flash"
+            color={theme.accentInk}
+            title="ดึงสลิปวันนี้"
+            sub="อ่านสลิปของวันนี้ในแกลเลอรีให้ทันที"
+            onPress={() => {
+              auto.grantAndRun().catch(() => {});
+              goBack();
+            }}
+          />
+        ) : null}
         <Option index={0} icon="images" color={theme.primary} title="เลือกสลิปจากแกลเลอรี" sub="แอปอ่านยอดจากสลิปให้เอง" to="/scan" />
         <Option index={1} icon="mic" color={theme.accentInk} title="พูดรายการ" sub="พูดครั้งเดียว ได้หลายรายการ" to="/voice" />
         <Option index={2} icon="create" color={theme.watch} title="กรอกรายจ่ายเอง" sub="จดรายจ่ายเงินสด ฯลฯ" to="/transaction" />

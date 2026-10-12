@@ -39,7 +39,7 @@ const GRADIENTS: [string, string, string][] = [
 function BigBaht({ satang, color }: { satang: number; color?: string }) {
   const theme = useTheme();
   const reduce = useReduceMotion();
-  const baht = useCountUp(Math.round(satang / 100), !reduce, 1200);
+  const baht = useCountUp(Math.round(satang / 100), !reduce, 1200, 0);
   return (
     <T v="display" color={color ?? theme.heroAccent} style={{ fontFamily: fonts.serifBold }}>
       {formatBaht(baht * 100, { decimals: false })}

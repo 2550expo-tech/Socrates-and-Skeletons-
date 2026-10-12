@@ -14,7 +14,7 @@ import { missionForSkin } from '../domain/missions';
 import { isSkinId, SKINS, skinState, skinStatusLine, type Skin, type SkinId, type SkinState } from '../domain/skins';
 import { useKla } from '../services/kla';
 import { Badge, Button, IconButton, Ionicons, Row, T } from '../ui/components';
-import { GrowBar, Reveal, useCelebrate } from '../ui/effects';
+import { GrowBar, Reveal } from '../ui/effects';
 import { useToast } from '../ui/feedback';
 import { KlaBackdrop } from '../ui/kla/KlaBackdrop';
 import { KlaPicture } from '../ui/kla/KlaPicture';
@@ -30,7 +30,6 @@ import { HALLOWEEN } from '../domain/halloween';
 export default function Skins() {
   const theme = useTheme();
   const toast = useToast();
-  const celebrate = useCelebrate();
   const params = useLocalSearchParams<{ skin?: string }>();
   const { today } = useApp();
   const { missions, owned, equipped, fresh, equip, markSeen, candies } = useKla();
@@ -70,7 +69,6 @@ export default function Skins() {
     equip(skin.id);
     setHop((h) => h + 1);
     setCheer(true);
-    celebrate();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     toast({ message: `น้องกล้าใส่ชุด${skin.name}แล้ว` });
   }

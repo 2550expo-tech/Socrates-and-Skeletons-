@@ -21,7 +21,7 @@ import { Button, IconButton, Row, T } from './components';
 import { GrowBar, useCelebrate } from './effects';
 import { useToast } from './feedback';
 import { useReduceMotion } from './motion';
-import { radius, space, useTheme } from './theme';
+import { fonts, radius, space, useTheme } from './theme';
 import { setColorTheme } from './themeMode';
 
 const useNative = Platform.OS !== 'web';
@@ -446,6 +446,152 @@ export function HalloweenCard() {
       </LinearGradient>
     </View>
   );
+}
+
+// ---------------------------------------------------------------------------
+// MindPay ใหม่: the ghost hunt as one slim strip under the money card
+// (Halloween theme, during the event). Closable for the rest of the day.
+// ---------------------------------------------------------------------------
+
+const STRIP_KEY = 'mindpay.halloweenStrip.hiddenDay';
+let stripHidden: string | null | undefined;
+const stripListeners = new Set<() => void>();
+const stripSub = (l: () => void) => {
+  stripListeners.add(l);
+  return () => {
+    stripListeners.delete(l);
+  };
+};
+const stripSnap = () => stripHidden;
+function hideStripFor(day: string) {
+  stripHidden = day;
+  stripListeners.forEach((l) => l());
+  Storage.setItem(STRIP_KEY, day).catch(() => {});
+}
+
+/** One ghost to tap: it pops and fades, then counts as caught. */
+function GhostButton({ index, onCatch }: { index: number; onCatch: () => void }) {
+  const reduce = useReduceMotion();
+  const [pop] = useState(() => new Animated.Value(0));
+  const [caught, setCaught] = useState(false);
+  return (
+    <Animated.View
+      style={{
+        opacity: pop.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+        transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] }) }],
+      }}
+    >
+      <Pressable
+        hitSlop={6}
+        disabled={caught}
+        accessibilityRole="button"
+        accessibilityLabel={`จับผีตัวที่ ${index + 1}`}
+        style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+        onPress={() => {
+          setCaught(true);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+          if (reduce) onCatch();
+          else Animated.timing(pop, { toValue: 1, duration: 240, easing: Easing.out(Easing.quad), useNativeDriver: useNative }).start(() => onCatch());
+        }}
+      >
+        <GhostArt size={34} boo={caught} />
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+export function HalloweenStrip({ today }: { today: string }) {
+  const theme = useTheme();
+  const toast = useToast();
+  const celebrate = useCelebrate();
+  const kla = useKla();
+  const hiddenDay = useSyncExternalStore(stripSub, stripSnap, stripSnap);
+  const [gone, setGone] = useState<number[]>([]);
+  useEffect(() => {
+    if (stripHidden !== undefined) return;
+    Storage.getItem(STRIP_KEY)
+      .then((v) => {
+        stripHidden = v;
+        stripListeners.forEach((l) => l());
+      })
+      .catch(() => {
+        stripHidden = null;
+        stripListeners.forEach((l) => l());
+      });
+  }, []);
+  if (hiddenDay === undefined || hiddenDay === today) return null;
+  const total = kla.candies.total;
+  const ghosts = [0, 1, 2].filter((i) => !gone.includes(i)).slice(0, kla.ghostsLeft);
+  const next = SKINS.filter((s) => s.event === 'halloween2569' && s.candies && !kla.owned.has(s.id)).sort((a, b) => (a.candies ?? 0) - (b.candies ?? 0))[0];
+  const target: SkinId = next?.id ?? 'pumpkin';
+  function caught(i: number) {
+    setGone((g) => [...g, i]);
+    kla.catchGhost();
+    toast({ message: ghostSays(total + 1) });
+    if (next && total + 1 >= (next.candies ?? 0)) celebrate();
+  }
+  return (
+    <View style={{ borderRadius: radius.lg, backgroundColor: theme.surface, paddingVertical: space.sm, paddingLeft: space.md, paddingRight: space.xs, gap: 2 }}>
+      <Row gap={space.sm}>
+        <View style={{ flex: 1, gap: 0 }}>
+          <T v="body" style={{ fontFamily: fonts.sansSemi }}>
+            จับผีรับลูกอม
+          </T>
+          <T v="micro" numberOfLines={2}>
+            {kla.ghostsLeft > 0 ? `วันนี้มีผีน้อย ${kla.ghostsLeft} ตัว แตะเพื่อจับ` : 'วันนี้จับผีครบแล้ว พรุ่งนี้มาใหม่นะ'}
+          </T>
+        </View>
+        {ghosts.map((i) => (
+          <GhostButton key={i} index={i} onCatch={() => caught(i)} />
+        ))}
+        <View
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, height: 30, borderRadius: radius.pill, backgroundColor: theme.surfaceAlt }}
+          accessible
+          accessibilityLabel={`ลูกอม ${total} เม็ด`}
+        >
+          <CandyArt size={16} />
+          <T v="small" color={theme.ink} style={{ fontVariant: ['tabular-nums'], fontFamily: fonts.sansSemi }}>
+            {total}
+          </T>
+        </View>
+        <IconButton icon="close" label="ซ่อนการจับผีวันนี้" onPress={() => hideStripFor(today)} />
+      </Row>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="ดูสกินฮาโลวีน"
+        hitSlop={6}
+        onPress={() => router.push({ pathname: '/skins', params: { skin: target } })}
+        style={{ alignSelf: 'flex-start', paddingVertical: 4 }}
+      >
+        <T v="micro" color={theme.ink} style={{ fontFamily: fonts.sansSemi }}>
+          {next ? `อีก ${Math.max(0, (next.candies ?? 0) - total)} เม็ดได้ชุด${next.name} · ดูสกินฮาโลวีน ›` : 'ได้ชุดฮาโลวีนครบแล้ว · ดูสกินฮาโลวีน ›'}
+        </T>
+      </Pressable>
+    </View>
+  );
+}
+
+/** True while the Halloween invitation (other themes, during the event) has not been closed. */
+export function useHalloweenInvitePending(): boolean {
+  const closed = useSyncExternalStore(inviteSub, inviteSnap, inviteSnap);
+  useEffect(() => {
+    if (inviteClosed !== null) return;
+    Storage.getItem(INVITE_KEY)
+      .then((v) => {
+        inviteClosed = v === 'closed';
+        inviteListeners.forEach((l) => l());
+      })
+      .catch(() => {
+        inviteClosed = false;
+        inviteListeners.forEach((l) => l());
+      });
+  }, []);
+  return closed === false;
+}
+
+/** Close the invitation for good (the "X" on its card). */
+export function closeHalloweenInvite() {
+  closeInvite();
 }
 
 // ---------------------------------------------------------------------------

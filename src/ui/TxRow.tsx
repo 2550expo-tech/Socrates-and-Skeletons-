@@ -9,7 +9,11 @@ import { Badge, Money, Row, T } from './components';
 import { radius, space, useTheme } from './theme';
 
 /** One transaction in a list. Tapping opens it for editing (FR-1). */
-export function TxRow({ tx, showTime = true }: { tx: Transaction; showTime?: boolean }) {
+/**
+ * `dayLabel`: "เมื่อวาน", "11 ต.ค."… shown before the time where items from different days are mixed
+ * (the home screen's latest items), so yesterday is never mistaken for today.
+ */
+export function TxRow({ tx, showTime = true, dayLabel }: { tx: Transaction; showTime?: boolean; dayLabel?: string | null }) {
   const theme = useTheme();
   const cat = getCategory(tx.categoryKey);
   const draft = tx.status === 'draft';
@@ -57,7 +61,7 @@ export function TxRow({ tx, showTime = true }: { tx: Transaction; showTime?: boo
           <Row gap={6}>
             <T v="micro" numberOfLines={1}>
               {cat.label}
-              {showTime ? ` · ${bkkTime(tx.occurredAt)}` : ''}
+              {showTime ? ` · ${dayLabel ? `${dayLabel} ` : ''}${bkkTime(tx.occurredAt)}` : ''}
               {tx.source === 'slip' ? (fresh ? ' · จดจากสลิปวันนี้' : ' · จากสลิป') : ''}
             </T>
           </Row>

@@ -22,7 +22,7 @@ import { askMicPermission, listen, speechAvailable } from '../services/speech';
 import { BuddySays } from '../ui/Buddy';
 import { Button, Card, Chip, IconButton, Ionicons, Money, Row, T } from '../ui/components';
 import { inputBox, inputText } from '../ui/inputs';
-import { Aurora, PulseRing, Reveal, useCelebrate, usePressSpring } from '../ui/effects';
+import { Aurora, PulseRing, Reveal, usePressSpring } from '../ui/effects';
 import { useToast } from '../ui/feedback';
 import { useNative, useReduceMotion } from '../ui/motion';
 import { goBack, useLeaveWhenDone } from '../ui/nav';
@@ -81,7 +81,6 @@ export default function VoiceEntry() {
   const theme = useTheme();
   const toast = useToast();
   const leaveWhenDone = useLeaveWhenDone();
-  const celebrate = useCelebrate();
   const { addTx, today } = useApp();
   const [canListen] = useState(() => speechAvailable());
   const [listening, setListening] = useState(false);
@@ -165,7 +164,7 @@ export default function VoiceEntry() {
         saved += 1;
         setRemoved((r) => new Set(r).add(key));
       }
-      celebrate();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       toast({ message: `บันทึก ${saved} รายการแล้ว` });
       leaveWhenDone();
     } catch {

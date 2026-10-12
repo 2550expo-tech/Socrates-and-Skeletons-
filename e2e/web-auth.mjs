@@ -384,7 +384,7 @@ try {
     );
     await button(page, 'เสร็จ').click();
     check('"เสร็จ" returns home even when the scan page was opened directly', await visible(page, 'สวัสดี', 8000));
-    check('Home: the money card shows what was spent today', await visible(page, 'วันนี้ใช้ไป'));
+    check('Quick Access shows what was spent today', await visible(page, 'วันนี้ใช้ไป'));
     await openTab(page, 'สถิติ');
     await pickPeriod(page, 'วันนี้');
     check('สถิติ: the chosen period shows its exact hours', await visible(page, '00:00–23:59'));
@@ -425,15 +425,16 @@ try {
     const pickedBefore = await pickPeriod(page, 'วันนี้');
     const statsBefore = pickedBefore && (await visible(page, '28 ก.ย. 2569 · 00:00–23:59', 8000));
     await openTab(page, 'หน้าหลัก');
+    // The date sits in the header; the rail on the money card counts the days to the month end.
     const card = page.locator('[aria-label^="เงินพอใช้อีก"]').first();
-    const onCard = (text, timeout) => shown(card.getByText(text).first(), timeout);
-    const before = (await onCard('28 ก.ย. 2569', 8000)) && (await onCard('อีก 2 วันถึงสิ้นเดือน'));
+    const rail = (n) => shown(card.locator(`[aria-label^="อีก ${n} วันถึงสิ้นเดือน"]`).first(), 8000);
+    const before = (await visible(page, 'จันทร์ 28 ก.ย.', 8000)) && (await rail(2));
     const clockBefore = await page.evaluate(() => new Date().toISOString());
     await page.clock.fastForward(90_000); // past midnight
     await page.waitForTimeout(500);
-    const after = (await onCard('29 ก.ย. 2569', 8000)) && (await onCard('อีก 1 วันถึงสิ้นเดือน'));
+    const after = (await visible(page, 'อังคาร 29 ก.ย.', 8000)) && (await rail(1));
     const cardText = after ? '' : `${clockBefore} -> ${await page.evaluate(() => new Date().toISOString())} | ${(await card.innerText().catch(() => '')).split('\n').filter(Boolean).slice(0, 8).join(' / ')}`;
-    check('At midnight the money card moves to the new day by itself (date and days to the month end)', before && after, `before=${before} after=${after} ${cardText}`);
+    check('At midnight the home moves to the new day by itself (date, and days to the month end on the rail)', before && after, `before=${before} after=${after} ${cardText}`);
     await openTab(page, 'สถิติ');
     const statsTab = page.getByRole('tab', { name: 'สถิติ', exact: true }).first();
     const onStats = await statsTab.waitFor({ state: 'visible' }).then(async () => {
@@ -939,16 +940,26 @@ try {
     const start = await balance();
     // Streak and badges: the sample data has already earned some.
     check('Home: the recording streak is shown', await button(page, 'จดต่อเนื่อง').isVisible());
-    check('Home: earned badges are announced', await visible(page, 'ได้เหรียญใหม่'));
-    // "มีอะไรใหม่": one card on home opens the list of new features, then goes away.
-    await page.getByText('มีอะไรใหม่ในอัปเดตนี้').first().click();
+    // A first open is calm: badges and skins the account already had are not announced as new,
+    // and at most one card asks for attention above the money card.
+    const asks = ['ฮาโลวีนมาแล้ว!', 'มีอะไรใหม่ในอัปเดตนี้', 'ได้ของใหม่', 'ได้เหรียญใหม่', 'น้องกล้าได้ชุดใหม่', 'สรุปเดือน'];
+    let asking = 0;
+    for (const a of asks) asking += await page.getByText(a, { exact: false }).filter({ visible: true }).count();
+    check('Home: no flood on opening — at most one attention card, no "new" badges the user did not just earn', asking <= 1 && (await page.getByText('ได้เหรียญใหม่').count()) === 0, `${asking} cards`);
+    // "มีอะไรใหม่": from settings (it never pushes the money down).
+    await page.goto(`${APP}settings`);
+    await introGone(page);
+    await page.getByRole('button', { name: 'มีอะไรใหม่', exact: true }).first().click();
     const news = (await visible(page, 'ตั้งเป้าของที่อยากได้')) && (await visible(page, 'อ่านสลิปแม่นขึ้น ทุกธนาคาร'));
     await page.waitForTimeout(900);
     await shot(page, '30-whats-new');
     check('What\'s new: the new features, each with a way to try it', news);
     await button(page, 'ปิด').click();
-    check('What\'s new: the card is not shown again', await gone(page, 'มีอะไรใหม่ในอัปเดตนี้'));
-    await button(page, 'ดูเหรียญ').click();
+    await page.goto(APP);
+    await introGone(page);
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    check('What\'s new: once read, its card is not shown on home', await gone(page, 'มีอะไรใหม่ในอัปเดตนี้'));
+    await button(page, 'จดต่อเนื่อง').click();
     const achievements = (await visible(page, 'เหรียญของฉัน')) && (await visible(page, 'สถิติสูงสุด'));
     await page.waitForTimeout(1500);
     await shot(page, '24-achievements');
@@ -958,12 +969,12 @@ try {
     // MindPay ใหม่: home has three parts only — the money card (days vs the month end), this month's budget, the latest items.
     const card = page.locator('[aria-label^="เงินพอใช้อีก"]').first();
     const cardLabel = (await card.getAttribute('aria-label').catch(() => '')) ?? '';
-    const monthEnd = /เหลือเก็บได้อีก|ขาดอีก \d+ วันถึงสิ้นเดือน|พอดีถึงสิ้นเดือน|เงินสำรอง|ยังไม่มีรายจ่าย/.test(cardLabel) && (await shown(card.getByText('ถึงสิ้นเดือน').first()));
-    const parts = (await visible(page, 'งบเดือนนี้')) && (await visible(page, 'รายการล่าสุด')) && (await shown(button(page, 'ดึงสลิปวันนี้')));
+    const monthEnd = /เหลือเก็บได้อีก|ขาดอีก \d+ วันถึงสิ้นเดือน|พอดีถึงสิ้นเดือน|เงินสำรอง|ยังไม่มีรายจ่าย/.test(cardLabel) && (await shown(card.locator('[aria-label*="ถึงสิ้นเดือน"]').first()));
+    const parts = (await visible(page, 'งบเดือนนี้')) && (await visible(page, 'งบวันนี้เหลือ')) && (await visible(page, 'รายการล่าสุด')) && (await visible(page, 'ใช้เฉลี่ยต่อวัน'));
     await page.waitForTimeout(500);
     await shot(page, '23-home-three-parts');
     check('Home: the money card compares the days the money lasts with the month end', monthEnd, cardLabel);
-    check('Home: three parts — money card (with "ดึงสลิปวันนี้"), this month\'s budget, latest items', parts);
+    check('Home: three parts — money card (days, rail, balance, 7-day average), this month\'s budget with what is left today, latest items', parts);
     await page.locator('[aria-label^="เงินพอใช้อีก"]').first().click();
     check('Home: tapping the money card opens Money Runway', await visible(page, 'ใช้น้อยลงวันละ', 8000));
     await button(page, 'กลับ').click();
@@ -1052,7 +1063,7 @@ try {
     await introGone(page);
     await page.getByText('ลองใช้ด้วยข้อมูลตัวอย่าง').click();
     await visible(page, 'ยอดคงเหลือ', 8000);
-    check('Home: new skins for น้องกล้า are announced', await visible(page, 'น้องกล้าได้ชุดใหม่'));
+    check('Home: skins the account already had are not announced as new', (await page.getByText('น้องกล้าได้ชุดใหม่').count()) === 0);
     await page.goto(`${APP}achievements`);
     await introGone(page);
     check(

@@ -35,9 +35,11 @@ export function useReduceMotion(): boolean {
 }
 
 /** A number that counts up to `target` (and eases to new values), e.g. the balance on the home screen. */
-export function useCountUp(target: number, enabled: boolean, durationMs = 700, from = 0): number {
-  const [shown, setShown] = useState(enabled ? from : target);
-  const current = useRef(enabled ? from : target);
+export function useCountUp(target: number, enabled: boolean, durationMs = 700, from?: number): number {
+  // Without `from`, the first value shows at once and only later changes count (calm screens).
+  const start0 = enabled && from !== undefined ? from : target;
+  const [shown, setShown] = useState(start0);
+  const current = useRef(start0);
   useEffect(() => {
     if (!enabled) return;
     const start = current.current;

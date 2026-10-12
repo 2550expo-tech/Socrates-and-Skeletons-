@@ -86,7 +86,7 @@ export function MoneyTree({
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
   const leaves = useMemo(() => buildLeaves(), []);
   const target = Math.round(Math.max(0, Math.min(1, health)) * leaves.length);
-  const lit = useCountUp(target, !!grow && !reduce, 1100);
+  const lit = useCountUp(target, !!grow && !reduce, 1100, 0);
   const [rock] = useState(() => new Animated.Value(0));
   useEffect(() => {
     if (!sway || reduce) return;
@@ -179,7 +179,7 @@ export function ProgressRing({
   children?: ReactNode;
 }) {
   const reduce = useReduceMotion();
-  const shown = useCountUp(Math.round(Math.max(0, Math.min(1, value)) * 1000), !reduce, 1300) / 1000;
+  const shown = useCountUp(Math.round(Math.max(0, Math.min(1, value)) * 1000), !reduce, 1300, 0) / 1000;
   const r = size / 2 - width;
   const c = 2 * Math.PI * r;
   return (
