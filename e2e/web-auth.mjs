@@ -411,7 +411,21 @@ try {
     const cardText = after ? '' : `${clockBefore} -> ${await page.evaluate(() => new Date().toISOString())} | ${(await card.innerText().catch(() => '')).split('\n').filter(Boolean).slice(0, 8).join(' / ')}`;
     check('At midnight the money card moves to the new day by itself (date and days to the month end)', before && after, `before=${before} after=${after} ${cardText}`);
     await openTab(page, 'สถิติ');
-    check('"วันนี้" on สถิติ now means the new day, 00:00–23:59', statsBefore && (await visible(page, '29 ก.ย. 2569 · 00:00–23:59', 8000)), statsBefore ? '' : 'not set before midnight');
+    const statsTab = page.getByRole('tab', { name: 'สถิติ', exact: true }).first();
+    const onStats = await statsTab.waitFor({ state: 'visible' }).then(async () => {
+      for (let i = 0; i < 10; i++) {
+        if ((await statsTab.getAttribute('aria-selected').catch(() => null)) === 'true') return true;
+        await page.waitForTimeout(300);
+      }
+      return false;
+    });
+    const statsAfter = await visible(page, '29 ก.ย. 2569 · 00:00–23:59', 8000);
+    const spans = statsAfter ? '' : (await page.getByText(/00:00–23:59|วันเต็ม/).filter({ visible: true }).allInnerTexts().catch(() => [])).join(' | ');
+    check(
+      '"วันนี้" on สถิติ now means the new day, 00:00–23:59',
+      statsBefore && statsAfter,
+      statsBefore ? (statsAfter ? '' : `tab selected=${onStats}; shown: ${spans}`) : 'not set before midnight',
+    );
     await shot(page, '17-new-day');
     await ctx.close();
   }
@@ -997,9 +1011,18 @@ try {
     check('Recap: ends with the money tree and the badges', outro && (await visible(page, 'เหรียญที่ได้แล้ว')));
     await button(page, 'เสร็จ').click();
     check('Recap: "เสร็จ" returns to สถิติ', await shown(page.getByText('ใช้จ่ายรวม').filter({ visible: true }).first(), 8000));
+    await ctx.close();
+  }
 
-    // น้องกล้า's skins: announced on home, money missions on the achievements screen, the collection.
-    await openTab(page, 'หน้าหลัก');
+  // 19b. น้องกล้า's skins: announced on home, money missions on the achievements screen, the collection.
+  // (A fresh page: Safari's engine in CI can run out of memory on one very long page.)
+  {
+    const { ctx, page } = await freshPage('skins');
+    await page.goto(APP);
+    await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
+    await introGone(page);
+    await page.getByText('ลองใช้ด้วยข้อมูลตัวอย่าง').click();
+    await visible(page, 'ยอดคงเหลือ', 8000);
     check('Home: new skins for น้องกล้า are announced', await visible(page, 'น้องกล้าได้ชุดใหม่'));
     await page.goto(`${APP}achievements`);
     await introGone(page);
