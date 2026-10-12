@@ -15,6 +15,8 @@ import type { Profile, Transaction, TransactionInput } from '../domain/types';
 import { createCloudRepo, createDemoRepo, resetDemoData, type Repo } from './repo';
 import { clearLinkFromAddressBar, onIncomingLink, openingLink } from './authLinks';
 import { supabase } from './supabase';
+import { clearWidget } from '../services/quickWidget';
+import { deleteSlipCopy } from '../services/slipCopies';
 
 const MODE_KEY = 'mindpay.mode';
 const LAST_DAY_KEY = 'mindpay.lastOpenDay';
@@ -119,6 +121,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const loadGen = useRef(0);
   /** Changes made on this phone while a load is running (null = deleted), put back over what it returns. */
   const localChanges = useRef(new Map<string, Transaction | null>());
+  /** The latest list, for work that runs later (removing a deleted slip's copy after the undo time). */
+  const txsRef = useRef<Transaction[]>([]);
+  useEffect(() => {
+    txsRef.current = txs;
+  }, [txs]);
 
   const noteLocal = (id: string, tx: Transaction | null) => {
     localChanges.current.set(id, tx);
@@ -177,6 +184,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCarry(0);
     setGoals([]);
     setStatus('signedOut');
+    // The home-screen widget (Android) stops showing this account's numbers.
+    clearWidget().catch(() => {});
   }, []);
 
   // A new day starts at 00:00 Bangkok time: while the app is open (timer) or
@@ -405,6 +414,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (repoRef.current !== r) return removed;
         noteLocal(id, null);
         setTxs((list) => list.filter((t) => t.id !== id));
+        // The slip picture's copy on this phone goes too, once the undo time has passed and it was not put back.
+        const hash = removed?.slipImageHash;
+        const owner = activeUserRef.current;
+        if (hash && owner) {
+          setTimeout(() => {
+            if (activeUserRef.current === owner && !txsRef.current.some((t) => t.slipImageHash === hash)) deleteSlipCopy(owner, hash).catch(() => {});
+          }, 15_000);
+        }
         return removed;
       },
       async confirmTxs(ids) {

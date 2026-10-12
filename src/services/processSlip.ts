@@ -3,6 +3,7 @@
  * and the automatic scan that runs when the app opens.
  *
  *   QR check (phone, free) -> shrink + hash -> slip reader -> rules -> save
+ *   -> a copy of the picture kept on this phone only (slipCopies.ts)
  */
 import { bkkToIso } from '../domain/dates';
 import {
@@ -19,6 +20,7 @@ import type { ItemStatus } from '../domain/scanQueue';
 import type { Transaction } from '../domain/types';
 import { DuplicateSlipError, type Repo } from '../data/repo';
 import { learnPayer, loadNames } from './myNames';
+import { saveSlipCopy } from './slipCopies';
 import { detectSlipQr, prepareImage, READER_MESSAGES, readSlip, SlipReaderError } from './slips';
 
 export interface ProcessResult {
@@ -93,6 +95,8 @@ export async function processSlipImage(opts: {
       reviewFlags: c.flags,
     });
     addToIndex(opts.index, tx);
+    // A copy of the picture stays on this phone only, to look at with the item later (never on the MindPay server).
+    if (opts.userId) await saveSlipCopy(opts.userId, prepared.hash, prepared.base64).catch(() => {});
     return {
       status: outcome,
       tx,

@@ -27,6 +27,19 @@ function openFeature(href: Href) {
 
 const FEATURES: { icon: IconName; colors: [string, string]; title: string; body: string; action?: { label: string; href: Href } }[] = [
   {
+    icon: 'flash',
+    colors: ['#C9A227', '#7A5A0E'],
+    title: 'Quick Access: ยอดวันนี้ข้างปุ่ม +',
+    body: 'ยอดที่ใช้ไปวันนี้อยู่ติดปุ่ม + ทุกหน้า แตะดูรายการได้เลย บนแอป Android เพิ่มเป็นวิดเจ็ตบนหน้าจอโฮมได้ด้วย: เห็นยอดวันนี้ เงินพอใช้กี่วัน และปุ่มลัดเลือกสลิป พูด และ + (ตั้งค่า → วิดเจ็ตหน้าจอโฮม)',
+    action: { label: 'ดูรายการวันนี้', href: '/transactions' },
+  },
+  {
+    icon: 'image',
+    colors: ['#1F7A52', '#0E3B2C'],
+    title: 'ดูรูปสลิปย้อนหลังได้',
+    body: 'สลิปที่อ่านแล้วเก็บสำเนารูปไว้ในเครื่องนี้เท่านั้น ไม่ได้อัปโหลดเก็บบน server แตะรายการที่จดจากสลิปเพื่อดูรูป ลบรูปในแกลเลอรีไปแล้วก็ยังดูได้',
+  },
+  {
     icon: 'sparkles-outline',
     colors: ['#1F7A52', '#0E3B2C'],
     title: 'หน้าตาใหม่ โล่งตาขึ้น',

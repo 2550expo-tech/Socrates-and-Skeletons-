@@ -1,8 +1,10 @@
 /**
  * Bottom navigation (MindPay ใหม่): หน้าหลัก · รายการ · (+) · สถิติ · โค้ช.
- * The raised (+) in the middle opens one sheet for every way to add money in or
- * out (slip, voice, typing, money in). Money Runway opens from the home card,
- * settings from the gear on the home screen.
+ * The raised Quick Access in the middle: the (+) opens one sheet for every way
+ * to add money in or out (slip, voice, typing, money in), and today's spending
+ * sits right beside it on every tab (tap it for the list). Money Runway opens
+ * from the home card, settings from the gear on the home screen. The Android
+ * home-screen widget shows the same numbers (useQuickWidgetSync).
  *
  * Motion: a soft pill slides to the chosen tab and its icon pops; the (+)
  * sends out gold ripples a few times when the app opens, and keeps rippling
@@ -12,11 +14,15 @@ import { router } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useApp, useMoney } from '../../data/AppProvider';
+import { spentOnDay } from '../../domain/buddy';
+import { shortBaht } from '../../domain/widget';
 import { useAutoScan } from '../../services/AutoScanProvider';
 import { useKlaSync } from '../../services/kla';
+import { saveWidgetSnapshot, widgetAvailable } from '../../services/quickWidget';
 import { Ionicons, type IconName } from '../../ui/components';
 import { PulseRing, usePressSpring } from '../../ui/effects';
 import { useNative, useReduceMotion } from '../../ui/motion';
@@ -30,6 +36,43 @@ const TABS: Record<string, { label: string; icon: IconName; iconActive: IconName
 };
 
 const PILL_W = 56;
+/** Width of the Quick Access slot in the middle of the bar. */
+const QUICK_W = 136;
+
+/** Today's confirmed spending (starts over at 00:00 Bangkok time). */
+function useSpentToday(): number {
+  const { txs, today } = useApp();
+  return useMemo(() => spentOnDay(txs, today), [txs, today]);
+}
+
+/** Android: keep the home-screen widget showing the same numbers as the app. */
+function useQuickWidgetSync() {
+  const { today, status } = useApp();
+  const { balance, runway } = useMoney();
+  const theme = useTheme();
+  const spent = useSpentToday();
+  const { depletionDay, capped } = runway;
+  const below = runway.status === 'below_floor';
+  const { heroTop, heroDeep, heroAccent, heroInk, heroInkSoft } = theme;
+  useEffect(() => {
+    if (!widgetAvailable || status !== 'ready') return;
+    // A moment's wait so a burst of changes (a scan saving several slips) redraws once.
+    const t = setTimeout(() => {
+      saveWidgetSnapshot({
+        v: 1,
+        day: today,
+        spentSatang: spent,
+        balanceSatang: balance,
+        depletionDay,
+        runwayCapped: capped,
+        belowFloor: below,
+        signedIn: true,
+        colors: { top: heroTop, deep: heroDeep, accent: heroAccent, ink: heroInk, inkSoft: heroInkSoft },
+      }).catch(() => {});
+    }, 600);
+    return () => clearTimeout(t);
+  }, [status, today, spent, balance, depletionDay, capped, below, heroTop, heroDeep, heroAccent, heroInk, heroInkSoft]);
+}
 
 /** The tab icon pops when its tab becomes the chosen one. */
 function TabIcon({ name, focused, color }: { name: IconName; focused: boolean; color: string }) {
@@ -53,6 +96,7 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
   const reduce = useReduceMotion();
   const auto = useAutoScan();
   const press = usePressSpring(0.9);
+  const spentToday = useSpentToday();
   const routes = state.routes;
   const half = Math.ceil(routes.length / 2);
   // Centre of each tab, measured after layout, so the pill can slide there.
@@ -134,40 +178,70 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
         />
       ) : null}
       {routes.slice(0, half).map((r, i) => tab(r, i))}
-      <View style={{ width: 76, alignItems: 'center' }}>
-        <View style={{ width: 60, height: 60, marginTop: -26, alignItems: 'center', justifyContent: 'center' }}>
-          <PulseRing size={60} active times={auto.state.phase === 'scanning' ? 'always' : 3} color={theme.accent} />
-          <Animated.View style={{ transform: [{ scale: press.scale }] }}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="เพิ่มรายการ"
-              onPressIn={press.onPressIn}
-              onPressOut={press.onPressOut}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-                router.push('/add');
-              }}
-              style={{
-                width: 60,
-                height: 60,
-                borderRadius: 30,
-                backgroundColor: theme.hero,
-                borderWidth: 3,
-                borderColor: theme.accent,
-                alignItems: 'center',
-                justifyContent: 'center',
-                shadowColor: theme.accent,
-                shadowOpacity: 0.35,
-                shadowRadius: 10,
-                shadowOffset: { width: 0, height: 4 },
-                elevation: 8,
-              }}
+      {/* Quick Access: the (+) with today's spending right beside it, raised above the bar. */}
+      <View style={{ width: QUICK_W, alignItems: 'center' }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            height: 58,
+            marginTop: -24,
+            marginBottom: 6,
+            padding: 4,
+            paddingRight: 12,
+            gap: 8,
+            borderRadius: 29,
+            backgroundColor: theme.hero,
+            borderWidth: 2,
+            borderColor: theme.accent,
+            shadowColor: theme.accent,
+            shadowOpacity: 0.3,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 8,
+          }}
+        >
+          <View style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}>
+            <PulseRing size={48} active times={auto.state.phase === 'scanning' ? 'always' : 3} color={theme.accent} />
+            <Animated.View style={{ transform: [{ scale: press.scale }] }}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="เพิ่มรายการ"
+                onPressIn={press.onPressIn}
+                onPressOut={press.onPressOut}
+                hitSlop={4}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                  router.push('/add');
+                }}
+                style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Ionicons name="add" size={30} color={theme.onAccent} />
+              </Pressable>
+            </Animated.View>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`วันนี้ใช้ไป ${shortBaht(spentToday)} ดูรายการวันนี้`}
+            hitSlop={6}
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              router.navigate('/transactions');
+            }}
+            style={{ minWidth: 44, gap: 0 }}
+          >
+            <Text style={[type.micro, { color: theme.heroInkSoft, fontSize: 10, lineHeight: 13 }]} numberOfLines={1}>
+              วันนี้ใช้ไป
+            </Text>
+            <Text
+              style={{ fontFamily: fonts.sansSemi, fontSize: 15, lineHeight: 19, color: theme.heroAccent, fontVariant: ['tabular-nums'] }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
             >
-              <Ionicons name="add" size={32} color={theme.heroAccent} />
-            </Pressable>
-          </Animated.View>
+              {shortBaht(spentToday)}
+            </Text>
+          </Pressable>
         </View>
-        <Text style={[type.micro, { fontFamily: fonts.sansSemi, color: theme.ink, marginTop: 4 }]}>เพิ่ม</Text>
       </View>
       {routes.slice(half).map((r, i) => tab(r, i + half))}
     </View>
@@ -177,6 +251,7 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
 export default function TabsLayout() {
   // Records today's visit and hands out น้องกล้า's skins for finished missions and events.
   useKlaSync();
+  useQuickWidgetSync();
   return (
     <Tabs tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
       <Tabs.Screen name="index" />

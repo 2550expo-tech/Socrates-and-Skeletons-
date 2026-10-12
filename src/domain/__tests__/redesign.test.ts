@@ -1,11 +1,13 @@
 /**
  * MindPay ใหม่ (redesign): TC-90 the home card's "does the money last to the
- * month end" check, TC-91 the stats screen's average per day.
+ * month end" check, TC-91 the stats screen's average per day, TC-92 the Quick
+ * Access widget.
  */
 import { describe, expect, it } from 'vitest';
 import { computeRunway, monthEndCheck } from '../runway';
 import { rangeDailyAverage } from '../summary';
 import type { Transaction } from '../types';
+import { DEFAULT_WIDGET_COLORS, widgetView, type WidgetSnapshot } from '../widget';
 
 // 12 Oct 2026, 18:00 in Bangkok: 19 days after today to 31 Oct.
 const NOW = new Date('2026-10-12T11:00:00Z');
@@ -66,5 +68,38 @@ describe('TC-91 stats: average spending per day in a range', () => {
     // Started on 11 Oct: 2 days, ฿200 → ฿100 a day (not ฿200 / 30).
     expect(rangeDailyAverage(txs, '1m', NOW)).toBe(10_000);
     expect(rangeDailyAverage([], '1m', NOW)).toBe(0);
+  });
+});
+
+describe('TC-92 Quick Access widget: today\'s spending from the saved snapshot', () => {
+  const snap = (over: Partial<WidgetSnapshot> = {}): WidgetSnapshot => ({
+    v: 1,
+    day: '2026-10-12',
+    spentSatang: 14_250,
+    balanceSatang: 1_121_700,
+    depletionDay: '2026-12-10',
+    runwayCapped: false,
+    belowFloor: false,
+    signedIn: true,
+    colors: DEFAULT_WIDGET_COLORS,
+    ...over,
+  });
+  it('shows today\'s spending and the days the money lasts', () => {
+    expect(widgetView(snap(), NOW.getTime())).toMatchObject({ label: 'วันนี้ใช้ไป', amount: '฿143', sub: 'เงินพอใช้อีก 59 วัน' });
+  });
+  it('a snapshot from yesterday shows ฿0 today, and one day less of runway', () => {
+    const tomorrow = Date.parse('2026-10-13T02:00:00Z'); // 09:00 on 13 Oct in Bangkok
+    expect(widgetView(snap(), tomorrow)).toMatchObject({ amount: '฿0', sub: 'เงินพอใช้อีก 58 วัน' });
+  });
+  it('before midnight Bangkok time it is still the same day (UTC is not used)', () => {
+    expect(widgetView(snap(), Date.parse('2026-10-12T16:59:00Z')).amount).toBe('฿143');
+    expect(widgetView(snap(), Date.parse('2026-10-12T17:00:00Z')).amount).toBe('฿0');
+  });
+  it('reserve line, no spending yet, a capped runway, and before signing in', () => {
+    expect(widgetView(snap({ belowFloor: true }), NOW.getTime()).sub).toBe('แตะเส้นเงินสำรองแล้ว');
+    expect(widgetView(snap({ depletionDay: null }), NOW.getTime()).sub).toBe('คงเหลือ ฿11,217');
+    expect(widgetView(snap({ runwayCapped: true }), NOW.getTime()).sub).toBe('เงินพอใช้อีก 365+ วัน');
+    expect(widgetView(null, NOW.getTime())).toMatchObject({ amount: '฿0', sub: 'เปิดแอปเพื่อเริ่มใช้' });
+    expect(widgetView(snap({ signedIn: false }), NOW.getTime()).sub).toBe('เปิดแอปเพื่อเริ่มใช้');
   });
 });

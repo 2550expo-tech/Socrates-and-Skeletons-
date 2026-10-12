@@ -22,7 +22,8 @@ export function authRedirectUrl(): string {
     const base = (process.env.EXPO_BASE_URL ?? '').replace(/\/$/, '');
     return `${window.location.origin}${base}/`;
   }
-  return Linking.createURL('/');
+  // MindPay ใหม่ also answers "mindpay-v2://" (its widget's buttons): email links keep "mindpay://".
+  return Linking.createURL('/', { scheme: 'mindpay' });
 }
 
 /** The link that opened the app (or web page), if any. */

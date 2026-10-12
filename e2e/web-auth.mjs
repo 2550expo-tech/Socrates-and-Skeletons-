@@ -78,6 +78,12 @@ async function openAdd(page, option) {
 }
 /** Open a tab of the bottom bar (หน้าหลัก / รายการ / สถิติ / โค้ช). */
 const openTab = (page, name) => page.getByRole('tab', { name, exact: true }).first().click();
+/** Today's spending shown beside the (+) in the tab bar, in whole baht (from its accessibility label). */
+async function quickToday(page) {
+  const label = (await page.locator('[aria-label^="วันนี้ใช้ไป ฿"]').first().getAttribute('aria-label').catch(() => '')) ?? '';
+  const m = label.match(/วันนี้ใช้ไป ฿([\d,]+)/);
+  return m ? Number(m[1].replace(/,/g, '')) : NaN;
+}
 /** The balance on the home money card, in satang (read from its accessibility label). */
 async function homeBalance(page) {
   await page.waitForTimeout(900); // let the card settle
@@ -292,6 +298,7 @@ try {
     await shot(page, '12-settings');
     check('Settings shows the signed-in email', await visible(page, 'mint@example.com'));
     check('Settings: no coach tone picker; น้องกล้า has a sound switch', (await page.getByText('โทนของโค้ช').count()) === 0 && (await visible(page, 'เสียงน้องกล้า')));
+    check('Settings: slip pictures are kept on this device only (and say so)', (await visible(page, 'รูปสลิปในเครื่องนี้')) && (await visible(page, 'ไม่ได้อัปโหลดเก็บบน server')));
     await button(page, 'เปลี่ยนรหัสผ่าน').click();
     check('Settings: change password opens the new-password dialog', await visible(page, 'บันทึกรหัสผ่านใหม่'));
     await button(page, 'ไว้ทีหลัง').click();
@@ -383,6 +390,23 @@ try {
     check('สถิติ: the chosen period shows its exact hours', await visible(page, '00:00–23:59'));
     check('สถิติ: today shows the money out from the slip (and yesterday\'s income is not counted)', (await visible(page, 'ใช้จ่ายรวม')) && (await visible(page, 'สุทธิ −฿120')));
     await shot(page, '16-stats-today');
+    // The slip's picture: a copy kept in this browser only, shown on the item.
+    await openTab(page, 'รายการ');
+    await page.getByTestId('transactions-screen').getByText('ร้านป้าแดง').first().click();
+    const copyShown = (await visible(page, 'รูปสลิป', 8000)) && (await visible(page, 'สำเนาเก็บไว้ในเครื่องนี้เท่านั้น'));
+    const imgOk = await page.getByRole('img', { name: 'รูปสลิป', exact: true }).first().evaluate((el) => {
+      const img = el.tagName === 'IMG' ? el : el.querySelector('img');
+      const bg = getComputedStyle(el).backgroundImage || '';
+      return !!(img && img.naturalWidth > 0) || bg.startsWith('url("data:image/jpeg');
+    }).catch(() => false);
+    await page.waitForTimeout(500);
+    await shot(page, '16b-slip-copy');
+    check('Slip copy: the item read from a slip shows its picture, kept on this device only', copyShown && imgOk, `shown=${copyShown} image=${imgOk}`);
+    await button(page, 'ดูรูปสลิปเต็มจอ').click();
+    const full = await visible(page, 'แตะที่ไหนก็ได้เพื่อปิด');
+    await shot(page, '16c-slip-full');
+    await button(page, 'ปิดรูปสลิป').click();
+    check('Slip copy: opens full screen and closes with a tap', full && (await gone(page, 'แตะที่ไหนก็ได้เพื่อปิด')));
     await ctx.close();
     state.confirmEmail = true;
   }
@@ -483,6 +507,8 @@ try {
     await visible(page, 'ยอดคงเหลือ', 8000);
     const balance = () => homeBalance(page);
     const start = await balance();
+    const todayStart = await quickToday(page);
+    check('Quick Access: today\'s spending is shown right beside the (+) in the tab bar', Number.isFinite(todayStart) && (await shown(page.getByRole('button', { name: 'เพิ่มรายการ', exact: true }).first())));
     // (+) opens one sheet with every way to add.
     await page.getByRole('button', { name: 'เพิ่มรายการ', exact: true }).first().click();
     const sheet = (await visible(page, 'เลือกสลิปจากแกลเลอรี')) && (await visible(page, 'พูดรายการ')) && (await visible(page, 'กรอกรายจ่ายเอง')) && (await visible(page, 'เพิ่มเงินเข้า'));
@@ -499,6 +525,7 @@ try {
     check('Add: saved with a confirmation', await visible(page, 'บันทึกรายการแล้ว'));
     await visible(page, 'ยอดคงเหลือ', 8000);
     check('Add: the balance goes down by ฿123', (await balance()) === start - 12_300);
+    check('Quick Access: today\'s spending beside the (+) goes up by ฿123', (await quickToday(page)) === todayStart + 123, `${todayStart} -> ${await quickToday(page)}`);
     await page.goto(`${APP}transactions`);
     await introGone(page);
     await page.getByText('ทดสอบกาแฟ').first().click();
@@ -531,6 +558,8 @@ try {
     check('Add money in: the form opens as income with quick amounts, and saves', incomeForm && (await visible(page, 'เพิ่มเงินเข้าแล้ว')));
     await visible(page, 'ยอดคงเหลือ', 8000);
     check('Add money in: the balance goes up by ฿1,000', (await balance()) === beforeIncome + 100_000);
+    await page.locator('[aria-label^="วันนี้ใช้ไป ฿"]').first().click();
+    check('Quick Access: tapping today\'s spending opens the รายการ tab', (await page.getByRole('tab', { name: 'รายการ', exact: true }).first().getAttribute('aria-selected')) === 'true');
     await ctx.close();
   }
 

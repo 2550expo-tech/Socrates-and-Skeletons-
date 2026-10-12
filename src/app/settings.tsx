@@ -12,6 +12,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../data/AppProvider';
 import { supabase } from '../data/supabase';
 import { useAutoScan } from '../services/AutoScanProvider';
+import { pinQuickWidget, widgetAvailable } from '../services/quickWidget';
+import { deleteAllSlipCopies, slipCopyStats } from '../services/slipCopies';
 import { forgetScanned } from '../services/slips';
 import { amountToInput, parseBahtToSatang } from '../domain/money';
 import { Button, Divider, IconButton, Ionicons, Row, Segmented, T, Toggle, type IconName } from '../ui/components';
@@ -162,6 +164,19 @@ export default function Settings() {
   const [budget, setBudget] = useState(amountToInput(profile?.monthlyBudgetSatang));
   const [busy, setBusy] = useState(false);
   const [askOut, setAskOut] = useState(false);
+  const [askCopies, setAskCopies] = useState(false);
+  /** Slip pictures kept on this phone (or in this browser) for this account. */
+  const [copies, setCopies] = useState<{ count: number; bytes: number } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    if (!userId || repo?.mode !== 'cloud') return;
+    slipCopyStats(userId)
+      .then((c) => alive && setCopies(c))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [userId, repo?.mode]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Satang are kept (the fields show them), and ฿0 is a fine balance or reserve.
@@ -306,6 +321,32 @@ export default function Settings() {
             </View>
           </Group>
 
+          {copies ? (
+            <Group title="รูปสลิปในเครื่องนี้">
+              <T v="small" style={{ paddingTop: space.md }}>
+                {copies.count > 0
+                  ? `เก็บไว้ ${copies.count} รูป (${(copies.bytes / 1_048_576).toFixed(1)} MB) แตะรายการที่จดจากสลิปเพื่อดูรูป`
+                  : 'สลิปที่อ่านแล้วจะเก็บสำเนารูปไว้ในเครื่องนี้ แตะรายการเพื่อดูรูปได้'}
+                {'\n'}สำเนาอยู่ในเครื่องนี้เท่านั้น ไม่ได้เก็บบน server และไม่หายแม้ลบรูปในแกลเลอรี
+              </T>
+              {copies.count > 0 ? <LinkRow icon="trash-outline" label="ลบรูปสลิปที่เก็บไว้" danger onPress={() => setAskCopies(true)} /> : null}
+            </Group>
+          ) : null}
+
+          {widgetAvailable ? (
+            <Group title="วิดเจ็ตหน้าจอโฮม">
+              <LinkRow
+                icon="apps-outline"
+                label="เพิ่มวิดเจ็ต: ยอดใช้วันนี้ + ปุ่มลัด"
+                onPress={() =>
+                  pinQuickWidget().then((ok) => {
+                    if (!ok) toast({ message: 'กดค้างที่หน้าจอโฮม → วิดเจ็ต → MindPay ใหม่' });
+                  })
+                }
+              />
+            </Group>
+          ) : null}
+
           <Group title="อื่น ๆ">
             <LinkRow icon="ribbon-outline" label="ความสำเร็จและภารกิจ" onPress={() => router.push('/achievements')} />
             <LinkRow icon="gift-outline" label="มีอะไรใหม่" onPress={() => router.push('/whatsnew')} />
@@ -321,6 +362,7 @@ export default function Settings() {
           <Group title="ความเป็นส่วนตัว">
             <T v="small" style={{ paddingVertical: space.md }}>
               • รูปในแกลเลอรีถูกตรวจบนมือถือก่อน เฉพาะรูปที่มี QR ของสลิปจะถูกส่งให้ AI (Google Gemini) อ่าน และไม่ถูกเก็บบนเซิร์ฟเวอร์ MindPay{'\n'}
+              • สลิปที่อ่านแล้วเก็บเป็นสำเนารูปไว้ในเครื่องนี้เท่านั้น (ดูได้ที่รายการนั้น) ไม่ได้อัปโหลดเก็บบน server{'\n'}
               • ช่วงทดลองใช้ Gemini แบบฟรี ซึ่ง Google อาจเก็บข้อมูลที่ส่งไปเพื่อปรับปรุง AI ตามเงื่อนไขของ Google{'\n'}
               • น้องกล้า (โค้ช AI) เห็นเฉพาะยอดรวมตามหมวด ไม่เห็นรูปสลิป เลขบัญชี หรือชื่อคนที่คุณโอนให้{'\n'}
               • เสียงของน้องกล้าใช้เสียงอ่านภาษาไทยที่มากับมือถือหรือเบราว์เซอร์ของคุณ (ข้อความที่อ่านเป็นคำตอบของโค้ชเท่านั้น){'\n'}
@@ -344,6 +386,24 @@ export default function Settings() {
           signOut();
         }}
         onCancel={() => setAskOut(false)}
+      />
+      <ConfirmSheet
+        visible={askCopies}
+        title="ลบรูปสลิปที่เก็บไว้?"
+        body="ลบเฉพาะสำเนารูปในเครื่องนี้ รายการและยอดเงินยังอยู่ครบ รูปในแกลเลอรีไม่ถูกลบ"
+        confirmLabel="ลบรูปสลิป"
+        destructive
+        onConfirm={() => {
+          setAskCopies(false);
+          if (!userId) return;
+          deleteAllSlipCopies(userId)
+            .then(() => {
+              setCopies({ count: 0, bytes: 0 });
+              toast({ message: 'ลบรูปสลิปในเครื่องแล้ว' });
+            })
+            .catch(() => toast({ message: 'ลบไม่สำเร็จ', tone: 'error' }));
+        }}
+        onCancel={() => setAskCopies(false)}
       />
     </SafeAreaView>
   );

@@ -77,9 +77,31 @@
             "com.google.android.googlequicksearchbox"
           ]
         }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "MindPayQuick",
+              "label": "MindPay ใหม่ · วันนี้",
+              "description": "ยอดใช้วันนี้ เงินพอใช้อีกกี่วัน และปุ่มลัด เลือกสลิป พูด และ +",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "previewImage": "./assets/widget-preview/quick.png",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
       ]
     ],
-    "scheme": "mindpay",
+    "scheme": [
+      "mindpay",
+      "mindpay-v2"
+    ],
     "experiments": {
       "typedRoutes": true
     },

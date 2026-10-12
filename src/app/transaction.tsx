@@ -20,6 +20,7 @@ import { ConfirmSheet, useToast } from '../ui/feedback';
 import { AmountField, Field } from '../ui/inputs';
 import { fonts, radius, space, useTheme } from '../ui/theme';
 import { HeaderDecor } from '../ui/halloween';
+import { SlipCopy } from '../ui/SlipCopy';
 
 export default function TransactionForm() {
   const theme = useTheme();
@@ -228,6 +229,9 @@ export default function TransactionForm() {
               </Row>
             </Card>
           ) : null}
+
+          {/* The slip picture: a copy kept on this phone only (MindPay ใหม่). */}
+          {existing?.source === 'slip' ? <SlipCopy hash={existing.slipImageHash} /> : null}
 
           <Segmented<TxKind>
             options={[
