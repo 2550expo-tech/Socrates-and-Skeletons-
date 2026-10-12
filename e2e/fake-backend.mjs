@@ -232,6 +232,21 @@ const FIXTURES = new URL('./fixtures/', import.meta.url).pathname;
  * `photos`: [{ name: 'slip-qr.jpg', minutesAgo: 30, width: 1080, height: 1920 }, ...] from e2e/fixtures.
  * `file` shows the same fixture under another name (a second, different photo in the gallery).
  */
+/** Minutes since 00:00 today, Bangkok time. */
+export function minutesSinceBkkMidnight(nowMs = Date.now()) {
+  return ((nowMs + 7 * 3600e3) % 86400e3) / 60000;
+}
+
+/**
+ * Photo ages (minutes ago) squeezed into today when the test runs just after midnight,
+ * because the automatic scan reads only photos saved today (Bangkok time).
+ */
+export function fitToday(minutesAgo) {
+  const room = Math.max(0.5, minutesSinceBkkMidnight() - 2);
+  const oldest = Math.max(...minutesAgo);
+  return oldest <= room ? minutesAgo : minutesAgo.map((m) => (m * room) / oldest);
+}
+
 export async function installTestGallery(page, photos) {
   const files = new Map(photos.map((p) => [p.name, p.file ?? p.name]));
   await page.route('**/__test-gallery__/*', (route) => {

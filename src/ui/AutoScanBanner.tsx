@@ -36,7 +36,7 @@ export function AutoScanBanner() {
           </View>
           <View style={{ flex: 1, gap: 6 }}>
             <T v="body">
-              {state.total === 0 ? `${BUDDY_NAME}กำลังหาสลิปใหม่ในแกลเลอรี…` : `${BUDDY_NAME}กำลังอ่านสลิปใหม่ ${state.processed}/${state.total}`}
+              {state.total === 0 ? `${BUDDY_NAME}กำลังหาสลิปของวันนี้ในแกลเลอรี…` : `${BUDDY_NAME}กำลังอ่านสลิปใหม่ ${state.processed}/${state.total}`}
             </T>
             {state.total > 0 ? <ProgressBar value={state.processed / state.total} color={theme.accent} /> : null}
             {state.waitUntil ? <WaitNotice until={state.waitUntil} micro /> : null}
@@ -55,7 +55,7 @@ export function AutoScanBanner() {
           <View style={{ flex: 1, gap: 4 }}>
             <T v="h3">ให้{BUDDY_NAME}จดจากสลิปให้อัตโนมัติไหม</T>
             <T v="small">
-              {state.message ?? 'แค่เปิดแอป กล้าจะหาสลิปใหม่ในแกลเลอรี อ่านยอด แล้วคำนวณเงินให้ทันที รูปอื่นไม่ออกจากมือถือ'}
+              {state.message ?? 'แค่เปิดแอป กล้าจะหาสลิปของวันนี้ในแกลเลอรี อ่านยอด แล้วคำนวณเงินให้ทันที รูปอื่นไม่ออกจากมือถือ'}
             </T>
           </View>
           <IconButton icon="close" label="ปิด" onPress={dismiss} />

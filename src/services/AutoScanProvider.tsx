@@ -1,22 +1,26 @@
 /**
  * FR-4 automatic scan: when the app opens (and each time it comes back to the
- * foreground, at most every 5 minutes), look for NEW slips in the gallery,
+ * foreground, at most every 5 minutes), look for TODAY's slips in the gallery,
  * read them, and update the balance right away.
  *
+ * - Only photos saved today (from 00:00 Bangkok time) are looked at: on the day
+ *   the app is installed that is the install day, and every later run reads only
+ *   its own day. Older slips are never pulled in by themselves; the scan screen
+ *   ("สแกนสลิป") finds them on request.
  * - Only photos with a Thai slip QR code are read (cost + privacy).
  * - Slips read with ≥ 80% confidence on every field count immediately when
  *   auto-confirm is on; unsure ones wait in "สลิปรอยืนยัน".
  * - Never shows the permission prompt by itself: if access is missing, the home
  *   screen offers a button instead.
- * - Nothing is skipped for good by accident: when the phone is offline or the AI
- *   is unavailable the run stops without moving its window forward, and a photo
- *   that could not be read is tried again next run (MAX_AUTO_ATTEMPTS in all).
- *   Two unreadable photos in a row look like the reader being down: the run stops
- *   early (each still counts as one try). A photo that keeps stopping whole runs
- *   (busy or timed-out reader) is left for the scan screen after STALL_LIMIT runs,
- *   so one bad photo can never hold up the photos behind it.
- * - Each account has its own window, and a run stops (saving nothing more) when
- *   the account changes. It also waits while the scan screen is reading photos.
+ * - When the phone is offline or the AI is unavailable the run stops, and the next
+ *   opening of the app tries again; a photo that could not be read is tried again
+ *   (MAX_AUTO_ATTEMPTS in all) while it is still today's. Two unreadable photos in
+ *   a row look like the reader being down: the run stops early (each still counts
+ *   as one try). A photo that keeps stopping whole runs (busy or timed-out reader)
+ *   is left for the scan screen after STALL_LIMIT runs, so one bad photo can never
+ *   hold up the photos behind it.
+ * - Each account keeps its own last-run time, and a run stops (saving nothing more)
+ *   when the account changes. It also waits while the scan screen is reading photos.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
@@ -138,7 +142,7 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
       let unreadable: string[] = [];
       try {
         const [images, scanned, failures] = await Promise.all([
-          findGalleryImages(autoScanSince(p.lastAutoScanAt, startedAt)),
+          findGalleryImages(autoScanSince(startedAt)),
           loadScannedIds(userId),
           loadScanFailures(userId),
         ]);
@@ -148,7 +152,7 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, total: batch.length }));
         const index = buildDuplicateIndex(txsRef.current);
         const range = rangeDays('1y');
-        /** Oldest photo to try again next run (it must stay inside the next run's window). */
+        /** Oldest photo to try again: the next opening of the app scans again right away (see nextAutoScanMark). */
         let retryFrom: number | null = null;
 
         for (const img of batch) {
@@ -226,7 +230,7 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
 
         await rememberScanned(userId, scanned);
         await saveScanFailures(userId, failures);
-        // Move the window forward only when everything in it was handled.
+        // Save this run as done only when everything found was handled (otherwise the next opening tries again).
         if (!stoppedBy && !quiet && fresh.length <= MAX_IMAGES_PER_RUN) {
           const next = await saveScanPrefs({ lastAutoScanAt: nextAutoScanMark(startedAt, retryFrom) }, userId).catch(() => null);
           if (next && current()) setPrefsState(next);

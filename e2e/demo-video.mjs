@@ -15,7 +15,7 @@
 import { mkdir, readdir, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { createFakeSupabase, installTestGallery, routeQrDecoder, serveDist, SUPA } from './fake-backend.mjs';
+import { createFakeSupabase, fitToday, installTestGallery, routeQrDecoder, serveDist, SUPA } from './fake-backend.mjs';
 
 const DIST = process.argv[2] ?? 'dist';
 const OUT = process.argv[3] ?? 'demo-video';
@@ -64,13 +64,15 @@ await page.route(`${SUPA}/**`, supabase);
 await routeQrDecoder(page);
 if (FLOW === 'android') {
   // Photos on the "phone": three slips with a slip QR and three ordinary photos (skipped, never sent).
+  // All saved today: the automatic scan reads only today's slips.
+  const age = fitToday([15, 30, 60 * 2, 60 * 3, 60 * 4, 60 * 5]);
   await installTestGallery(page, [
-    { name: 'slip-qr.jpg', minutesAgo: 15 },
-    { name: 'photo-1.jpg', minutesAgo: 30, width: 600, height: 1000 },
-    { name: 'slip-qr-2.jpg', minutesAgo: 60 * 20 },
-    { name: 'photo-2.jpg', minutesAgo: 60 * 22, width: 600, height: 1000 },
-    { name: 'slip-qr-3.jpg', minutesAgo: 60 * 30 },
-    { name: 'photo-3.jpg', minutesAgo: 60 * 50, width: 600, height: 1000 },
+    { name: 'slip-qr.jpg', minutesAgo: age[0] },
+    { name: 'photo-1.jpg', minutesAgo: age[1], width: 600, height: 1000 },
+    { name: 'slip-qr-2.jpg', minutesAgo: age[2] },
+    { name: 'photo-2.jpg', minutesAgo: age[3], width: 600, height: 1000 },
+    { name: 'slip-qr-3.jpg', minutesAgo: age[4] },
+    { name: 'photo-3.jpg', minutesAgo: age[5], width: 600, height: 1000 },
   ]);
   state.slipReadings = state.slipReadings.slice(0, 3);
   state.coach = coachSays(209);

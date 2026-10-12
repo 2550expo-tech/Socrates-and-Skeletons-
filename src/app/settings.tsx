@@ -111,7 +111,7 @@ export default function Settings() {
               <Row justify="space-between" gap={space.md}>
                 <View style={{ flex: 1 }}>
                   <T v="body">หาสลิปใหม่ทุกครั้งที่เปิดแอป</T>
-                  <T v="micro">ตรวจเฉพาะรูปที่มี QR ของสลิปธนาคาร ย้อนหลังตั้งแต่ครั้งล่าสุดที่เปิดแอป</T>
+                  <T v="micro">ตรวจเฉพาะสลิปที่มี QR ซึ่งบันทึกลงเครื่องวันนี้ สลิปของวันก่อนหน้าเลือกเองได้ที่ปุ่มสแกนสลิป</T>
                 </View>
                 <Toggle value={auto.prefs.autoScan} onValueChange={(v) => auto.setPrefs({ autoScan: v })} label="หาสลิปใหม่ทุกครั้งที่เปิดแอป" />
               </Row>

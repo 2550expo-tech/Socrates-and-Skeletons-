@@ -13,7 +13,7 @@
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium, webkit } from 'playwright';
-import { createFakeSupabase, installTestGallery, routeQrDecoder, serveDist, SUPA } from './fake-backend.mjs';
+import { createFakeSupabase, fitToday, installTestGallery, minutesSinceBkkMidnight, routeQrDecoder, serveDist, SUPA } from './fake-backend.mjs';
 
 // E2E_BROWSER=webkit runs the same checks on Safari's engine, set up like an iPhone.
 const ENGINE = process.env.E2E_BROWSER === 'webkit' ? 'webkit' : 'chromium';
@@ -714,15 +714,19 @@ try {
       { isSlip: true, direction: 'expense', amount: '350.00', dateText: 'x', dateIso: bkkDay(0), time: '11:20', counterparty: 'ร้านข้าวมันไก่', bank: 'SCB', reference: 'AUTO1', confidence: { amount: 0.97, date: 0.96, counterparty: 0.94 } },
       { isSlip: true, direction: 'income', amount: '1200.00', dateText: 'x', dateIso: bkkDay(1), time: '20:00', counterparty: 'พี่ชาย', bank: 'BBL', reference: 'AUTO2', confidence: { amount: 0.99, date: 0.97, counterparty: 0.95 } },
       { isSlip: true, direction: 'expense', amount: '120.00', dateText: 'x', dateIso: bkkDay(0), time: '08:30', counterparty: 'ร้านชานม', bank: 'TrueMoney', reference: 'TMN55501', confidence: { amount: 0.96, date: 0.95, counterparty: 0.92 } },
+      // Read later by the scan screen: yesterday's slip, which the automatic scan leaves alone.
+      { isSlip: true, direction: 'expense', amount: '75.00', dateText: 'x', dateIso: bkkDay(1), time: '21:00', counterparty: 'ร้านเมื่อวาน', bank: 'KBank', reference: 'AUTO4', confidence: { amount: 0.97, date: 0.96, counterparty: 0.94 } },
     ];
     const { ctx, page } = await freshPage('auto');
+    const age = fitToday([10, 20, 30, 40, 50, 60]);
     await installTestGallery(page, [
-      { name: 'slip-qr-2.jpg', minutesAgo: 10 },
-      { name: 'photo-1.jpg', minutesAgo: 20, width: 600, height: 1000 },
-      { name: 'slip-qr-3.jpg', minutesAgo: 30 },
-      { name: 'photo-2.jpg', minutesAgo: 40, width: 600, height: 1000 },
-      { name: 'wallet-qr.jpg', minutesAgo: 50 }, // e-wallet receipt: its own kind of QR
-      { name: 'camera-qr.jpg', file: 'wallet-qr.jpg', minutesAgo: 60, width: 3000, height: 4000 }, // a camera photo with a QR: stays on the phone
+      { name: 'slip-qr-2.jpg', minutesAgo: age[0] },
+      { name: 'photo-1.jpg', minutesAgo: age[1], width: 600, height: 1000 },
+      { name: 'slip-qr-3.jpg', minutesAgo: age[2] },
+      { name: 'photo-2.jpg', minutesAgo: age[3], width: 600, height: 1000 },
+      { name: 'wallet-qr.jpg', minutesAgo: age[4] }, // e-wallet receipt: its own kind of QR
+      { name: 'camera-qr.jpg', file: 'wallet-qr.jpg', minutesAgo: age[5], width: 3000, height: 4000 }, // a camera photo with a QR: stays on the phone
+      { name: 'slip-qr.jpg', minutesAgo: minutesSinceBkkMidnight() + 180 }, // saved yesterday at about 21:00
     ]);
     await page.goto(APP);
     await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
@@ -744,13 +748,18 @@ try {
     await shot(page, '20-auto-scan-done');
     check('Android flow: new slips are read by themselves on opening the app, no photo picked', scanned);
     const aiCalls = state.calls.filter((c) => c.startsWith('POST /functions/v1/parse-slip')).length - aiBefore;
-    check('Only slip-like pictures are sent to the AI: 2 bank slips + 1 e-wallet receipt of 6 photos', aiCalls === 3, `${aiCalls} sent`);
+    check("Only today's slip-like pictures are sent to the AI: 2 bank slips + 1 e-wallet receipt of 6 photos; yesterday's slip is left alone", aiCalls === 3, `${aiCalls} sent`);
+    check("Yesterday's slip is not recorded by the automatic scan", !state.txRows.some((r) => r.title === 'ร้านเมื่อวาน'));
     const refs = state.txRows.filter((r) => ['ร้านข้าวมันไก่', 'พี่ชาย'].includes(r.title)).map((r) => r.slip_ref).sort();
     check('The QR references are kept', JSON.stringify(refs) === JSON.stringify(['016272184455CKQ11220', '016273009912DMV30011']), refs.join(','));
     check('The balance counts them at once', await visible(page, '฿5,730', 8000));
     await page.getByRole('button', { name: 'สแกนสลิป' }).last().click();
-    const nothingNew = await visible(page, 'ทุกรูปเคยตรวจแล้ว (6 รูป)', 15000);
-    check('The scan screen searches the gallery by itself and finds nothing new', nothingNew, nothingNew ? '' : (await page.locator('body').innerText()).split('\n').filter((l) => /รูป|สลิป/.test(l)).slice(0, 6).join(' | '));
+    const olderFound = await visible(page, 'อ่านเสร็จแล้ว ได้ 1 รายการ', 20000);
+    check(
+      "The scan screen searches the gallery by itself and finds only yesterday's slip (today's were already read)",
+      olderFound && state.txRows.some((r) => r.title === 'ร้านเมื่อวาน'),
+      olderFound ? '' : (await page.locator('body').innerText()).split('\n').filter((l) => /รูป|สลิป/.test(l)).slice(0, 6).join(' | '),
+    );
     await ctx.close();
     state.confirmEmail = true;
   }
