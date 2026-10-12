@@ -117,7 +117,10 @@ try {
   } else {
     // 4b. Website: pick the slips once, the rest is automatic.
     await pause(2400);
-    await button('สแกนสลิป').click();
+    // (+) in the tab bar -> "เลือกสลิปจากแกลเลอรี"
+    await page.getByRole('button', { name: 'เพิ่มรายการ', exact: true }).first().click();
+    await pause(1200);
+    await page.getByRole('button', { name: 'เลือกสลิปจากแกลเลอรี', exact: true }).first().click();
     await page.getByText('เลือกรูปสลิป', { exact: false }).first().waitFor({ timeout: 10000 });
     await pause(900);
     const chooser = page.waitForEvent('filechooser');
@@ -132,8 +135,20 @@ try {
     await pause(3200);
   }
 
-  // 5. Home: periods and charts
-  await page.mouse.wheel(0, 620);
+  // 5. Home: the money card, this month's budget, the latest items
+  await page.mouse.wheel(0, 500);
+  await pause(1600);
+  await page.mouse.wheel(0, -1200);
+  await pause(800);
+
+  // 6. Money Runway: tap the money card
+  await page.locator('[aria-label^="เงินพอใช้อีก"]').first().click();
+  await pause(3200);
+  await button('กลับ').click();
+  await pause(900);
+
+  // 7. สถิติ: ranges and the category donut
+  await page.getByRole('tab', { name: 'สถิติ', exact: true }).first().click();
   await pause(900);
   for (const label of ['วันนี้', '7 วัน', '1 เดือน']) {
     await page.getByRole('tab', { name: label, exact: true }).first().click();
@@ -144,11 +159,7 @@ try {
   await page.mouse.wheel(0, -2400);
   await pause(800);
 
-  // 6. Money Runway
-  await page.getByRole('tab', { name: 'เงินพอถึง' }).click();
-  await pause(3200);
-
-  // 7. Coach
+  // 8. Coach
   await page.getByRole('tab', { name: 'โค้ช' }).click();
   await pause(1400);
   await page.getByText('สรุปสัปดาห์นี้ให้หน่อย').first().click();
@@ -156,7 +167,7 @@ try {
   // น้องกล้า reads the answer out with subtitles, moving its mouth and hands.
   await pause(5200);
 
-  // 8. Back home
+  // 9. Back home
   await page.getByRole('tab', { name: 'หน้าหลัก' }).click();
   await pause(1500);
 } finally {

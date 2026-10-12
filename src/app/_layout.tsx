@@ -119,6 +119,9 @@ function Screens({ signedIn, needsOnboarding, inApp }: { signedIn: boolean; need
           <Stack.Screen name="goal" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
           <Stack.Screen name="drafts" />
           <Stack.Screen name="settings" />
+          <Stack.Screen name="runway" />
+          {/* The (+) in the middle of the tab bar: choose how to add a transaction. */}
+          <Stack.Screen name="add" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         </Stack.Protected>
       </Stack>
     </>

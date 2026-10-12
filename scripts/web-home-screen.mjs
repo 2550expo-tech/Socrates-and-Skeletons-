@@ -16,8 +16,8 @@ for (const name of ['apple-touch-icon.png', 'icon-192.png', 'icon-512.png']) {
 }
 
 const manifest = {
-  name: 'MindPay',
-  short_name: 'MindPay',
+  name: 'MindPay ใหม่',
+  short_name: 'MindPay ใหม่',
   description: 'เพื่อนการเงินที่อ่านสลิปและบอกว่าเงินพอถึงวันไหน',
   lang: 'th',
   start_url: `${base}/`,
@@ -37,7 +37,7 @@ const tags = [
   `<link rel="apple-touch-icon" href="${base}/apple-touch-icon.png">`,
   '<meta name="apple-mobile-web-app-capable" content="yes">',
   '<meta name="mobile-web-app-capable" content="yes">',
-  '<meta name="apple-mobile-web-app-title" content="MindPay">',
+  '<meta name="apple-mobile-web-app-title" content="MindPay ใหม่">',
   '<meta name="apple-mobile-web-app-status-bar-style" content="default">',
   // Brand green while the app loads, so the page does not flash white before the opening animation.
   `<style>html, body { background-color: ${FOREST}; }</style>`,

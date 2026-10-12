@@ -19,13 +19,20 @@ import { HeaderDecor } from '../ui/halloween';
 type IconName = keyof typeof Ionicons.glyphMap;
 
 /** Tabs already sit under this screen: go back to them (pushing would open a second set of tabs). */
-const TAB_ROUTES = new Set(['/', '/coach', '/runway', '/transactions']);
+const TAB_ROUTES = new Set(['/', '/coach', '/stats', '/transactions']);
 function openFeature(href: Href) {
   if (typeof href === 'string' && TAB_ROUTES.has(href)) router.dismissTo(href);
   else router.push(href);
 }
 
 const FEATURES: { icon: IconName; colors: [string, string]; title: string; body: string; action?: { label: string; href: Href } }[] = [
+  {
+    icon: 'sparkles-outline',
+    colors: ['#1F7A52', '#0E3B2C'],
+    title: 'หน้าตาใหม่ โล่งตาขึ้น',
+    body: 'หน้าหลักเหลือ 3 ส่วน: เงินพอใช้กี่วันเทียบกับสิ้นเดือน งบเดือนนี้ และรายการล่าสุด กราฟกับภาพรวมย้ายไปแท็บสถิติ ปุ่ม + ตรงกลางรวมทุกวิธีเพิ่มรายการ ส่วนเงินพอถึงวันไหนแตะการ์ดบนสุดของหน้าหลัก',
+    action: { label: 'ดูสถิติ', href: '/stats' },
+  },
   {
     icon: 'moon',
     colors: ['#3B1E5C', '#120822'],
@@ -51,7 +58,7 @@ const FEATURES: { icon: IconName; colors: [string, string]; title: string; body:
     icon: 'add-circle',
     colors: ['#2E8B57', '#14502F'],
     title: 'เพิ่มเงินเข้าเอง',
-    body: 'เงินเข้าที่ไม่มีสลิป เช่น เงินเดือน เงินจากที่บ้าน กด “เพิ่มเงินเข้า” บนหน้าหลัก เลือกยอดด่วนได้เลย',
+    body: 'เงินเข้าที่ไม่มีสลิป เช่น เงินเดือน เงินจากที่บ้าน กดปุ่ม + แล้วเลือก “เพิ่มเงินเข้า” เลือกยอดด่วนได้เลย',
     action: { label: 'เพิ่มเงินเข้า', href: '/transaction?kind=income' },
   },
   {
@@ -65,7 +72,7 @@ const FEATURES: { icon: IconName; colors: [string, string]; title: string; body:
     icon: 'mic',
     colors: ['#C8992A', '#8F600C'],
     title: 'พูดจด',
-    body: 'แตะไมค์ทองบนหน้าหลัก แล้วพูดว่า “ข้าว 50 บาท” พูดหลายรายการในประโยคเดียวก็ได้ (แอป Android ต้องลงเวอร์ชันใหม่)',
+    body: 'กดปุ่ม + แล้วเลือก “พูดรายการ” แล้วพูดว่า “ข้าว 50 บาท” พูดหลายรายการในประโยคเดียวก็ได้',
     action: { label: 'ลองพูดจด', href: '/voice' },
   },
   {

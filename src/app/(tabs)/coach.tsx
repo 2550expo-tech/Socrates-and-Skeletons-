@@ -395,7 +395,7 @@ export default function Coach() {
 
         <Row
           gap={space.sm}
-          style={{ paddingHorizontal: space.lg, paddingVertical: space.sm, borderTopWidth: 1, borderTopColor: theme.line, backgroundColor: theme.surface }}
+          style={{ paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.sm + 26, borderTopWidth: 1, borderTopColor: theme.line, backgroundColor: theme.surface }}
         >
           <TextInput
             nativeID="coach-input"

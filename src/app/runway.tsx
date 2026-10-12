@@ -1,23 +1,25 @@
 /**
  * FR-6 Money Runway, in full: the number, how it is calculated, what the next
  * 30 days look like, and two "what if" tools (spend less / check before buying).
+ * Opened from the card at the top of the home screen.
  */
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
-import { useApp, useMoney } from '../../data/AppProvider';
-import { addDays, formatThaiDay } from '../../domain/dates';
-import { formatBaht, parseBahtToSatang } from '../../domain/money';
-import { runwayAfterPurchase, runwayWithReduction, RUNWAY_WINDOW_DAYS, type Runway } from '../../domain/runway';
-import { ContourLines, MoneyTree, ProgressRing, treeHealth } from '../../ui/art';
-import { Badge, Button, Card, Divider, Ionicons, Money, Row, Screen, T } from '../../ui/components';
-import { Aurora, GrowBar, Reveal, Sparkles } from '../../ui/effects';
-import { Field } from '../../ui/inputs';
-import { useCountUp, useReduceMotion } from '../../ui/motion';
-import { Slider } from '../../ui/Slider';
-import { fonts, palette, radius, space, useTheme } from '../../ui/theme';
-import { TitleDecor } from '../../ui/halloween';
+import { useApp, useMoney } from '../data/AppProvider';
+import { addDays, formatThaiDay } from '../domain/dates';
+import { formatBaht, parseBahtToSatang } from '../domain/money';
+import { runwayAfterPurchase, runwayWithReduction, RUNWAY_WINDOW_DAYS, type Runway } from '../domain/runway';
+import { ContourLines, MoneyTree, ProgressRing, treeHealth } from '../ui/art';
+import { Badge, Button, Card, Divider, IconButton, Ionicons, Money, Row, Screen, T } from '../ui/components';
+import { Aurora, GrowBar, Reveal, Sparkles } from '../ui/effects';
+import { Field } from '../ui/inputs';
+import { useCountUp, useReduceMotion } from '../ui/motion';
+import { Slider } from '../ui/Slider';
+import { fonts, palette, radius, space, useTheme } from '../ui/theme';
+import { TitleDecor } from '../ui/halloween';
+import { goBack } from '../ui/nav';
 
 function daysText(r: Runway) {
   if (r.status === 'below_floor') return 'แตะเส้นสำรองแล้ว';
@@ -51,10 +53,15 @@ export default function RunwayScreen() {
   return (
     <Screen>
       <Row justify="space-between" align="flex-end" style={{ paddingTop: space.sm }}>
-        <View style={{ gap: 2 }}>
-          <T v="label">Money Runway</T>
-          <T v="h1">เงินพอถึงวันไหน</T>
-        </View>
+        <Row gap={space.xs} align="flex-end" style={{ flex: 1 }}>
+          <View style={{ marginLeft: -space.sm }}>
+            <IconButton icon="chevron-back" label="กลับ" onPress={() => goBack()} />
+          </View>
+          <View style={{ gap: 2, flex: 1 }}>
+            <T v="label">Money Runway</T>
+            <T v="h1">เงินพอถึงวันไหน</T>
+          </View>
+        </Row>
         <TitleDecor />
       </Row>
 

@@ -139,3 +139,32 @@ export function runwayWithReduction(current: Runway, reducePercent: number, now:
     now,
   });
 }
+
+export interface MonthEndCheck {
+  /** Days from today to the last day of this month (0 on the last day). */
+  daysToMonthEnd: number;
+  /**
+   * surplus: the money lasts `days` days past the month end ("เหลือเก็บ").
+   * short: it runs out `days` days before the month end. exact: it lasts to the month end.
+   * unknown: no spending in 7 days, so no runway yet. below: already at the reserve line.
+   */
+  kind: 'surplus' | 'short' | 'exact' | 'unknown' | 'below';
+  days: number;
+  /** The runway was capped at RUNWAY_CAP_DAYS, so the surplus is "at least" this many days. */
+  capped: boolean;
+}
+
+/**
+ * The home card: does the money last to the end of this month, and by how many
+ * days does it go past it (or fall short)? Uses the same day counting as the
+ * runway itself (days after today), so depletion day = month end + surplus.
+ */
+export function monthEndCheck(r: Runway, now: Date = new Date()): MonthEndCheck {
+  const daysToMonthEnd = daysBetween(bkkDayKey(now), endOfMonthDay(now));
+  if (r.status === 'below_floor') return { daysToMonthEnd, kind: 'below', days: daysToMonthEnd, capped: false };
+  if (r.days === null) return { daysToMonthEnd, kind: 'unknown', days: 0, capped: false };
+  const diff = r.days - daysToMonthEnd;
+  if (diff > 0) return { daysToMonthEnd, kind: 'surplus', days: diff, capped: r.capped };
+  if (diff < 0) return { daysToMonthEnd, kind: 'short', days: -diff, capped: false };
+  return { daysToMonthEnd, kind: 'exact', days: 0, capped: false };
+}

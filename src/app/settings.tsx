@@ -6,22 +6,140 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { goBack } from '../ui/nav';
-import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { Children, useEffect, useState, type ReactNode } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../data/AppProvider';
 import { supabase } from '../data/supabase';
 import { useAutoScan } from '../services/AutoScanProvider';
 import { forgetScanned } from '../services/slips';
 import { amountToInput, parseBahtToSatang } from '../domain/money';
-import { Button, Card, IconButton, Ionicons, Row, Segmented, T, Toggle } from '../ui/components';
+import { Button, Divider, IconButton, Ionicons, Row, Segmented, T, Toggle, type IconName } from '../ui/components';
 import { setKlaSound, useKlaSound } from '../ui/kla/useKlaTalk';
 import { ThemePicker } from '../ui/ThemePicker';
 import { setThemeMode, useThemeMode, type ThemeMode } from '../ui/themeMode';
 import { ConfirmSheet, useToast } from '../ui/feedback';
-import { Field } from '../ui/inputs';
-import { space, useTheme } from '../ui/theme';
+import { inputBox, inputText } from '../ui/inputs';
+import { alpha, fonts, radius, space, useTheme } from '../ui/theme';
 import { HeaderDecor } from '../ui/halloween';
+
+/** A titled group of rows in one card (the grouped-list look of the settings). */
+function Group({ title, children }: { title: string; children: ReactNode }) {
+  const theme = useTheme();
+  const rows = Children.toArray(children).filter(Boolean);
+  return (
+    <View style={{ gap: space.sm, marginTop: space.md }}>
+      <T v="h3">{title}</T>
+      <View style={{ backgroundColor: theme.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: theme.line, paddingHorizontal: space.lg }}>
+        {rows.map((r, i) => (
+          <View key={i}>
+            {i > 0 ? <Divider /> : null}
+            {r}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function RowIcon({ icon, color }: { icon: IconName; color: string }) {
+  const theme = useTheme();
+  return (
+    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: alpha(color, theme.dark ? 0.2 : 0.12), alignItems: 'center', justifyContent: 'center' }}>
+      <Ionicons name={icon} size={19} color={color} />
+    </View>
+  );
+}
+
+function LinkRow({ icon, label, onPress, danger }: { icon: IconName; label: string; onPress: () => void; danger?: boolean }) {
+  const theme = useTheme();
+  const color = danger ? theme.critical : theme.primary;
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md, minHeight: 56 }}>
+      <RowIcon icon={icon} color={color} />
+      <T v="body" color={danger ? theme.critical : theme.ink} style={{ flex: 1 }}>
+        {label}
+      </T>
+      <Ionicons name="chevron-forward" size={18} color={theme.inkFaint} />
+    </Pressable>
+  );
+}
+
+function ToggleRow({ icon, label, hint, value, onValueChange }: { icon: IconName; label: string; hint?: string; value: boolean; onValueChange: (v: boolean) => void }) {
+  const theme = useTheme();
+  return (
+    <Row gap={space.md} style={{ paddingVertical: space.md }}>
+      <RowIcon icon={icon} color={theme.primary} />
+      <View style={{ flex: 1 }}>
+        <T v="body">{label}</T>
+        {hint ? <T v="micro">{hint}</T> : null}
+      </View>
+      <Toggle value={value} onValueChange={onValueChange} label={label} />
+    </Row>
+  );
+}
+
+/** A setting typed in place: label on the left, a short box on the right, the hint under it. */
+function InputRow({
+  id,
+  icon,
+  label,
+  value,
+  onChangeText,
+  money,
+  hint,
+  error,
+  placeholder,
+  maxLength,
+}: {
+  id: string;
+  icon: IconName;
+  label: string;
+  value: string;
+  onChangeText: (s: string) => void;
+  money?: boolean;
+  hint?: string;
+  error?: string;
+  placeholder?: string;
+  maxLength?: number;
+}) {
+  const theme = useTheme();
+  const [focused, setFocused] = useState(false);
+  return (
+    <View style={{ paddingVertical: space.md, gap: 6 }}>
+      <Row gap={space.md}>
+        <RowIcon icon={icon} color={theme.primary} />
+        <T v="body" style={{ flex: 1 }}>
+          {label}
+        </T>
+        <View style={[inputBox(theme, { focused, error: !!error }), { width: 132, paddingHorizontal: 10 }]}>
+          <TextInput
+            nativeID={id}
+            accessibilityLabel={label}
+            value={value}
+            onChangeText={onChangeText}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder={placeholder}
+            placeholderTextColor={theme.inkFaint}
+            keyboardType={money ? 'decimal-pad' : 'default'}
+            maxLength={maxLength}
+            style={[inputText(theme), { minWidth: 0, width: '100%', paddingVertical: 8, textAlign: money ? 'right' : 'left', color: money ? theme.primary : theme.ink, fontFamily: fonts.sansSemi }]}
+          />
+        </View>
+      </Row>
+      {error ? (
+        <T v="small" color={theme.critical} style={{ marginLeft: 48 }}>
+          {error}
+        </T>
+      ) : hint ? (
+        <T v="micro" style={{ marginLeft: 48 }}>
+          {hint}
+        </T>
+      ) : null}
+    </View>
+  );
+}
 
 export default function Settings() {
   const theme = useTheme();
@@ -71,123 +189,147 @@ export default function Settings() {
     }
   }
 
+  const initial = (profile?.displayName || email || 'M').trim().charAt(0).toUpperCase();
+
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
       <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
         <IconButton icon="chevron-back" label="กลับ" onPress={() => goBack()} />
-        <T v="h3">ตั้งค่า</T>
         <HeaderDecor />
       </Row>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxxl }} keyboardShouldPersistTaps="handled">
-          <Card style={{ gap: space.lg }}>
-            <T v="h3">เงินของฉัน</T>
-            <Field id="st-name" label="ชื่อเล่น" value={name} onChangeText={setName} error={errors.name} maxLength={30} />
-            <Field
+        <ScrollView contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.sm, paddingBottom: space.xxxl }} keyboardShouldPersistTaps="handled">
+          <T v="h1" style={{ marginBottom: space.sm }}>ตั้งค่า</T>
+
+          <Group title="บัญชี">
+            <Row gap={space.md} style={{ paddingVertical: space.md }}>
+              <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: theme.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
+                {repo?.mode === 'demo' ? (
+                  <Ionicons name="flask-outline" size={24} color={theme.accentInk} />
+                ) : (
+                  <T v="h2" color={theme.accentInk}>{initial}</T>
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <T v="h3" numberOfLines={1}>{profile?.displayName || 'ผู้ใช้ MindPay'}</T>
+                <T v="small" numberOfLines={1}>{repo?.mode === 'demo' ? 'โหมดทดลอง (ข้อมูลในเครื่อง)' : (email ?? 'บัญชี MindPay')}</T>
+              </View>
+            </Row>
+            {repo?.mode === 'cloud' ? <LinkRow icon="key-outline" label="เปลี่ยนรหัสผ่าน" onPress={() => showAuthNotice({ kind: 'recovery' })} /> : null}
+            <LinkRow icon="log-out-outline" label={repo?.mode === 'demo' ? 'ออกจากโหมดทดลอง' : 'ออกจากระบบ'} danger onPress={() => setAskOut(true)} />
+          </Group>
+
+          <Group title="เงินและงบประมาณ">
+            <InputRow id="st-name" icon="person-outline" label="ชื่อเล่น" value={name} onChangeText={setName} error={errors.name} maxLength={30} />
+            <InputRow
               id="st-opening"
+              icon="wallet-outline"
               label="ยอดเงินตอนเริ่มใช้ MindPay (บาท)"
               value={opening}
               onChangeText={setOpening}
-              keyboardType="decimal-pad"
+              money
               hint="ยอดคงเหลือ = ค่านี้ + รายรับ − รายจ่ายที่ยืนยันแล้ว ถ้ายอดในแอปไม่ตรงกับธนาคาร ปรับที่นี่"
               error={errors.opening}
             />
-            <Field
+            <InputRow
               id="st-floor"
+              icon="shield-checkmark-outline"
               label="เงินสำรองขั้นต่ำ (บาท)"
               value={floor}
               onChangeText={setFloor}
-              keyboardType="decimal-pad"
+              money
               hint="Money Runway นับวันจนยอดเงินเหลือเท่านี้"
               error={errors.floor}
             />
-            <Field id="st-budget" label="งบใช้จ่ายต่อเดือน (บาท)" value={budget} onChangeText={setBudget} keyboardType="decimal-pad" hint="เว้นว่างถ้าไม่ต้องการตั้งงบ" error={errors.budget} />
-            <Button label="บันทึก" onPress={save} loading={busy} />
-          </Card>
+            <InputRow
+              id="st-budget"
+              icon="cash-outline"
+              label="งบใช้จ่ายต่อเดือน (บาท)"
+              value={budget}
+              onChangeText={setBudget}
+              money
+              placeholder="ไม่ตั้ง"
+              hint="เว้นว่างถ้าไม่ต้องการตั้งงบ"
+              error={errors.budget}
+            />
+            <View style={{ paddingVertical: space.md }}>
+              <Button label="บันทึก" onPress={save} loading={busy} />
+            </View>
+          </Group>
 
           {auto.available ? (
-            <Card>
-              <T v="h3">อ่านสลิปอัตโนมัติ</T>
-              <Row justify="space-between" gap={space.md}>
-                <View style={{ flex: 1 }}>
-                  <T v="body">หาสลิปใหม่ทุกครั้งที่เปิดแอป</T>
-                  <T v="micro">ตรวจเฉพาะสลิปที่มี QR ซึ่งบันทึกลงเครื่องวันนี้ สลิปของวันก่อนหน้าเลือกเองได้ที่ปุ่มสแกนสลิป</T>
-                </View>
-                <Toggle value={auto.prefs.autoScan} onValueChange={(v) => auto.setPrefs({ autoScan: v })} label="หาสลิปใหม่ทุกครั้งที่เปิดแอป" />
-              </Row>
-              <Row justify="space-between" gap={space.md}>
-                <View style={{ flex: 1 }}>
-                  <T v="body">รวมยอดทันทีเมื่ออ่านชัด</T>
-                  <T v="micro">สลิปที่อ่านได้มั่นใจ 80% ขึ้นไปทุกช่องจะเข้ายอดเงินเลย ส่วนที่ไม่ชัดรอให้ตรวจก่อน</T>
-                </View>
-                <Toggle value={auto.prefs.autoConfirm} onValueChange={(v) => auto.setPrefs({ autoConfirm: v })} label="รวมยอดทันทีเมื่ออ่านชัด" />
-              </Row>
-            </Card>
+            <Group title="อ่านสลิปอัตโนมัติ">
+              <ToggleRow
+                icon="images-outline"
+                label="หาสลิปใหม่ทุกครั้งที่เปิดแอป"
+                hint="ตรวจเฉพาะสลิปที่มี QR ซึ่งบันทึกลงเครื่องวันนี้ สลิปของวันก่อนหน้าเลือกเองได้ที่ปุ่ม +"
+                value={auto.prefs.autoScan}
+                onValueChange={(v) => auto.setPrefs({ autoScan: v })}
+              />
+              <ToggleRow
+                icon="checkmark-done-outline"
+                label="รวมยอดทันทีเมื่ออ่านชัด"
+                hint="สลิปที่อ่านได้มั่นใจ 80% ขึ้นไปทุกช่องจะเข้ายอดเงินเลย ส่วนที่ไม่ชัดรอให้ตรวจก่อน"
+                value={auto.prefs.autoConfirm}
+                onValueChange={(v) => auto.setPrefs({ autoConfirm: v })}
+              />
+            </Group>
           ) : null}
 
-          <Card>
-            <T v="h3">น้องกล้า</T>
-            <Row justify="space-between" gap={space.md}>
-              <View style={{ flex: 1 }}>
-                <T v="body">เสียงน้องกล้า</T>
-                <T v="micro">น้องกล้าพูดคำแนะนำออกเสียงในหน้าโค้ช ปิดไว้ก็ยังมีตัวหนังสือขึ้นให้อ่าน</T>
-              </View>
-              <Toggle value={klaSound} onValueChange={setKlaSound} label="เสียงน้องกล้า" />
-            </Row>
-            <Button label="ตู้สกินน้องกล้า" kind="soft" small icon="shirt-outline" onPress={() => router.push('/skins')} />
-          </Card>
-
-          <Card>
-            <T v="h3">หน้าตาแอป</T>
-            <Segmented<ThemeMode>
-              options={[
-                { key: 'system', label: 'ตามมือถือ' },
-                { key: 'light', label: 'สว่าง' },
-                { key: 'dark', label: 'มืด' },
-              ]}
-              value={themeMode}
-              onChange={setThemeMode}
+          <Group title="น้องกล้า">
+            <ToggleRow
+              icon="volume-medium-outline"
+              label="เสียงน้องกล้า"
+              hint="น้องกล้าพูดคำแนะนำออกเสียงในหน้าโค้ช ปิดไว้ก็ยังมีตัวหนังสือขึ้นให้อ่าน"
+              value={klaSound}
+              onValueChange={setKlaSound}
             />
-            <T v="micro">โหมดมืดช่วยถนอมสายตาตอนกลางคืน และประหยัดแบตบนจอ OLED</T>
-            <T v="small" color={theme.ink} style={{ marginTop: space.sm }}>
-              ธีมสี
-            </T>
-            <ThemePicker />
-          </Card>
+            <LinkRow icon="shirt-outline" label="ตู้สกินน้องกล้า" onPress={() => router.push('/skins')} />
+          </Group>
 
-          <Card>
-            <T v="h3">ความเป็นส่วนตัว</T>
-            <T v="small">
+          <Group title="หน้าตาแอป">
+            <View style={{ paddingVertical: space.md, gap: space.sm }}>
+              <Segmented<ThemeMode>
+                options={[
+                  { key: 'system', label: 'ตามมือถือ' },
+                  { key: 'light', label: 'สว่าง' },
+                  { key: 'dark', label: 'มืด' },
+                ]}
+                value={themeMode}
+                onChange={setThemeMode}
+              />
+              <T v="micro">โหมดมืดช่วยถนอมสายตาตอนกลางคืน และประหยัดแบตบนจอ OLED</T>
+              <T v="small" color={theme.ink} style={{ marginTop: space.sm }}>
+                ธีมสี
+              </T>
+              <ThemePicker />
+            </View>
+          </Group>
+
+          <Group title="อื่น ๆ">
+            <LinkRow icon="ribbon-outline" label="ความสำเร็จและภารกิจ" onPress={() => router.push('/achievements')} />
+            <LinkRow icon="gift-outline" label="มีอะไรใหม่" onPress={() => router.push('/whatsnew')} />
+            {userId ? (
+              <LinkRow
+                icon="refresh-outline"
+                label="ล้างประวัติรูปที่เคยสแกน"
+                onPress={() => forgetScanned(userId).then(() => toast({ message: 'สแกนครั้งหน้าจะตรวจทุกรูปใหม่' }))}
+              />
+            ) : null}
+          </Group>
+
+          <Group title="ความเป็นส่วนตัว">
+            <T v="small" style={{ paddingVertical: space.md }}>
               • รูปในแกลเลอรีถูกตรวจบนมือถือก่อน เฉพาะรูปที่มี QR ของสลิปจะถูกส่งให้ AI (Google Gemini) อ่าน และไม่ถูกเก็บบนเซิร์ฟเวอร์ MindPay{'\n'}
               • ช่วงทดลองใช้ Gemini แบบฟรี ซึ่ง Google อาจเก็บข้อมูลที่ส่งไปเพื่อปรับปรุง AI ตามเงื่อนไขของ Google{'\n'}
               • น้องกล้า (โค้ช AI) เห็นเฉพาะยอดรวมตามหมวด ไม่เห็นรูปสลิป เลขบัญชี หรือชื่อคนที่คุณโอนให้{'\n'}
               • เสียงของน้องกล้าใช้เสียงอ่านภาษาไทยที่มากับมือถือหรือเบราว์เซอร์ของคุณ (ข้อความที่อ่านเป็นคำตอบของโค้ชเท่านั้น){'\n'}
               • ข้อมูลรายการของคุณมองเห็นได้เฉพาะบัญชีของคุณ (Row Level Security)
             </T>
-            {userId ? (
-              <Button
-                label="ล้างประวัติรูปที่เคยสแกน"
-                kind="soft"
-                small
-                onPress={() => forgetScanned(userId).then(() => toast({ message: 'สแกนครั้งหน้าจะตรวจทุกรูปใหม่' }))}
-              />
-            ) : null}
-          </Card>
-
-          <Card>
-            <T v="h3">บัญชี</T>
-            <Row gap={space.sm}>
-              <Ionicons name={repo?.mode === 'demo' ? 'flask-outline' : 'person-circle-outline'} size={22} color={theme.inkSoft} />
-              <T v="body" style={{ flex: 1 }} numberOfLines={1}>
-                {repo?.mode === 'demo' ? 'โหมดทดลอง (ข้อมูลในเครื่อง)' : (email ?? 'บัญชี MindPay')}
-              </T>
-            </Row>
-            {repo?.mode === 'cloud' ? (
-              <Button label="เปลี่ยนรหัสผ่าน" kind="soft" icon="key-outline" onPress={() => showAuthNotice({ kind: 'recovery' })} />
-            ) : null}
-            <T v="micro">MindPay เวอร์ชัน {Constants.expoConfig?.version ?? '1.0.0'}</T>
-            <Button label={repo?.mode === 'demo' ? 'ออกจากโหมดทดลอง' : 'ออกจากระบบ'} kind="danger" icon="log-out-outline" onPress={() => setAskOut(true)} />
-          </Card>
+          </Group>
+          <T v="micro" center style={{ marginTop: space.md }}>
+            {Constants.expoConfig?.name ?? 'MindPay'} เวอร์ชัน {Constants.expoConfig?.version ?? '1.0.0'}
+          </T>
         </ScrollView>
       </KeyboardAvoidingView>
 

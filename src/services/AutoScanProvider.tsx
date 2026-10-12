@@ -245,7 +245,7 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
         else if (confirmed.length + drafts > 0) setState({ ...IDLE, phase: 'done', total: batch.length, processed, confirmed, drafts });
         else setState(IDLE); // nothing new: stay quiet
       } catch {
-        if (current()) setState({ ...IDLE, phase: 'error', message: 'ตรวจแกลเลอรีอัตโนมัติไม่สำเร็จ ลองใหม่ได้ที่ปุ่มสแกนสลิป' });
+        if (current()) setState({ ...IDLE, phase: 'error', message: 'ตรวจแกลเลอรีอัตโนมัติไม่สำเร็จ ลองใหม่ได้ที่ปุ่ม “ดึงสลิปวันนี้” บนหน้าหลัก' });
       } finally {
         running.current = false;
       }

@@ -52,7 +52,8 @@ async function freshPage(tag) {
   return { ctx, page };
 }
 const shot = (page, name) => page.screenshot({ path: join(SHOTS, `${name}.png`) });
-const visible = (page, text, timeout = 6000) => page.getByText(text, { exact: false }).first().waitFor({ state: 'visible', timeout }).then(() => true, () => false);
+// Any shown copy counts (a screen underneath, such as another tab, may hold a hidden copy of the same words).
+const visible = (page, text, timeout = 6000) => page.getByText(text, { exact: false }).filter({ visible: true }).first().waitFor({ state: 'visible', timeout }).then(() => true, () => false);
 const gone = (page, text, timeout = 6000) => page.getByText(text, { exact: false }).first().waitFor({ state: 'hidden', timeout }).then(() => true, () => false);
 const introGone = (page) => page.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
 const button = (page, name) => page.getByRole('button', { name, exact: false }).first();
@@ -69,6 +70,19 @@ async function pickPeriod(page, label) {
     if ((await tab.getAttribute('aria-selected').catch(() => null)) === 'true') return true;
   }
   return false;
+}
+/** MindPay ใหม่: every way to add something starts at the (+) in the tab bar. */
+async function openAdd(page, option) {
+  await page.getByRole('button', { name: 'เพิ่มรายการ', exact: true }).first().click();
+  await page.getByRole('button', { name: option, exact: true }).first().click();
+}
+/** Open a tab of the bottom bar (หน้าหลัก / รายการ / สถิติ / โค้ช). */
+const openTab = (page, name) => page.getByRole('tab', { name, exact: true }).first().click();
+/** The balance on the home money card, in satang (read from its accessibility label). */
+async function homeBalance(page) {
+  await page.waitForTimeout(900); // let the card settle
+  const label = await page.locator('[aria-label*="ยอดคงเหลือ ฿"]').first().getAttribute('aria-label');
+  return Math.round(Number(label.match(/ยอดคงเหลือ ฿([\d,]+\.\d{2})/)[1].replace(/,/g, '')) * 100);
 }
 
 // ---------------------------------------------------------------- scenarios
@@ -363,10 +377,12 @@ try {
     );
     await button(page, 'เสร็จ').click();
     check('"เสร็จ" returns home even when the scan page was opened directly', await visible(page, 'สวัสดี', 8000));
+    check('Home: the money card shows what was spent today', await visible(page, 'วันนี้ใช้ไป'));
+    await openTab(page, 'สถิติ');
     await pickPeriod(page, 'วันนี้');
-    check('Home: the chosen period shows its exact hours', await visible(page, '00:00–23:59'));
-    check('Home: today shows the money out from the slip', await visible(page, 'เงินออก'));
-    await shot(page, '16-home-today');
+    check('สถิติ: the chosen period shows its exact hours', await visible(page, '00:00–23:59'));
+    check('สถิติ: today shows the money out from the slip (and yesterday\'s income is not counted)', (await visible(page, 'ใช้จ่ายรวม')) && (await visible(page, 'สุทธิ −฿120')));
+    await shot(page, '16-stats-today');
     await ctx.close();
     state.confirmEmail = true;
   }
@@ -374,19 +390,28 @@ try {
   // 10. A new day: at 00:00 Bangkok time "วันนี้" starts over by itself
   {
     const { ctx, page } = await freshPage('midnight');
-    await page.clock.install({ time: new Date('2026-09-28T16:59:40Z') }); // 23:59:40 on 28 Sep in Bangkok
+    await page.clock.install({ time: new Date('2026-09-28T16:59:00Z') }); // 23:59:00 on 28 Sep in Bangkok
     await page.goto(APP);
     await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
     await introGone(page);
     await page.getByText('ลองใช้ด้วยข้อมูลตัวอย่าง').click();
-    const before = await visible(page, 'วันจันทร์ที่ 28 กันยายน 2569', 8000);
-    await page.clock.fastForward(30_000); // past midnight
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    // "วันนี้" picked on the สถิติ tab before midnight.
+    await openTab(page, 'สถิติ');
+    const pickedBefore = await pickPeriod(page, 'วันนี้');
+    const statsBefore = pickedBefore && (await visible(page, '28 ก.ย. 2569 · 00:00–23:59', 8000));
+    await openTab(page, 'หน้าหลัก');
+    const card = page.locator('[aria-label^="เงินพอใช้อีก"]').first();
+    const onCard = (text, timeout) => shown(card.getByText(text).first(), timeout);
+    const before = (await onCard('28 ก.ย. 2569', 8000)) && (await onCard('อีก 2 วันถึงสิ้นเดือน'));
+    const clockBefore = await page.evaluate(() => new Date().toISOString());
+    await page.clock.fastForward(90_000); // past midnight
     await page.waitForTimeout(500);
-    const after = await visible(page, 'วันอังคารที่ 29 กันยายน 2569', 5000);
-    check('At midnight the date on the home screen moves to the new day by itself', before && after);
-    check('The companion greets the new day with yesterday\'s spending', await visible(page, 'วันใหม่แล้ว!'));
-    const picked = await pickPeriod(page, 'วันนี้');
-    check('"วันนี้" now means the new day, 00:00–23:59', picked && (await visible(page, '29 ก.ย. 2569 · 00:00–23:59', 8000)), picked ? '' : 'tab not selected');
+    const after = (await onCard('29 ก.ย. 2569', 8000)) && (await onCard('อีก 1 วันถึงสิ้นเดือน'));
+    const cardText = after ? '' : `${clockBefore} -> ${await page.evaluate(() => new Date().toISOString())} | ${(await card.innerText().catch(() => '')).split('\n').filter(Boolean).slice(0, 8).join(' / ')}`;
+    check('At midnight the money card moves to the new day by itself (date and days to the month end)', before && after, `before=${before} after=${after} ${cardText}`);
+    await openTab(page, 'สถิติ');
+    check('"วันนี้" on สถิติ now means the new day, 00:00–23:59', statsBefore && (await visible(page, '29 ก.ย. 2569 · 00:00–23:59', 8000)), statsBefore ? '' : 'not set before midnight');
     await shot(page, '17-new-day');
     await ctx.close();
   }
@@ -403,10 +428,12 @@ try {
     const introMs = Date.now() - t0;
     check('Reduce motion: the opening screen still shows, then leaves quickly', shown && introMs < 1500, `${introMs} ms on screen`);
     await page.getByText('ลองใช้ด้วยข้อมูลตัวอย่าง').click();
-    await visible(page, 'ยอดคงเหลือ', 8000);
-    const balanceNow = await page.getByText(/฿[\d,]+/).first().textContent();
-    await page.waitForTimeout(150);
-    check('Reduce motion: the balance appears at once (no count-up)', balanceNow === (await page.getByText(/฿[\d,]+/).first().textContent()));
+    // The money card's day count normally counts up; with reduce motion it shows the number at once.
+    const card = page.locator('[aria-label^="เงินพอใช้อีก"]').first();
+    await card.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+    const daysNow = await card.innerText().catch(() => '');
+    const daysTrue = (await card.getAttribute('aria-label').catch(() => '') ?? '').match(/เงินพอใช้อีก (\d+) วัน/)?.[1];
+    check('Reduce motion: the days on the money card appear at once (no count-up)', !!daysTrue && new RegExp(`(^|\\n)${daysTrue}\\s+วัน`).test(daysNow), `${daysTrue} | ${daysNow.split('\n').slice(0, 4).join(' / ')}`);
     await reduced.close();
 
     const { ctx, page: p2 } = await freshPage('idle');
@@ -440,13 +467,15 @@ try {
     await introGone(page);
     await page.getByText('ลองใช้ด้วยข้อมูลตัวอย่าง').click();
     await visible(page, 'ยอดคงเหลือ', 8000);
-    const balance = async () => {
-      await page.waitForTimeout(900); // let the count-up finish
-      const label = await page.locator('[aria-label^="ยอดคงเหลือ"]').first().getAttribute('aria-label');
-      return Math.round(Number(label.match(/฿([\d,]+\.\d{2})/)[1].replace(/,/g, '')) * 100);
-    };
+    const balance = () => homeBalance(page);
     const start = await balance();
-    await button(page, 'จดรายการ').click();
+    // (+) opens one sheet with every way to add.
+    await page.getByRole('button', { name: 'เพิ่มรายการ', exact: true }).first().click();
+    const sheet = (await visible(page, 'เลือกสลิปจากแกลเลอรี')) && (await visible(page, 'พูดรายการ')) && (await visible(page, 'กรอกรายจ่ายเอง')) && (await visible(page, 'เพิ่มเงินเข้า'));
+    await page.waitForTimeout(600);
+    await shot(page, '12b-add-sheet');
+    check('(+) opens the add sheet: slip, voice, type an expense, money in', sheet);
+    await page.getByRole('button', { name: 'กรอกรายจ่ายเอง', exact: true }).first().click();
     await visible(page, 'จ่ายให้ / ซื้ออะไร');
     await button(page, 'บันทึกรายการ').click();
     check('Add: an empty amount is not saved', await visible(page, 'จ่ายให้ / ซื้ออะไร'));
@@ -474,13 +503,12 @@ try {
     await button(page, 'เลิกทำ').click();
     await page.waitForTimeout(500);
     check('Undo: the item is back', await visible(page, 'ทดสอบกาแฟ'));
-    // Money in without a slip: one tile on home opens the form as income.
+    // Money in without a slip: (+) -> "เพิ่มเงินเข้า" opens the form as income.
     await page.goto(APP);
     await introGone(page);
     await visible(page, 'ยอดคงเหลือ', 8000);
     const beforeIncome = await balance();
-    // Exactly the tile (the "มีอะไรใหม่" card also mentions it).
-    await page.getByRole('button', { name: 'เพิ่มเงินเข้า', exact: true }).first().click();
+    await openAdd(page, 'เพิ่มเงินเข้า');
     const incomeForm = (await visible(page, 'ได้รับจาก')) && (await page.getByRole('tab', { name: 'รายรับ', exact: true }).first().getAttribute('aria-selected')) === 'true';
     await page.getByRole('button', { name: '+฿1,000', exact: true }).first().click();
     await page.fill('#tx-title', 'ค่าสอนพิเศษ');
@@ -753,7 +781,7 @@ try {
     const refs = state.txRows.filter((r) => ['ร้านข้าวมันไก่', 'พี่ชาย'].includes(r.title)).map((r) => r.slip_ref).sort();
     check('The QR references are kept', JSON.stringify(refs) === JSON.stringify(['016272184455CKQ11220', '016273009912DMV30011']), refs.join(','));
     check('The balance counts them at once', await visible(page, '฿5,730', 8000));
-    await page.getByRole('button', { name: 'สแกนสลิป' }).last().click();
+    await openAdd(page, 'เลือกสลิปจากแกลเลอรี');
     const olderFound = await visible(page, 'อ่านเสร็จแล้ว ได้ 1 รายการ', 20000);
     check(
       "The scan screen searches the gallery by itself and finds only yesterday's slip (today's were already read)",
@@ -864,11 +892,7 @@ try {
     await introGone(page);
     await page.getByText('ลองใช้ด้วยข้อมูลตัวอย่าง').click();
     await visible(page, 'ยอดคงเหลือ', 8000);
-    const balance = async () => {
-      await page.waitForTimeout(900);
-      const label = await page.locator('[aria-label^="ยอดคงเหลือ"]').first().getAttribute('aria-label');
-      return Math.round(Number(label.match(/฿([\d,]+\.\d{2})/)[1].replace(/,/g, '')) * 100);
-    };
+    const balance = () => homeBalance(page);
     const start = await balance();
     // Streak and badges: the sample data has already earned some.
     check('Home: the recording streak is shown', await button(page, 'จดต่อเนื่อง').isVisible());
@@ -888,16 +912,21 @@ try {
     check('Achievements: streak of the last 14 days and the badge collection', achievements);
     await button(page, 'กลับ').click();
     check('Seen badges are not announced again', await gone(page, 'ได้เหรียญใหม่'));
-    // The companion and the money tree answer when tapped.
-    await button(page, 'แตะน้องกล้าเพื่อฟังเคล็ดลับ').click();
-    check('Tapping the companion: it gives a tip', await visible(page, 'เก็บสลิปไว้ในเครื่องได้เลย'));
-    await button(page, 'ต้นไม้เงิน แตะเพื่อดูความหมาย').click();
-    const treeSays = await visible(page, 'ใบทองคือวันที่เงินพอใช้');
+    // MindPay ใหม่: home has three parts only — the money card (days vs the month end), this month's budget, the latest items.
+    const card = page.locator('[aria-label^="เงินพอใช้อีก"]').first();
+    const cardLabel = (await card.getAttribute('aria-label').catch(() => '')) ?? '';
+    const monthEnd = /เหลือเก็บได้อีก|ขาดอีก \d+ วันถึงสิ้นเดือน|พอดีถึงสิ้นเดือน|เงินสำรอง|ยังไม่มีรายจ่าย/.test(cardLabel) && (await shown(card.getByText('ถึงสิ้นเดือน').first()));
+    const parts = (await visible(page, 'งบเดือนนี้')) && (await visible(page, 'รายการล่าสุด')) && (await shown(button(page, 'ดึงสลิปวันนี้')));
     await page.waitForTimeout(500);
-    await shot(page, '23-tree-tapped');
-    check('Tapping the money tree: the companion explains the gold leaves', treeSays);
-    await button(page, 'จดด้วยเสียง').click();
-    check('Voice: the mic on the home screen opens "พูดจดรายการ"', await visible(page, 'แตะไมค์แล้วพูด'));
+    await shot(page, '23-home-three-parts');
+    check('Home: the money card compares the days the money lasts with the month end', monthEnd, cardLabel);
+    check('Home: three parts — money card (with "ดึงสลิปวันนี้"), this month\'s budget, latest items', parts);
+    await page.locator('[aria-label^="เงินพอใช้อีก"]').first().click();
+    check('Home: tapping the money card opens Money Runway', await visible(page, 'ใช้น้อยลงวันละ', 8000));
+    await button(page, 'กลับ').click();
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    await openAdd(page, 'พูดรายการ');
+    check('Voice: (+) -> "พูดรายการ" opens "พูดจดรายการ"', await visible(page, 'แตะไมค์แล้วพูด'));
     await button(page, 'แตะแล้วพูด').click();
     const heard = await visible(page, 'จะบันทึก 1 รายการ', 6000);
     await page.waitForTimeout(600);
@@ -914,8 +943,23 @@ try {
     check('Voice: the balance follows (−฿25 −฿65 +฿500)', (await balance()) === start - 2_500 - 6_500 + 50_000);
     check('First voice entry earns the "พูดแล้วจด" badge', (await visible(page, 'ได้เหรียญใหม่')) && (await visible(page, 'พูดแล้วจด')));
 
-    // Spending calendar on the transactions tab: each day shaded by spending; tap a day to see only it.
-    await page.getByRole('tab', { name: 'รายการ', exact: true }).first().click().catch(() => page.goto(`${APP}transactions`));
+    // The รายการ tab: search and filter chips; items grouped by day, each day with its total.
+    await openTab(page, 'รายการ');
+    // (Other tabs stay in the page underneath: count only what is on this screen.)
+    const onScreen = (text) => page.getByTestId('transactions-screen').getByText(text, { exact: false }).filter({ visible: true }).count();
+    const grouped = (await shown(page.getByText(/^วันนี้ • /).filter({ visible: true }).first())) && (await shown(page.locator('#tx-search')));
+    await page.fill('#tx-search', 'ค่ารถ');
+    await page.waitForTimeout(600);
+    const found = (await onScreen('ค่ารถ')) > 0 && (await onScreen('กาแฟ')) === 0;
+    await shot(page, '27a-transactions-search');
+    check('รายการ: grouped by day ("วันนี้ • weekday"), and the search finds an item', grouped && found, `grouped=${grouped}`);
+    await page.fill('#tx-search', '');
+    await page.getByRole('button', { name: 'รายรับ', exact: true }).first().click();
+    await page.waitForTimeout(600);
+    check('รายการ: the "รายรับ" chip shows money in only', (await onScreen('เงินจากแม่')) > 0 && (await onScreen('ค่ารถ')) === 0);
+    await page.getByRole('button', { name: 'ทั้งหมด', exact: true }).first().click();
+    // Spending calendar: one tap away; each day shaded by spending; tap a day to see only it.
+    await button(page, 'ดูปฏิทินการใช้จ่าย').click();
     const calendarShown = (await visible(page, 'มีเงินเข้า')) && (await visible(page, 'เทียบกับวันที่ใช้ตามปกติ'));
     check('Transactions: the spending calendar of this month is shown', calendarShown);
     const spentDay = page.getByRole('button', { name: /ใช้ไป ฿/ }).first();
@@ -926,12 +970,18 @@ try {
     check('Tapping a day shows only that day (with its total)', (await visible(page, 'ดูทุกวัน')) && dayLabel.length > 0, dayLabel);
     await button(page, 'ดูทุกวัน').click();
     check('"ดูทุกวัน" shows every day again', await gone(page, 'ดูทุกวัน'));
-    await page.goto(APP);
-    await introGone(page);
-    await visible(page, 'ยอดคงเหลือ', 8000);
 
-    // Month recap: a story of full screens that moves on by itself; tap right for the next one.
-    await button(page, 'ดูสรุปเดือน').click();
+    // สถิติ: total for the range, items and average per day, spending by category as a donut (or bars).
+    await openTab(page, 'สถิติ');
+    const statsShown = (await visible(page, 'ใช้จ่ายรวม')) && (await visible(page, 'เฉลี่ยต่อวัน')) && (await visible(page, 'ภาพรวมการใช้จ่าย'));
+    await page.waitForTimeout(1200);
+    await shot(page, '27b-stats');
+    check('สถิติ: total spending, items, average per day and the category breakdown', statsShown);
+    await page.getByRole('tab', { name: 'แท่ง', exact: true }).first().click();
+    check('สถิติ: the breakdown switches between a donut and bars', (await page.getByRole('tab', { name: 'แท่ง', exact: true }).first().getAttribute('aria-selected')) === 'true');
+
+    // Month recap (from สถิติ): a story of full screens that moves on by itself; tap right for the next one.
+    await page.getByText(/^สรุปเดือน/).filter({ visible: true }).first().click();
     check('Recap: opens on the month\'s title screen', await visible(page, 'แตะด้านขวาเพื่อไปต่อ'));
     // This month so far, or (on the 1st, when the recap is the month just ended) the whole month.
     check('Recap: moves on to the next screen by itself', await visible(page, /เดือนนี้ใช้ไปแล้ว|ทั้งเดือนใช้ไป/, 9000));
@@ -946,9 +996,10 @@ try {
     await shot(page, '26-recap-end');
     check('Recap: ends with the money tree and the badges', outro && (await visible(page, 'เหรียญที่ได้แล้ว')));
     await button(page, 'เสร็จ').click();
-    check('Recap: "เสร็จ" returns home', await visible(page, 'ยอดคงเหลือ', 8000));
+    check('Recap: "เสร็จ" returns to สถิติ', await shown(page.getByText('ใช้จ่ายรวม').filter({ visible: true }).first(), 8000));
 
     // น้องกล้า's skins: announced on home, money missions on the achievements screen, the collection.
+    await openTab(page, 'หน้าหลัก');
     check('Home: new skins for น้องกล้า are announced', await visible(page, 'น้องกล้าได้ชุดใหม่'));
     await page.goto(`${APP}achievements`);
     await introGone(page);

@@ -148,6 +148,12 @@ export function formatThaiDayLong(dayKey: string): string {
   return `วัน${THAI_WEEKDAYS[weekday]}ที่ ${d} ${THAI_MONTHS_LONG[m - 1]} ${y + 543}`;
 }
 
+/** Thai weekday name of a day: "2026-10-12" -> "จันทร์". */
+export function thaiWeekday(dayKey: string): string {
+  const [y, m, d] = dayKey.split('-').map(Number);
+  return THAI_WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+}
+
 /** Friendly label for a day relative to today: "วันนี้", "เมื่อวาน", or "25 ก.ย." */
 export function relativeDayLabel(dayKey: string, now: Date = new Date()): string {
   const today = bkkDayKey(now);

@@ -3,7 +3,7 @@
  * Only CONFIRMED transactions count. Drafts never change a number the user sees.
  */
 import { getCategory } from './categories';
-import { addDays, bkkDayKey, isDayInRange, rangeDays } from './dates';
+import { addDays, bkkDayKey, daysBetween, isDayInRange, rangeDays } from './dates';
 import type { RangeKey, Transaction, TxKind } from './types';
 
 export const confirmedOnly = (txs: Transaction[]) => txs.filter((t) => t.status === 'confirmed');
@@ -131,4 +131,23 @@ export function monthExpense(txs: Transaction[], now: Date = new Date()): number
   return confirmedOnly(txs)
     .filter((t) => t.kind === 'expense' && bkkDayKey(t.occurredAt).startsWith(month))
     .reduce((s, t) => s + t.amountSatang, 0);
+}
+
+/**
+ * Average spending per day in a range (the stats screen): the range's confirmed
+ * expense divided by its days, counting only from the first confirmed record,
+ * so a new user's average is not watered down by days before they started.
+ * Whole satang.
+ */
+export function rangeDailyAverage(txs: Transaction[], range: RangeKey, now: Date = new Date()): number {
+  const days = rangeDays(range, now);
+  const confirmed = confirmedOnly(txs);
+  if (confirmed.length === 0) return 0;
+  const first = confirmed.map((t) => bkkDayKey(t.occurredAt)).sort()[0];
+  const start = first > days.from ? first : days.from;
+  const counted = Math.max(1, daysBetween(start, days.to) + 1);
+  const expense = confirmed
+    .filter((t) => t.kind === 'expense' && isDayInRange(bkkDayKey(t.occurredAt), days))
+    .reduce((s, t) => s + t.amountSatang, 0);
+  return Math.round(expense / counted);
 }

@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "MindPay",
+    "name": "MindPay ใหม่",
     "slug": "mindpay",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.socratesandskeletons.mindpay",
+      "bundleIdentifier": "com.socratesandskeletons.mindpay.v2",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "MindPay ตรวจรูปในแกลเลอรีเพื่อหาสลิปโอนเงินและบันทึกรายการให้อัตโนมัติ"
       }
@@ -21,7 +21,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.socratesandskeletons.mindpay",
+      "package": "com.socratesandskeletons.mindpay.v2",
       "blockedPermissions": [
         "android.permission.CAMERA",
         "android.permission.READ_MEDIA_VIDEO",
@@ -32,7 +32,7 @@
       "favicon": "./assets/favicon.png",
       "output": "single",
       "bundler": "metro",
-      "name": "MindPay",
+      "name": "MindPay ใหม่",
       "themeColor": "#0E3B2C",
       "backgroundColor": "#F2F5F1"
     },

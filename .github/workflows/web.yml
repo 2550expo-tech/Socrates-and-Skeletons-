@@ -1,20 +1,21 @@
-# Publishes the web version of MindPay to GitHub Pages on every push to main:
-#   https://2550expo-tech.github.io/Socrates-and-Skeletons-/
-# The web version shows the app at phone width, works with real accounts and
-# demo data, and reads slips from photos the user uploads. Scanning the whole
-# gallery is only in the phone app. On iPhone: open in Safari -> Share ->
-# Add to Home Screen, and it opens full screen with the MindPay icon.
-name: Deploy web app
+# Publishes the web version of "MindPay ใหม่" (the redesign on branch v2) to
+# GitHub Pages under /v2/, next to the original MindPay at the site root:
+#   https://2550expo-tech.github.io/Socrates-and-Skeletons-/v2/
+# The original app at the root is kept exactly as it is: this job takes the
+# published site, replaces only the /v2/ folder, and publishes it back.
+# On iPhone: open the link in Safari -> Share -> Add to Home Screen, and it gets
+# its own "MindPay ใหม่" icon next to the old one. Same accounts and data.
+name: Deploy web app (MindPay ใหม่, /v2/)
 
 on:
   push:
-    branches: [main]
+    branches: [v2]
   workflow_dispatch:
 
 permissions:
   contents: write
 
-# Shared with the "MindPay ใหม่" deploy (branch v2): one deploy at a time, none cancelled.
+# Shared with the original app's deploy (branch main): one at a time, none cancelled.
 concurrency:
   group: web-pages
   cancel-in-progress: false
@@ -22,7 +23,7 @@ concurrency:
 jobs:
   web:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -36,52 +37,54 @@ jobs:
       - name: App settings (public Supabase URL and publishable key)
         run: cp .env.example .env
 
-      - name: Export web build
-        env:
-          EXPO_WEB_BASE_URL: /Socrates-and-Skeletons-
-        run: npx expo export --platform web --output-dir dist
-
-      - name: Home-screen icon and full-screen mode (iPhone "Add to Home Screen")
-        env:
-          EXPO_WEB_BASE_URL: /Socrates-and-Skeletons-
-        run: node scripts/web-home-screen.mjs dist
-
-      - name: Single-page app fallback for deep links
-        run: cp dist/index.html dist/404.html
-
       - name: Unit tests
         run: npm test
 
-      # Browser test of every sign-in path (sign up, email code, links, reset
-      # password, sign out) against a local stand-in for Supabase. If anything
-      # fails, the website is NOT published and the screenshots are attached.
+      # The browser tests run on a build at the usual address (the test server serves that path).
+      - name: Export a build for the browser tests
+        env:
+          EXPO_WEB_BASE_URL: /Socrates-and-Skeletons-
+        run: |
+          npx expo export --platform web --output-dir dist-test
+          node scripts/web-home-screen.mjs dist-test
+          cp dist-test/index.html dist-test/404.html
+
       - name: Install the test browser
         run: npx playwright install --with-deps chromium
 
-      - name: Browser tests (sign-in flows)
-        run: node e2e/web-auth.mjs dist e2e-shots
+      - name: Browser tests
+        run: node e2e/web-auth.mjs dist-test e2e-shots
 
       - name: Keep screenshots when the browser tests fail
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-screenshots
+          name: e2e-screenshots-v2
           path: e2e-shots
 
-      # The redesign "MindPay ใหม่" (branch v2) lives at /v2/ on the same site:
-      # keep the copy already published there, and let its reloads find it.
-      - name: Keep the new app at /v2/
+      - name: Export the build for /v2/
+        env:
+          EXPO_WEB_BASE_URL: /Socrates-and-Skeletons-/v2
         run: |
-          if git fetch --depth=1 origin gh-pages:refs/remotes/origin/gh-pages && git ls-tree -d --name-only origin/gh-pages v2 | grep -qx v2; then
-            git archive origin/gh-pages v2 | tar -x -C dist
-            echo "kept /v2/"
-          fi
-          node scripts/route-v2.mjs dist
+          npx expo export --platform web --output-dir dist-v2
+          node scripts/web-home-screen.mjs dist-v2
+
+      - name: Put it next to the original app
+        run: |
+          mkdir site
+          git fetch --depth=1 origin gh-pages:refs/remotes/origin/gh-pages
+          git archive origin/gh-pages | tar -x -C site
+          # Never publish without the original app at the root.
+          test -f site/index.html || { echo "The original app is missing from gh-pages: not publishing."; exit 1; }
+          rm -rf site/v2
+          cp -r dist-v2 site/v2
+          node scripts/route-v2.mjs site
+          ls site | head -30
 
       - name: Publish to the gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
+          publish_dir: ./site
           force_orphan: true
-          commit_message: 'Deploy web app'
+          commit_message: 'Deploy web app (MindPay ใหม่ /v2/)'

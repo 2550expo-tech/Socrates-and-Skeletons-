@@ -1,10 +1,12 @@
 /**
- * Bottom navigation: four places plus a raised gold button in the middle for
- * the most frequent action, scanning slips (FR-4).
+ * Bottom navigation (MindPay ใหม่): หน้าหลัก · รายการ · (+) · สถิติ · โค้ช.
+ * The raised (+) in the middle opens one sheet for every way to add money in or
+ * out (slip, voice, typing, money in). Money Runway opens from the home card,
+ * settings from the gear on the home screen.
  *
- * Motion: a soft pill slides to the chosen tab and its icon pops; the scan
- * button sends out gold ripples a few times when the app opens, and keeps
- * rippling while the automatic scan is reading new slips.
+ * Motion: a soft pill slides to the chosen tab and its icon pops; the (+)
+ * sends out gold ripples a few times when the app opens, and keeps rippling
+ * while the automatic scan is reading today's slips.
  */
 import { router } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
@@ -23,7 +25,7 @@ import { alpha, fonts, type, useTheme } from '../../ui/theme';
 const TABS: Record<string, { label: string; icon: IconName; iconActive: IconName }> = {
   index: { label: 'หน้าหลัก', icon: 'home-outline', iconActive: 'home' },
   transactions: { label: 'รายการ', icon: 'list-outline', iconActive: 'list' },
-  runway: { label: 'เงินพอถึง', icon: 'leaf-outline', iconActive: 'leaf' },
+  stats: { label: 'สถิติ', icon: 'pie-chart-outline', iconActive: 'pie-chart' },
   coach: { label: 'โค้ช', icon: 'chatbubble-ellipses-outline', iconActive: 'chatbubble-ellipses' },
 };
 
@@ -138,12 +140,12 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
           <Animated.View style={{ transform: [{ scale: press.scale }] }}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="สแกนสลิป"
+              accessibilityLabel="เพิ่มรายการ"
               onPressIn={press.onPressIn}
               onPressOut={press.onPressOut}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-                router.push('/scan');
+                router.push('/add');
               }}
               style={{
                 width: 60,
@@ -161,11 +163,11 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
                 elevation: 8,
               }}
             >
-              <Ionicons name="scan" size={26} color={theme.heroAccent} />
+              <Ionicons name="add" size={32} color={theme.heroAccent} />
             </Pressable>
           </Animated.View>
         </View>
-        <Text style={[type.micro, { fontFamily: fonts.sansSemi, color: theme.ink, marginTop: 4 }]}>สแกนสลิป</Text>
+        <Text style={[type.micro, { fontFamily: fonts.sansSemi, color: theme.ink, marginTop: 4 }]}>เพิ่ม</Text>
       </View>
       {routes.slice(half).map((r, i) => tab(r, i + half))}
     </View>
@@ -179,7 +181,7 @@ export default function TabsLayout() {
     <Tabs tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
       <Tabs.Screen name="index" />
       <Tabs.Screen name="transactions" />
-      <Tabs.Screen name="runway" />
+      <Tabs.Screen name="stats" />
       <Tabs.Screen name="coach" />
     </Tabs>
   );
