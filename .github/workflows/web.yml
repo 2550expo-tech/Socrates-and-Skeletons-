@@ -14,9 +14,10 @@ on:
 permissions:
   contents: write
 
+# Shared with the "MindPay ใหม่" deploy (branch v2): one deploy at a time, none cancelled.
 concurrency:
   group: web-pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   web:
@@ -66,6 +67,16 @@ jobs:
         with:
           name: e2e-screenshots
           path: e2e-shots
+
+      # The redesign "MindPay ใหม่" (branch v2) lives at /v2/ on the same site:
+      # keep the copy already published there, and let its reloads find it.
+      - name: Keep the new app at /v2/
+        run: |
+          if git fetch --depth=1 origin gh-pages:refs/remotes/origin/gh-pages && git ls-tree -d --name-only origin/gh-pages v2 | grep -qx v2; then
+            git archive origin/gh-pages v2 | tar -x -C dist
+            echo "kept /v2/"
+          fi
+          node scripts/route-v2.mjs dist
 
       - name: Publish to the gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
