@@ -363,7 +363,7 @@ export default function Settings() {
           <Group title="ความเป็นส่วนตัว">
             <View style={{ paddingVertical: space.md, gap: space.sm }}>
               <T v="small">
-                • ข้อมูลรายการของคุณมองเห็นได้เฉพาะบัญชีของคุณ (Row Level Security){'\n'}
+                • ข้อมูลรายการของคุณเปิดดูได้เฉพาะบัญชีของคุณ (ฐานข้อมูลล็อกสิทธิ์ทีละรายการ){'\n'}
                 • รูปสลิปที่อ่านแล้วเก็บเป็นสำเนาในเครื่องนี้เท่านั้น ไม่ได้อัปโหลดเก็บบน server
                 {showPrivacy ? (
                   <>

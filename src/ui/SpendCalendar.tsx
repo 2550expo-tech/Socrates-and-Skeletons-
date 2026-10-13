@@ -15,7 +15,7 @@ import { fonts, radius, space, useTheme } from './theme';
 const WEEKDAYS = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 /** Levels 1..4 (level 0 = no spending uses the neutral surface). */
 const RAMP_LIGHT = ['#D9AD4E', '#BF8A1C', '#96640C', '#664306'];
-const RAMP_DARK = ['#5C4A16', '#8C6D1C', '#C4972E', '#F0C75A'];
+const RAMP_DARK = ['#5C4A16', '#7E6218', '#C4972E', '#F0C75A'];
 
 export function SpendCalendar({
   cal,
@@ -37,7 +37,8 @@ export function SpendCalendar({
   const ink = (c: CalendarDay) => {
     if (!c.level) return c.future ? theme.inkFaint : theme.inkSoft;
     if (theme.dark) return c.level >= 3 ? '#0A1410' : '#F4F1E6';
-    return c.level >= 2 ? '#FFFFFF' : '#11231B';
+    // Dark digits on the two lighter golds, white on the two deeper ones (each ≥ 4.5:1).
+    return c.level >= 3 ? '#FFFFFF' : '#11231B';
   };
   const picked = selected ? cal.weeks.flat().find((c) => c?.day === selected) ?? null : null;
 

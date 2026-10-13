@@ -25,7 +25,7 @@ import { bkkDayKey, formatThaiDay, formatThaiMonth, previousMonth, relativeDayLa
 import { halloweenOn } from '../../domain/halloween';
 import { formatBaht } from '../../domain/money';
 import { recapToOffer } from '../../domain/recap';
-import { monthEndCheck, type MonthEndCheck, type Runway } from '../../domain/runway';
+import { monthEndCheck, type Runway } from '../../domain/runway';
 import { skinById } from '../../domain/skins';
 import { useAutoScan } from '../../services/AutoScanProvider';
 import { useEquippedSkin, useKla } from '../../services/kla';
@@ -40,7 +40,7 @@ import { closeHalloweenInvite, GhostArt, HalloweenStrip, SpookyHeroDecor, useHal
 import { KlaPicture } from '../../ui/kla/KlaPicture';
 import { Medal } from '../../ui/Medal';
 import { useCountUp, useReduceMotion } from '../../ui/motion';
-import { RunwayRail } from '../../ui/RunwayRail';
+import { monthEndStatus, railLabel, RunwayRail } from '../../ui/RunwayRail';
 import { TxRow } from '../../ui/TxRow';
 import { useToast } from '../../ui/feedback';
 import { alpha, fonts, radius, space, useTheme } from '../../ui/theme';
@@ -187,35 +187,17 @@ function AttentionRow({
 
 // ---------------------------------------------------------------- 1. the money card
 
-function statusOf(m: MonthEndCheck): { text: string; icon: IconName; tone: 'good' | 'bad' | 'plain' } {
-  switch (m.kind) {
-    case 'surplus':
-      return { text: `เหลือเก็บได้อีก${m.capped ? 'มากกว่า' : ''} ${m.days} วัน`, icon: 'checkmark-circle', tone: 'good' };
-    case 'exact':
-      return { text: 'พอดีถึงสิ้นเดือน', icon: 'ellipse', tone: 'plain' };
-    case 'short':
-      return { text: `ขาดอีก ${m.days} วันถึงสิ้นเดือน`, icon: 'alert-circle', tone: 'bad' };
-    case 'below':
-      return { text: 'แตะเส้นเงินสำรองแล้ว', icon: 'alert-circle', tone: 'bad' };
-    default:
-      return { text: 'ยังไม่มีรายจ่าย 7 วัน', icon: 'time-outline', tone: 'plain' };
-  }
-}
-
 function MoneyCard({ runway, balance, averageSatang }: { runway: Runway; balance: number; averageSatang: number }) {
   const theme = useTheme();
   const halloween = useHalloween();
   const reduce = useReduceMotion();
   const press = usePressSpring(0.985);
   const check = monthEndCheck(runway);
-  const status = statusOf(check);
+  const status = monthEndStatus(check);
   // Counts only when the number changes (after a save), never from 0 when the screen appears.
   const daysShown = useCountUp(runway.days ?? 0, !reduce && runway.days !== null && !runway.capped, 700);
   const statusColor = status.tone === 'good' ? theme.heroIncome : status.tone === 'bad' ? '#FFB4A8' : theme.heroInkSoft;
-  const railLabel =
-    check.kind === 'unknown'
-      ? ''
-      : `อีก ${check.daysToMonthEnd} วันถึงสิ้นเดือน ${check.kind === 'surplus' ? `เงินพอเกินสิ้นเดือนไปอีก ${check.days} วัน` : check.kind === 'short' ? `เงินหมดก่อนสิ้นเดือน ${check.days} วัน` : status.text}`;
+  const label = railLabel(check);
 
   const figure = (label: string, children: React.ReactNode) => (
     <View style={{ flex: 1, gap: 0 }}>
@@ -268,7 +250,7 @@ function MoneyCard({ runway, balance, averageSatang }: { runway: Runway; balance
               </View>
             </Row>
           )}
-          <RunwayRail check={check} label={railLabel} />
+          <RunwayRail check={check} label={label} />
           <Row gap={6}>
             <Ionicons name={status.icon} size={16} color={statusColor} />
             <T v="small" color={statusColor} style={{ fontFamily: fonts.sansSemi, flex: 1 }}>
@@ -319,7 +301,9 @@ function BudgetCard() {
     );
   }
   const used = b.spentMonthSatang / b.budgetSatang;
-  const barColor = b.state === 'over_month' ? theme.critical : used > b.pace + 0.1 ? theme.watch : theme.primary;
+  // Spending ahead of the month (by more than 10 points): said in words, not by the bar colour alone.
+  const fast = b.state !== 'over_month' && used > b.pace + 0.1;
+  const barColor = b.state === 'over_month' ? theme.critical : fast ? theme.watch : theme.primary;
   const todayLine =
     b.state === 'over_month'
       ? { text: 'เกินงบเดือนนี้', color: theme.critical }
@@ -330,7 +314,7 @@ function BudgetCard() {
     <Pressable
       onPress={() => router.navigate('/stats')}
       accessibilityRole="button"
-      accessibilityLabel={`งบเดือนนี้ ใช้ไป ${formatBaht(b.spentMonthSatang, { decimals: false })} จาก ${formatBaht(b.budgetSatang, { decimals: false })} ${todayLine.text} แตะเพื่อดูสถิติ`}
+      accessibilityLabel={`งบเดือนนี้ ใช้ไป ${formatBaht(b.spentMonthSatang, { decimals: false })} จาก ${formatBaht(b.budgetSatang, { decimals: false })} ${todayLine.text}${fast ? ' ใช้เร็วกว่าแผน' : ''} แตะเพื่อดูสถิติ`}
       style={({ pressed }) => ({ padding: space.lg, gap: space.sm, borderRadius: radius.lg, backgroundColor: theme.surface, opacity: pressed ? 0.85 : 1 })}
     >
       <Row justify="space-between" align="flex-end">
@@ -366,6 +350,14 @@ function BudgetCard() {
           {todayLine.text}
         </T>
       </Row>
+      {fast ? (
+        <Row gap={6}>
+          <Ionicons name="trending-up" size={16} color={theme.watch} />
+          <T v="small" color={theme.watch} style={{ flex: 1 }}>
+            ใช้เร็วกว่าแผน · ใช้ไป {Math.round(used * 100)}% เดือนผ่านไป {Math.round(b.pace * 100)}%
+          </T>
+        </Row>
+      ) : null}
     </Pressable>
   );
 }

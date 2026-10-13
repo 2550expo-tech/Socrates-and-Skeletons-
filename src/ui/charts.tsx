@@ -11,7 +11,7 @@ import { categoryLook } from './category';
 import { Ionicons, Row, T } from './components';
 import { GrowBar } from './effects';
 import { useNative, useReduceMotion } from './motion';
-import { fonts, space, useTheme } from './theme';
+import { alpha, fonts, space, useTheme } from './theme';
 
 /** One bar of DayBars: it rises out of the baseline (its rounded top stays round). */
 function RisingBar({ x, top, width, height, color, opacity, delay }: { x: number; top: number; width: number; height: number; color: string; opacity: number; delay: number }) {
@@ -51,14 +51,19 @@ export function TrendBars({ buckets, averageSatang, height = 140, label }: { buc
   const theme = useTheme();
   const [width, setWidth] = useState(0);
   const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);
-  const max = Math.max(1, ...buckets.map((d) => d.expenseSatang), averageSatang ?? 0);
+  // One day far above the rest (rent, a term fee) would flatten every other bar into a dot:
+  // then the scale stops a little above the second biggest and that bar is drawn broken, with its amount.
+  const sorted = buckets.map((d) => d.expenseSatang).sort((a, b) => b - a);
+  const second = sorted[1] ?? 0;
+  const cap = second > 0 && sorted[0] > second * 2.5 ? Math.max(second * 1.6, averageSatang ?? 0) : null;
+  const max = Math.max(1, cap ?? sorted[0] ?? 0, averageSatang ?? 0);
   const top = 18;
   const bottom = 22;
   const plotH = height - top - bottom;
   // Many bars (30 days): narrow gaps so each bar keeps some width.
   const gap = buckets.length > 14 ? 3 : 8;
   const barW = width > 0 ? (width - gap * (buckets.length - 1)) / buckets.length : 0;
-  const y = (v: number) => top + plotH - (v / max) * plotH;
+  const y = (v: number) => top + plotH - (Math.min(v, max) / max) * plotH;
   const peak = buckets.reduce((best, d) => (d.expenseSatang > best.expenseSatang ? d : best), buckets[0]);
   const peakIndex = buckets.indexOf(peak);
   const summary = peak && peak.expenseSatang > 0 ? `${label} สูงสุด ${formatBaht(peak.expenseSatang, { decimals: false })}` : `${label} ยังไม่มีรายจ่าย`;
@@ -113,6 +118,17 @@ export function TrendBars({ buckets, averageSatang, height = 140, label }: { buc
             >
               {formatBaht(peak.expenseSatang, { decimals: false })}
             </SvgText>
+          ) : null}
+          {cap && peak ? (
+            // The "taller than shown" mark: a slanted cut across the top of the biggest bar.
+            <Line
+              x1={peakIndex * (barW + gap) - 1}
+              x2={peakIndex * (barW + gap) + barW + 1}
+              y1={top + 12}
+              y2={top + 6}
+              stroke={theme.surface}
+              strokeWidth={3}
+            />
           ) : null}
           {averageSatang && averageSatang > 0 ? (
             <Line
@@ -249,11 +265,10 @@ export function CategoryDonut({ items, size = 190 }: { items: CategoryTotal[]; s
             {sl.icon ? (
               <CategoryIcon k={sl.key} />
             ) : (
-              <View style={{ width: 28, height: 28, borderRadius: 9, backgroundColor: theme.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: 28, height: 28, borderRadius: 9, backgroundColor: alpha(theme.inkFaint, 0.22), alignItems: 'center', justifyContent: 'center' }}>
                 <Ionicons name="ellipsis-horizontal" size={16} color={theme.inkSoft} />
               </View>
             )}
-            <View style={{ width: 4, height: 18, borderRadius: 2, backgroundColor: sl.color }} />
             <T v="small" color={theme.ink} numberOfLines={1} style={{ flex: 1 }}>
               {sl.label}
             </T>

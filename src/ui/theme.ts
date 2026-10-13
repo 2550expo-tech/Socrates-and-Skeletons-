@@ -207,8 +207,8 @@ export const COLOR_THEMES: ColorThemeSpec[] = [
 
 // Light-mode meaning colours are dark enough for text on the page and on their own soft tint (≥ 4.5:1).
 const SEMANTIC = {
-  light: { income: '#1F7A52', good: '#26704A', watch: '#8F5B0A', critical: '#A63A26', overlay: 'rgba(10, 16, 12, 0.45)' },
-  dark: { income: '#5CC08E', good: '#5CC08E', watch: '#E0A548', critical: '#E07A63', overlay: 'rgba(0, 0, 0, 0.6)' },
+  light: { income: '#1F7A52', good: '#26704A', watch: '#9A5200', critical: '#A63A26', overlay: 'rgba(10, 16, 12, 0.45)' },
+  dark: { income: '#5CC08E', good: '#5CC08E', watch: '#F0894A', critical: '#E07A63', overlay: 'rgba(0, 0, 0, 0.6)' },
 };
 
 /** Mix two hex colours: t = 1 gives `a`, t = 0 gives `b`. */

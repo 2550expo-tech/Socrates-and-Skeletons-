@@ -50,7 +50,7 @@ let greeted = false;
 
 export default function Coach() {
   const theme = useTheme();
-  const { width: screenW } = useWindowDimensions();
+  const { width: screenW, height: screenH } = useWindowDimensions();
   const params = useLocalSearchParams<{ ask?: string; price?: string; at?: string }>();
   const { profile, txs, repo } = useApp();
   const { balance, runway } = useMoney();
@@ -175,7 +175,8 @@ export default function Coach() {
   const mine = SKINS.filter((s) => kla.owned.has(s.id));
 
   const mood: BuddyMood = busy ? 'thinking' : talking ? (rest.mood === 'worried' ? 'calm' : rest.mood) : rest.mood;
-  const kW = Math.round(Math.min(214, Math.min(screenW, 440) * 0.52));
+  // The big stage keeps to about 40% of the screen height, so on a small phone the advice still shows.
+  const kW = Math.round(Math.max(96, Math.min(214, Math.min(screenW, 440) * 0.52, (screenH * 0.4 - 150) / 1.2)));
 
   // Chat first: once a question is asked, the stage shrinks to a strip and the conversation leads.
   const compact = msgs.length > 0;
@@ -185,6 +186,7 @@ export default function Coach() {
     <Row gap={space.sm} style={compact ? undefined : { marginTop: -space.sm }}>
       <StageButton
         icon={sound ? 'volume-high' : 'volume-mute'}
+        text={sound ? 'ปิดเสียง' : 'เปิดเสียง'}
         label={sound ? `ปิดเสียงน้อง${BUDDY_NAME}` : `เปิดเสียงน้อง${BUDDY_NAME}`}
         small={compact}
         onPress={() => setKlaSound(!sound)}
@@ -192,6 +194,7 @@ export default function Coach() {
       {talking ? (
         <StageButton
           icon="stop"
+          text="หยุด"
           label={`ให้น้อง${BUDDY_NAME}หยุดพูด`}
           small={compact}
           onPress={() => {
@@ -200,9 +203,9 @@ export default function Coach() {
           }}
         />
       ) : said ? (
-        <StageButton icon="refresh" label="ฟังอีกครั้ง" small={compact} onPress={() => tell(said, { mood: rest.mood === 'worried' ? 'calm' : rest.mood })} />
+        <StageButton icon="refresh" text="ฟังอีกครั้ง" label="ฟังอีกครั้ง" small={compact} onPress={() => tell(said, { mood: rest.mood === 'worried' ? 'calm' : rest.mood })} />
       ) : null}
-      <StageButton icon="shirt" label={`เปลี่ยนชุดน้อง${BUDDY_NAME}`} expanded={picking} small={compact} onPress={() => setPicking((p) => !p)} />
+      <StageButton icon="shirt" text="เปลี่ยนชุด" label={`เปลี่ยนชุดน้อง${BUDDY_NAME}`} expanded={picking} small={compact} onPress={() => setPicking((p) => !p)} />
     </Row>
   );
 
@@ -356,7 +359,7 @@ export default function Coach() {
       <T v="h3" accessibilityRole="header">
         คุยกับน้อง{BUDDY_NAME}
       </T>
-      {msgs.length === 0 ? <T v="micro">{BUDDY_NAME}ตอบจากตัวเลขที่คุณยืนยันแล้วเท่านั้น ไม่เห็นรูปสลิปหรือชื่อคนที่คุณโอนให้</T> : null}
+      {msgs.length === 0 ? <T v="micro">{BUDDY_NAME}เห็นแค่ยอดที่ยืนยันแล้ว ไม่เห็นรูปสลิปหรือชื่อคนที่คุณโอนให้</T> : null}
       {msgs.map((m) => {
         const color = m.from === 'me' ? theme.onPrimary : m.error ? theme.inkSoft : theme.ink;
         const live = m.id === speakingId;
@@ -433,7 +436,6 @@ export default function Coach() {
                   </View>
                 </Row>
                 {skinPicker}
-                {noVoice}
               </View>
             </KlaBackdrop>
           ) : (
@@ -466,7 +468,7 @@ export default function Coach() {
               nativeID="coach-input"
               value={input}
               onChangeText={setInput}
-              placeholder={`ถามน้อง${BUDDY_NAME} เช่น ซื้อรองเท้า 1,290 ได้ไหม`}
+              placeholder={`ถามน้อง${BUDDY_NAME} เช่น ซื้อของ 500 ได้ไหม`}
               placeholderTextColor={theme.inkSoft}
               accessibilityLabel={`คำถามถึงน้อง${BUDDY_NAME}`}
               multiline
@@ -537,10 +539,13 @@ function SpeechBubble({ children, tail = true }: { children: React.ReactNode; ta
   );
 }
 
-/** A round, see-through icon button on the stage; its name is said by screen readers. */
-function StageButton({ icon, label, onPress, small, expanded }: { icon: IconName; label: string; onPress: () => void; small?: boolean; expanded?: boolean }) {
+/**
+ * A see-through button on the stage: icon and a short word on the big stage, icon only in the
+ * compact strip. Its screen-reader name always starts with the visible word ("ปิดเสียง…").
+ */
+function StageButton({ icon, text, label, onPress, small, expanded }: { icon: IconName; text: string; label: string; onPress: () => void; small?: boolean; expanded?: boolean }) {
   const theme = useTheme();
-  const size = small ? 36 : 44;
+  const size = small ? 36 : 40;
   return (
     <Pressable
       onPress={() => {
@@ -550,19 +555,27 @@ function StageButton({ icon, label, onPress, small, expanded }: { icon: IconName
       accessibilityRole="button"
       accessibilityLabel={label}
       aria-expanded={expanded}
-      hitSlop={small ? 4 : 0}
+      hitSlop={small ? 4 : 2}
       style={({ pressed }) => ({
-        width: size,
-        height: size,
-        borderRadius: size / 2,
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: 6,
+        minWidth: size,
+        height: size,
+        paddingHorizontal: small ? 0 : 12,
+        borderRadius: size / 2,
         backgroundColor: alpha(theme.heroInk, pressed ? 0.24 : expanded ? 0.2 : 0.12),
         borderWidth: 1,
         borderColor: alpha(theme.heroInk, expanded ? 0.55 : 0.3),
       })}
     >
-      <Ionicons name={icon} size={small ? 17 : 20} color={theme.heroAccent} />
+      <Ionicons name={icon} size={small ? 17 : 18} color={theme.heroAccent} />
+      {small ? null : (
+        <T v="small" color={theme.heroInk}>
+          {text}
+        </T>
+      )}
     </Pressable>
   );
 }

@@ -102,7 +102,7 @@ export function computeMissions(p: MissionInput): Mission[] {
       skin: 'thai',
       progress: { value: Math.min(open, OPEN_TARGET), target: OPEN_TARGET },
       // Not the recording streak: this one counts days the app was opened.
-      note: open > 0 ? `เปิดแอปต่อเนื่อง ${open} วัน (นับวันที่เปิดแอป ไม่ใช่วันที่จด) ถ้าเว้นวันไหนจะเริ่มนับใหม่` : undefined,
+      note: open > 0 ? `เปิดแอปมาแล้ว ${open} วันติดกัน (นับวันที่เปิด ไม่ใช่วันที่จด)` : undefined,
     },
     open >= OPEN_TARGET,
   );
@@ -156,7 +156,7 @@ export function computeMissions(p: MissionInput): Mission[] {
       icon: 'wallet',
       skin: 'saver',
       progress: { value: reached ? 100 : best, target: 100 },
-      note: p.goals.length === 0 ? 'ยังไม่มีกระปุก ตั้งได้ที่หน้าหลัก' : reached ? undefined : `กระปุกที่ใกล้สุดได้ ${best}% แล้ว`,
+      note: p.goals.length === 0 ? 'ยังไม่มีกระปุก ตั้งได้ในหน้า "เงินพอถึงวันไหน" (แตะการ์ดเงินบนหน้าหลัก)' : reached ? undefined : `กระปุกที่ใกล้สุดได้ ${best}% แล้ว`,
     },
     reached,
   );

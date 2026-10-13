@@ -90,7 +90,9 @@ export default function Stats() {
           <View style={{ width: 1, backgroundColor: theme.line, marginHorizontal: space.md }} />
           <View style={{ flex: 1, gap: 2 }}>
             <T v="small">{range === 'today' ? 'เฉลี่ยต่อวัน (วันนี้)' : `เฉลี่ยต่อวัน (${RANGE_DAYS[range]} วัน)`}</T>
-            <Money satang={perDay} size="h2" decimals={false} />
+            <T v="h2" style={{ fontVariant: ['tabular-nums'] }}>
+              {formatBaht(perDay, { decimals: false })}
+            </T>
           </View>
         </Row>
       </Card>
@@ -140,7 +142,7 @@ export default function Stats() {
             </View>
             <View style={{ flex: 1 }}>
               <T v="h3">{`สรุปเดือน${formatThaiMonth(recapMonth)}`}</T>
-              <T v="small">เงินไปไหน วันไหนใช้เยอะ และเก่งขึ้นแค่ไหน</T>
+              <T v="small">เงินไปไหน และเก่งขึ้นแค่ไหน</T>
             </View>
             <Ionicons name="play-circle" size={28} color={theme.accentInk} />
           </Row>

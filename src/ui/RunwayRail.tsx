@@ -11,10 +11,33 @@ import Svg, { Circle, Line, Rect } from 'react-native-svg';
 import { addDays, formatThaiDay } from '../domain/dates';
 import { formatBaht } from '../domain/money';
 import type { MonthEndCheck } from '../domain/runway';
-import { Row, T } from './components';
+import { Row, T, type IconName } from './components';
 import { alpha, fonts, useTheme } from './theme';
 
 const H = 14;
+
+/** What the month-end comparison says, in the owner's words ("✓ เหลือเก็บได้อีก N วัน" / "! ขาดอีก N วันถึงสิ้นเดือน"). */
+export function monthEndStatus(m: MonthEndCheck): { text: string; icon: IconName; tone: 'good' | 'bad' | 'plain' } {
+  switch (m.kind) {
+    case 'surplus':
+      return { text: `เหลือเก็บได้อีก${m.capped ? 'มากกว่า' : ''} ${m.days} วัน`, icon: 'checkmark-circle', tone: 'good' };
+    case 'exact':
+      return { text: 'พอดีถึงสิ้นเดือน', icon: 'ellipse', tone: 'plain' };
+    case 'short':
+      return { text: `ขาดอีก ${m.days} วันถึงสิ้นเดือน`, icon: 'alert-circle', tone: 'bad' };
+    case 'below':
+      return { text: 'แตะเส้นเงินสำรองแล้ว', icon: 'alert-circle', tone: 'bad' };
+    default:
+      return { text: 'ยังไม่มีรายจ่าย 7 วัน', icon: 'time-outline', tone: 'plain' };
+  }
+}
+
+/** The rail read out as one sentence. */
+export function railLabel(check: MonthEndCheck): string {
+  if (check.kind === 'unknown') return '';
+  const status = monthEndStatus(check);
+  return `อีก ${check.daysToMonthEnd} วันถึงสิ้นเดือน ${check.kind === 'surplus' ? `เงินพอเกินสิ้นเดือนไปอีก ${check.days} วัน` : check.kind === 'short' ? `เงินหมดก่อนสิ้นเดือน ${check.days} วัน` : status.text}`;
+}
 
 export function RunwayRail({ check, label }: { check: MonthEndCheck; label: string }) {
   const theme = useTheme();
@@ -40,7 +63,7 @@ export function RunwayRail({ check, label }: { check: MonthEndCheck; label: stri
         {w > 0 ? (
           <Svg width={w} height={H}>
             {/* track */}
-            <Rect x={6} y={mid - 2} width={w - 12} height={4} rx={2} fill={alpha(ink, 0.16)} />
+            <Rect x={6} y={mid - 2} width={Math.max(0, Math.max(endX, tickX) - 6)} height={4} rx={2} fill={alpha(ink, 0.16)} />
             {/* the money, from today to the run-out day */}
             {runDays > 0 ? <Rect x={6} y={mid - 2} width={Math.max(0, Math.min(endX, tickX) - 6)} height={4} rx={2} fill={alpha(ink, 0.85)} /> : null}
             {check.kind === 'surplus' ? <Rect x={tickX} y={mid - 2} width={Math.max(0, endX - tickX)} height={4} rx={2} fill={good} /> : null}
@@ -73,73 +96,21 @@ export function RunwayRail({ check, label }: { check: MonthEndCheck; label: stri
 const MARKS = [7, 14, 30];
 
 /**
- * Money Runway screen: the same idea on a plain card, looking ahead. The line
- * runs from today to the day the money reaches the reserve line, with ticks at
- * 7, 14 and 30 days; under it, what would be left on each of those days if
- * spending stays at the daily average (red once it is at or under the reserve).
+ * Money Runway screen: what would be left in 7, 14 and 30 days if spending
+ * stays at the daily average (red once it is at or under the reserve line).
  */
-export function ProjectionRail({
-  balanceSatang,
-  floorSatang,
-  averageSatang,
-  runDays,
-  today,
-}: {
-  balanceSatang: number;
-  floorSatang: number;
-  averageSatang: number;
-  /** Days until the reserve line (null: more than a year). */
-  runDays: number | null;
-  today: string;
-}) {
+export function Projection({ balanceSatang, floorSatang, averageSatang, today }: { balanceSatang: number; floorSatang: number; averageSatang: number; today: string }) {
   const theme = useTheme();
-  const [w, setW] = useState(0);
-  const onLayout = (e: LayoutChangeEvent) => setW(Math.round(e.nativeEvent.layout.width));
-  const run = runDays === null ? Infinity : Math.max(0, runDays);
-  // The scale: a little past the longer of 30 days and the runway, at most 4 months.
-  const span = Math.min(120, Math.max(30, run)) * 1.06;
-  const pad = 6;
-  const x = (d: number) => pad + (Math.min(d, span) / span) * Math.max(1, w - pad * 2);
-  const H = 30;
-  const mid = 22;
   const marks = MARKS.map((d) => {
     const left = balanceSatang - averageSatang * d;
     return { d, left, day: addDays(today, d), out: left <= floorSatang };
   });
-  const runX = x(run);
-  const label =
-    `ถ้าใช้เท่าเดิม ` +
-    marks.map((m) => `อีก ${m.d} วันเหลือ ${formatBaht(m.left, { decimals: false })}${m.out ? ' ต่ำกว่าเงินสำรอง' : ''}`).join(' ');
-
+  const label = `ถ้าใช้เท่าเดิม ` + marks.map((m) => `อีก ${m.d} วันเหลือ ${formatBaht(m.left, { decimals: false })}${m.out ? ' ต่ำกว่าเงินสำรอง' : ''}`).join(' ');
   return (
-    <View accessible accessibilityRole="image" accessibilityLabel={label} style={{ gap: 10 }}>
-      <View onLayout={onLayout} style={{ height: H }}>
-        {w > 0 ? (
-          <Svg width={w} height={H}>
-            <Rect x={pad} y={mid - 3} width={w - pad * 2} height={6} rx={3} fill={theme.surfaceAlt} />
-            {/* the money, from today to the run-out day */}
-            {run > 0 ? <Rect x={pad} y={mid - 3} width={Math.max(0, runX - pad)} height={6} rx={3} fill={theme.primary} /> : null}
-            {/* past the run-out day, up to 30 days: the days that are not covered */}
-            {run < 30 ? <Rect x={runX} y={mid - 3} width={Math.max(0, x(30) - runX)} height={6} rx={3} fill={alpha(theme.critical, 0.45)} /> : null}
-            {marks.map((m) => (
-              <Line key={m.d} x1={x(m.d)} x2={x(m.d)} y1={mid - 8} y2={mid + 8} stroke={theme.ink} strokeOpacity={0.55} strokeWidth={2} strokeLinecap="round" />
-            ))}
-            <Circle cx={pad} cy={mid} r={5} fill={theme.ink} />
-            {Number.isFinite(run) && run > 0 ? <Circle cx={runX} cy={mid} r={5.5} fill={run < 30 ? theme.critical : theme.primary} stroke={theme.surface} strokeWidth={2} /> : null}
-          </Svg>
-        ) : null}
-        {/* The day numbers above the ticks (short, so they never collide). */}
-        {w > 0
-          ? marks.map((m) => (
-              <T key={m.d} v="micro" color={theme.inkSoft} style={{ position: 'absolute', top: -2, left: x(m.d) - 14, width: 28, textAlign: 'center' }}>
-                {m.d}
-              </T>
-            ))
-          : null}
-      </View>
+    <View accessible accessibilityRole="text" accessibilityLabel={label}>
       <Row gap={8} align="flex-start">
-        {marks.map((m) => (
-          <View key={m.d} style={{ flex: 1, gap: 0 }}>
+        {marks.map((m, i) => (
+          <View key={m.d} style={{ flex: 1, gap: 0, paddingLeft: i ? 10 : 0, borderLeftWidth: i ? 1 : 0, borderLeftColor: theme.line }}>
             <T v="micro" color={theme.inkSoft} numberOfLines={1}>
               อีก {m.d} วัน
             </T>

@@ -6,6 +6,7 @@
  *   3. two "what if" tools, both always visible: spend less / check before buying
  *   4. the savings jars (money put aside is not counted as spendable)
  */
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
@@ -13,17 +14,17 @@ import { useApp, useMoney } from '../data/AppProvider';
 import { formatThaiDay } from '../domain/dates';
 import { goalLine, goalProgress } from '../domain/goals';
 import { formatBaht, parseBahtToSatang } from '../domain/money';
-import { runwayAfterPurchase, runwayWithReduction, RUNWAY_WINDOW_DAYS, type Runway } from '../domain/runway';
+import { monthEndCheck, runwayAfterPurchase, runwayWithReduction, RUNWAY_WINDOW_DAYS, type Runway } from '../domain/runway';
 import { spendingTrend } from '../domain/summary';
-import { MoneyTree, treeHealth } from '../ui/art';
+import { DotGrid, MoneyTree, treeHealth } from '../ui/art';
 import { Badge, Button, Card, Divider, Ionicons, Row, Screen, T } from '../ui/components';
 import { TrendBars } from '../ui/charts';
 import { Field } from '../ui/inputs';
 import { Jar } from '../ui/Jar';
 import { useCountUp, useReduceMotion } from '../ui/motion';
-import { ProjectionRail } from '../ui/RunwayRail';
+import { monthEndStatus, Projection, railLabel, RunwayRail } from '../ui/RunwayRail';
 import { Slider } from '../ui/Slider';
-import { fonts, palette, space, useTheme } from '../ui/theme';
+import { alpha, fonts, radius, space, useTheme } from '../ui/theme';
 import { StackHeader } from '../ui/StackHeader';
 
 function daysText(r: Runway) {
@@ -67,64 +68,85 @@ export default function RunwayScreen() {
   const week = useMemo(() => spendingTrend(txs, '7d').buckets, [txs, today]);
   const openGoal = [...goals].filter((g) => g.savedSatang < g.targetSatang).sort((a, b) => goalProgress(b) - goalProgress(a))[0] ?? goals[0];
   const counting = runway.status !== 'no_spending' && runway.status !== 'below_floor';
+  const check = monthEndCheck(runway);
+  const status = monthEndStatus(check);
+  const statusColor = status.tone === 'good' ? theme.heroIncome : status.tone === 'bad' ? '#FFB4A8' : theme.heroInkSoft;
 
   return (
     <Screen header={<StackHeader title="เงินพอถึงวันไหน" />} contentStyle={{ paddingTop: space.sm }}>
-      {/* 1. The number, the tree, and the next 30 days. */}
-      <Card style={{ gap: space.lg }}>
-        <Row gap={space.md} align="center">
-          <View style={{ flex: 1, gap: 2 }}>
-            {runway.status === 'no_spending' ? (
-              <>
-                <T v="h2">ยังคำนวณไม่ได้</T>
-                <T v="small">ไม่มีรายจ่ายที่ยืนยันใน {RUNWAY_WINDOW_DAYS} วันล่าสุด จึงยังหาค่าเฉลี่ยไม่ได้</T>
-              </>
-            ) : runway.status === 'below_floor' ? (
-              <>
-                <T v="h2">ยอดเงินแตะเส้นสำรองแล้ว</T>
-                <T v="small">คงเหลือ {formatBaht(balance)} · เส้นสำรอง {formatBaht(runway.floorSatang, { decimals: false })}</T>
-              </>
-            ) : (
-              <>
-                <T v="small">เงินพอใช้อีก</T>
-                <Row gap={6} align="flex-end">
-                  <T v="display" color={theme.accentInk} style={{ fontVariant: ['tabular-nums'] }}>
-                    {runway.capped ? '365+' : daysShown}
+      {/* 1. The number on the same green as the home card (tap the card, land here), with the money tree. */}
+      <View style={{ borderRadius: radius.xl, overflow: 'hidden', borderWidth: theme.dark ? 1 : 0, borderColor: alpha(theme.heroInk, 0.08) }}>
+        <LinearGradient colors={[theme.heroTop, theme.heroDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ padding: space.xl, paddingBottom: space.lg, gap: space.sm }}>
+          <DotGrid color={theme.heroInk} />
+          <Row gap={space.md} align="center">
+            <View style={{ flex: 1, gap: 2 }}>
+              {runway.status === 'no_spending' ? (
+                <>
+                  <T v="h2" color={theme.heroInk}>
+                    ยังคำนวณไม่ได้
                   </T>
-                  <T v="h3" style={{ marginBottom: 10 }}>
-                    วัน
+                  <T v="small" color={theme.heroInkSoft}>
+                    ไม่มีรายจ่ายที่ยืนยันใน {RUNWAY_WINDOW_DAYS} วันล่าสุด จึงยังหาค่าเฉลี่ยไม่ได้
                   </T>
-                </Row>
-                <T v="small" color={theme.ink}>
-                  ถึงประมาณ {formatThaiDay(runway.depletionDay!)}
-                </T>
-              </>
-            )}
-            <View style={{ alignSelf: 'flex-start', marginTop: space.sm }}>
-              <Badge label={STATUS_LABEL[runway.status]} tone={STATUS_TONE[runway.status]} />
+                </>
+              ) : runway.status === 'below_floor' ? (
+                <>
+                  <T v="h2" color={theme.heroInk}>
+                    ยอดเงินแตะเส้นสำรองแล้ว
+                  </T>
+                  <T v="small" color={theme.heroInkSoft}>
+                    คงเหลือ {formatBaht(balance)} · เส้นสำรอง {formatBaht(runway.floorSatang, { decimals: false })}
+                  </T>
+                </>
+              ) : (
+                <>
+                  <T v="small" color={theme.heroInkSoft}>
+                    เงินพอใช้อีก
+                  </T>
+                  <Row gap={6} align="flex-end">
+                    <T v="display" color={theme.heroAccent} style={{ fontVariant: ['tabular-nums'] }}>
+                      {runway.capped ? '365+' : daysShown}
+                    </T>
+                    <T v="h3" color={theme.heroInk} style={{ marginBottom: 10 }}>
+                      วัน
+                    </T>
+                  </Row>
+                  <T v="small" color={theme.heroInkSoft}>
+                    ถึงประมาณ {formatThaiDay(runway.depletionDay!)}
+                  </T>
+                </>
+              )}
+              <View style={{ alignSelf: 'flex-start', marginTop: space.sm }}>
+                <Badge label={STATUS_LABEL[runway.status]} tone={STATUS_TONE[runway.status]} onDark />
+              </View>
             </View>
-          </View>
-          <MoneyTree
-            health={treeHealth(runway.status, runway.days)}
-            size={112}
-            trunk={theme.dark ? '#E8E1CC' : '#A88F5E'}
-            leaf={palette.goldBright}
-            bare={theme.dark ? '#3D5A4C' : '#C9D3CC'}
-            grow
-            sway
-          />
-        </Row>
-        {counting && runway.averageSatang > 0 ? (
-          <View style={{ gap: space.sm }}>
-            <Divider />
-            <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi, marginTop: space.xs }}>
-              ถ้ายังใช้เงินแบบนี้ต่อไป
-            </T>
-            <ProjectionRail balanceSatang={balance} floorSatang={runway.floorSatang} averageSatang={runway.averageSatang} runDays={runway.capped ? null : runway.days} today={today} />
-            <T v="micro">ประมาณการจากค่าเฉลี่ยรายวัน ยังไม่รวมรายรับที่จะเข้ามา</T>
-          </View>
-        ) : null}
-      </Card>
+            {/* The tree's leaves follow the status: full when comfortable, bare near the reserve line. */}
+            <MoneyTree health={treeHealth(runway.status, runway.days)} size={118} trunk="#E8E1CC" leaf={theme.heroAccent} bare={theme.heroBare} glow={theme.heroAccent} grow sway />
+          </Row>
+          {check.kind !== 'unknown' ? (
+            <>
+              <RunwayRail check={check} label={railLabel(check)} />
+              <Row gap={6}>
+                <Ionicons name={status.icon} size={16} color={statusColor} />
+                <T v="small" color={statusColor} style={{ fontFamily: fonts.sansSemi, flex: 1 }}>
+                  {status.text}
+                </T>
+              </Row>
+            </>
+          ) : null}
+        </LinearGradient>
+      </View>
+
+      {/* What would be left in 7, 14 and 30 days at this pace. */}
+      {counting && runway.averageSatang > 0 ? (
+        <Card>
+          <T v="h3" accessibilityRole="header">
+            ถ้ายังใช้เงินแบบนี้ต่อไป
+          </T>
+          <Projection balanceSatang={balance} floorSatang={runway.floorSatang} averageSatang={runway.averageSatang} today={today} />
+          <T v="micro">ประมาณการจากค่าเฉลี่ยรายวัน ยังไม่รวมรายรับที่จะเข้ามา</T>
+        </Card>
+      ) : null}
 
       {/* 2. Where the average comes from, and the arithmetic. */}
       <Card>
@@ -143,7 +165,7 @@ export default function RunwayScreen() {
             <>
               {/* Money in the jars is always shown: it is why "usable" is less than the balance. */}
               {reserved > 0 ? <Line label="หักเงินที่กันไว้ในกระปุกออม" value={`− ${formatBaht(reserved)}`} /> : null}
-              <Line label="ใช้ได้จริง (หลังหักเงินสำรอง)" value={formatBaht(runway.spendableSatang)} />
+              <Line label="ใช้ได้จริง (หลังหักเงินสำรอง)" value={formatBaht(runway.spendableSatang, { decimals: false })} />
             </>
           )}
           {showMath ? (
@@ -218,7 +240,7 @@ export default function RunwayScreen() {
             <Ionicons name="leaf" size={20} color={theme.primary} />
             <T v="body" style={{ flex: 1 }}>
               {reduce === 0
-                ? `เลื่อนดูว่าถ้าใช้น้อยลง เงินจะพอนานขึ้นกี่วัน (ตอนนี้ ${daysText(runway)})`
+                ? 'เลื่อนดูว่าถ้าใช้น้อยลง เงินจะพอนานขึ้นกี่วัน'
                 : `เงินจะพอ ${daysText(reduced.days === null ? reduced : { ...reduced, days: reducedDays })}${reduced.days !== null && runway.days !== null ? ` · เพิ่มขึ้น ${reducedDays - runway.days} วัน` : ''}`}
             </T>
           </Row>
