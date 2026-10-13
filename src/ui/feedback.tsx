@@ -42,7 +42,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       Animated.spring(anim, { toValue: 1, useNativeDriver: true }).start();
       timer.current = setTimeout(() => {
         Animated.timing(anim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setToast(null));
-      }, t.action ? 5000 : 2800);
+      }, t.action ? 10_000 : 2800);
     },
     [anim],
   );

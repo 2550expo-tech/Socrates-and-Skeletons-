@@ -1,20 +1,20 @@
 /**
- * "มีอะไรใหม่": the features added in this update, each with a button to try
- * it. Opened from the card on the home screen (shown once per update).
+ * "มีอะไรใหม่": the features added lately, each with a button to try it. The
+ * latest three are open; older ones are a list of titles that open on a tap.
+ * Opened from settings, or once per update from the home screen's slot.
  */
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, type Href } from 'expo-router';
-import { useEffect } from 'react';
-import { ScrollView, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BUDDY_NAME } from '../domain/buddy';
 import { markWhatsNewSeen } from '../services/whatsNew';
 import { BuddySays } from '../ui/Buddy';
-import { Button, Card, IconButton, Ionicons, Row, T } from '../ui/components';
+import { Button, Card, Divider, Ionicons, Row, T } from '../ui/components';
 import { Reveal } from '../ui/effects';
-import { goBack } from '../ui/nav';
-import { palette, radius, space, useTheme } from '../ui/theme';
-import { HeaderDecor } from '../ui/halloween';
+import { fonts, palette, radius, space, useTheme } from '../ui/theme';
+import { StackHeader } from '../ui/StackHeader';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -27,6 +27,13 @@ function openFeature(href: Href) {
 
 const FEATURES: { icon: IconName; colors: [string, string]; title: string; body: string; action?: { label: string; href: Href } }[] = [
   {
+    icon: 'sparkles-outline',
+    colors: ['#1F7A52', '#0E3B2C'],
+    title: 'หน้าตาใหม่ โล่งตาขึ้น',
+    body: 'ทุกหน้าโล่งและอ่านง่ายขึ้น: ปุ่ม + เปิดเป็นแผ่นเลือกวิธีจดโดยไม่ทิ้งหน้าเดิม รายการบอกว่าแต่ละวันใช้และรับเท่าไร สถิติมีกราฟตามช่วงที่เลือก และหน้าเงินพอถึงวันไหนบอกยอดที่จะเหลืออีก 7, 14 และ 30 วัน',
+    action: { label: 'ดูสถิติ', href: '/stats' },
+  },
+  {
     icon: 'flash',
     colors: ['#C9A227', '#7A5A0E'],
     title: 'Quick Access: ยอดวันนี้ข้างปุ่ม +',
@@ -38,13 +45,6 @@ const FEATURES: { icon: IconName; colors: [string, string]; title: string; body:
     colors: ['#1F7A52', '#0E3B2C'],
     title: 'ดูรูปสลิปย้อนหลังได้',
     body: 'สลิปที่อ่านแล้วเก็บสำเนารูปไว้ในเครื่องนี้เท่านั้น ไม่ได้อัปโหลดเก็บบน server แตะรายการที่จดจากสลิปเพื่อดูรูป ลบรูปในแกลเลอรีไปแล้วก็ยังดูได้',
-  },
-  {
-    icon: 'sparkles-outline',
-    colors: ['#1F7A52', '#0E3B2C'],
-    title: 'หน้าตาใหม่ โล่งตาขึ้น',
-    body: 'หน้าหลักเหลือ 3 ส่วน: เงินพอใช้กี่วันเทียบกับสิ้นเดือน งบเดือนนี้ และรายการล่าสุด กราฟกับภาพรวมย้ายไปแท็บสถิติ ปุ่ม + ตรงกลางรวมทุกวิธีเพิ่มรายการ ส่วนเงินพอถึงวันไหนแตะการ์ดบนสุดของหน้าหลัก',
-    action: { label: 'ดูสถิติ', href: '/stats' },
   },
   {
     icon: 'moon',
@@ -137,27 +137,33 @@ const FEATURES: { icon: IconName; colors: [string, string]; title: string; body:
   },
 ];
 
+/** How many of the newest stay open at the top. */
+const LATEST = 3;
+
+function FeatureIcon({ f, size }: { f: (typeof FEATURES)[number]; size: number }) {
+  return (
+    <LinearGradient colors={f.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: size, height: size, borderRadius: size > 40 ? radius.md : radius.sm, alignItems: 'center', justifyContent: 'center' }}>
+      <Ionicons name={f.icon} size={Math.round(size * 0.52)} color={palette.goldSoft} />
+    </LinearGradient>
+  );
+}
+
 export default function WhatsNew() {
   const theme = useTheme();
+  const [open, setOpen] = useState<string | null>(null);
   useEffect(() => {
     markWhatsNewSeen();
   }, []);
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
-      <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
-        <IconButton icon="close" label="ปิด" onPress={() => goBack()} />
-        <T v="h3">มีอะไรใหม่</T>
-        <HeaderDecor />
-      </Row>
+      <StackHeader title="มีอะไรใหม่" close />
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.md, paddingBottom: space.xxxl }}>
         <BuddySays mood="cheer">{`อัปเดตใหม่มาแล้ว! ${BUDDY_NAME}เตรียมของเล่นใหม่ไว้หลายอย่างเลย`}</BuddySays>
-        {FEATURES.map((f, i) => (
+        {FEATURES.slice(0, LATEST).map((f, i) => (
           <Reveal key={f.title} index={i} from={14}>
             <Card style={{ gap: space.sm }}>
               <Row gap={space.md} align="flex-start">
-                <LinearGradient colors={f.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: 46, height: 46, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name={f.icon} size={24} color={palette.goldSoft} />
-                </LinearGradient>
+                <FeatureIcon f={f} size={46} />
                 <View style={{ flex: 1, gap: 2 }}>
                   <T v="h3">{f.title}</T>
                   <T v="small">{f.body}</T>
@@ -169,6 +175,42 @@ export default function WhatsNew() {
             </Card>
           </Reveal>
         ))}
+
+        {/* Older news: titles only; a tap opens one. */}
+        <T v="h3" accessibilityRole="header" style={{ marginTop: space.sm }}>
+          ก่อนหน้านี้
+        </T>
+        <Card style={{ gap: 0, paddingVertical: space.xs }}>
+          {FEATURES.slice(LATEST).map((f, i) => {
+            const isOpen = open === f.title;
+            return (
+              <View key={f.title}>
+                {i > 0 ? <Divider /> : null}
+                <Pressable
+                  onPress={() => setOpen(isOpen ? null : f.title)}
+                  accessibilityRole="button"
+                  accessibilityLabel={f.title}
+                  aria-expanded={isOpen}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 52, paddingVertical: space.sm }}
+                >
+                  <FeatureIcon f={f} size={32} />
+                  <T v="body" style={{ flex: 1, fontFamily: fonts.sansMedium }}>
+                    {f.title}
+                  </T>
+                  <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={18} color={theme.inkSoft} />
+                </Pressable>
+                {isOpen ? (
+                  <View style={{ gap: space.sm, paddingBottom: space.md, paddingLeft: 32 + space.md }}>
+                    <T v="small">{f.body}</T>
+                    {f.action ? (
+                      <Button label={f.action.label} kind="soft" small icon="arrow-forward" onPress={() => openFeature(f.action!.href)} style={{ alignSelf: 'flex-start' }} />
+                    ) : null}
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </Card>
       </ScrollView>
     </SafeAreaView>
   );

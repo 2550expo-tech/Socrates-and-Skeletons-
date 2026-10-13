@@ -5,8 +5,9 @@ import { getCategory } from '../domain/categories';
 import { bkkTime } from '../domain/dates';
 import { FLAG_LABEL, type ReviewFlag } from '../domain/slip';
 import type { Transaction } from '../domain/types';
-import { Badge, Money, Row, T } from './components';
-import { radius, space, useTheme } from './theme';
+import { categoryLook } from './category';
+import { Badge, Ionicons, Money, Row, T } from './components';
+import { space, useTheme } from './theme';
 
 /** One transaction in a list. Tapping opens it for editing (FR-1). */
 /**
@@ -16,6 +17,7 @@ import { radius, space, useTheme } from './theme';
 export function TxRow({ tx, showTime = true, dayLabel }: { tx: Transaction; showTime?: boolean; dayLabel?: string | null }) {
   const theme = useTheme();
   const cat = getCategory(tx.categoryKey);
+  const look = categoryLook(tx.categoryKey, theme);
   const draft = tx.status === 'draft';
   const fresh = isNewFromSlip(tx);
   return (
@@ -28,15 +30,15 @@ export function TxRow({ tx, showTime = true, dayLabel }: { tx: Transaction; show
       <Row gap={space.md}>
         <View
           style={{
-            width: 42,
-            height: 42,
-            borderRadius: radius.md,
-            backgroundColor: draft ? theme.accentSoft : theme.surfaceAlt,
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            backgroundColor: draft ? theme.accentSoft : look.tile,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <T v="h3">{cat.glyph}</T>
+          <Ionicons name={look.icon} size={20} color={draft ? theme.accentInk : look.ink} />
           {fresh ? (
             <View
               accessibilityLabel="ใหม่วันนี้"

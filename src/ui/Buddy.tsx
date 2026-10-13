@@ -134,7 +134,11 @@ export function BuddySays({
 }) {
   const theme = useTheme();
   const [enter] = useState(() => new Animated.Value(0));
-  const key = typeof children === 'string' ? children : mood;
+  // Text given as several pieces ("…แล้ว{BUDDY_NAME}จะอ่าน…") is still text: it must go inside <T>
+  // (raw strings in a View crash on Android and lose the font and colour on the web).
+  const pieces = Array.isArray(children) ? children : [children];
+  const isText = pieces.every((c) => typeof c === 'string' || typeof c === 'number');
+  const key = isText ? pieces.join('') : mood;
   useEffect(() => {
     enter.setValue(0);
     Animated.spring(enter, { toValue: 1, friction: 7, tension: 60, useNativeDriver: useNative }).start();
@@ -180,7 +184,13 @@ export function BuddySays({
             gap: space.sm,
           }}
         >
-          {typeof children === 'string' ? <T v="small" color={theme.ink}>{children}</T> : children}
+          {isText ? (
+            <T v="small" color={theme.ink}>
+              {pieces.join('')}
+            </T>
+          ) : (
+            children
+          )}
           {action}
         </View>
       </Animated.View>

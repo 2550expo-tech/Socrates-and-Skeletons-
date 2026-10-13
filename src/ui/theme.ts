@@ -31,6 +31,8 @@ export interface Theme {
   inkSoft: string;
   inkFaint: string;
   line: string;
+  /** Edges of controls (inputs, switches, sliders, chips): at least 3:1 on the surface. `line` is for quiet dividers. */
+  lineStrong: string;
   primary: string;
   onPrimary: string;
   accent: string;
@@ -224,6 +226,13 @@ function inkOf(color: string, backgrounds: string[]): string {
   return c;
 }
 
+/** A divider colour moved towards the ink until it reads at 3:1 on every background (control edges). */
+function strongLine(line: string, ink: string, backgrounds: string[]): string {
+  let c = line;
+  for (let i = 0; i < 30 && backgrounds.some((bg) => contrast(c, bg) < 3); i++) c = mix(c, ink, 0.88);
+  return c;
+}
+
 export function buildTheme(key: ColorThemeKey, dark: boolean): Theme {
   const spec = COLOR_THEMES.find((t) => t.key === key) ?? COLOR_THEMES[0];
   const mode = dark ? spec.dark : spec.light;
@@ -234,6 +243,7 @@ export function buildTheme(key: ColorThemeKey, dark: boolean): Theme {
     colorTheme: spec.key,
     ...mode,
     ...sem,
+    lineStrong: strongLine(mode.line, mode.ink, [mode.surface, mode.bg]),
     onAccent: readableOn(mode.accent, '#1D1405', '#FFFFFF'),
     accentInk: dark ? mode.accent : inkOf(mode.accent, [mode.surface, mode.bg, mode.accentSoft]),
     goodSoft: soft(sem.good),
@@ -319,10 +329,11 @@ export const radius = { sm: 8, md: 14, lg: 20, xl: 28, pill: 999 };
 /** Type scale (size / line height). Thai needs generous line height for vowels above and below. */
 export const type = {
   display: { fontSize: 38, lineHeight: 52 },
-  h1: { fontSize: 26, lineHeight: 38 },
+  h1: { fontSize: 24, lineHeight: 34 },
   h2: { fontSize: 20, lineHeight: 30 },
   h3: { fontSize: 17, lineHeight: 26 },
   body: { fontSize: 15, lineHeight: 24 },
-  small: { fontSize: 13, lineHeight: 20 },
-  micro: { fontSize: 11, lineHeight: 16 },
+  small: { fontSize: 14, lineHeight: 22 },
+  // The smallest text in the app: Thai below 12 loses its tone marks.
+  micro: { fontSize: 12, lineHeight: 18 },
 };

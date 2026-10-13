@@ -21,7 +21,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { GrowBar, Reveal, Shine, usePressSpring } from './effects';
+import { GrowBar, Reveal, usePressSpring } from './effects';
 import { useCountUp, useNative, useReduceMotion } from './motion';
 import { alpha, fonts, radius, space, type, useTheme } from './theme';
 
@@ -37,7 +37,8 @@ type Variant = 'display' | 'h1' | 'h2' | 'h3' | 'body' | 'small' | 'micro' | 'la
 
 const VARIANT_FONT: Record<Variant, string> = {
   display: fonts.serif,
-  h1: fonts.serif,
+  // Page titles in the sans face: the serif is kept for money.
+  h1: fonts.sansBold,
   h2: fonts.sansBold,
   h3: fonts.sansSemi,
   body: fonts.sans,
@@ -79,8 +80,9 @@ export function T({
           color: color ?? (v === 'small' || v === 'micro' ? theme.inkSoft : theme.ink),
           textAlign: center ? 'center' : undefined,
         },
-        // Labels are text: inkSoft (inkFaint is for placeholders, rules and quiet icons, below 4.5:1).
-        v === 'label' && { letterSpacing: 0.8, textTransform: 'uppercase', color: color ?? theme.inkSoft },
+        // Labels are text: inkSoft (inkFaint is for rules and quiet icons, below 4.5:1). No letter
+        // spacing or capitals: Thai never needs them.
+        v === 'label' && { color: color ?? theme.inkSoft },
         style,
       ]}
     >
@@ -89,13 +91,18 @@ export function T({
   );
 }
 
-/** Money set in the serif face with tabular digits. */
+/**
+ * Money with tabular digits. Headline sizes (display, h1, h2) use the serif face, the voice of money;
+ * amounts in rows and tables use the sans face. Satang: `decimals` 'auto' (default) shows them only
+ * when they are not zero ("฿90", "฿89.50"); true always shows them (forms, slip review); false rounds
+ * to whole baht (totals, averages, projections).
+ */
 export function Money({
   satang,
   size = 'h2',
   color,
   sign,
-  decimals = true,
+  decimals = 'auto',
   style,
   countUp,
 }: {
@@ -103,7 +110,7 @@ export function Money({
   size?: 'display' | 'h1' | 'h2' | 'h3' | 'body' | 'small';
   color?: string;
   sign?: boolean;
-  decimals?: boolean;
+  decimals?: boolean | 'auto';
   style?: StyleProp<TextStyle>;
   /** Ease to new amounts when the value changes (it shows at once the first time). */
   countUp?: boolean;
@@ -112,21 +119,23 @@ export function Money({
   const reduce = useReduceMotion();
   const value = useCountUp(satang, !!countUp && !reduce);
   const abs = Math.abs(value);
+  const showFrac = decimals === true || (decimals === 'auto' && abs % 100 !== 0);
   // Whole baht only: round to the nearest baht, like formatBaht (฿99.99 shows ฿100).
-  const whole = String(decimals ? Math.floor(abs / 100) : Math.round(abs / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const whole = String(showFrac ? Math.floor(abs / 100) : Math.round(abs / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const frac = String(abs % 100).padStart(2, '0');
   const prefix = sign ? (value < 0 ? '−' : '+') : value < 0 ? '−' : '';
   const big = type[size];
+  const headline = size === 'display' || size === 'h1' || size === 'h2';
   return (
     <Text
       style={[
-        { fontFamily: fonts.serif, color: color ?? theme.ink, fontVariant: ['tabular-nums'] },
+        { fontFamily: headline ? fonts.serif : fonts.sansSemi, color: color ?? theme.ink, fontVariant: ['tabular-nums'] },
         big,
         style,
       ]}
     >
       {prefix}฿{whole}
-      {decimals ? <Text style={{ fontSize: big.fontSize * 0.6 }}>.{frac}</Text> : null}
+      {showFrac ? <Text style={headline ? { fontSize: big.fontSize * 0.6 } : undefined}>.{frac}</Text> : null}
     </Text>
   );
 }
@@ -143,6 +152,7 @@ export function Screen({
   contentStyle,
   refreshControl,
   scrollY,
+  header,
 }: {
   children: ReactNode;
   scroll?: boolean;
@@ -152,11 +162,14 @@ export function Screen({
   refreshControl?: ComponentProps<typeof ScrollView>['refreshControl'];
   /** Receives the scroll position, for effects that follow scrolling (parallax). */
   scrollY?: Animated.Value;
+  /** Stays put above the scrolling content (the stack screens' StackHeader). */
+  header?: ReactNode;
 }) {
   const theme = useTheme();
   const pad = padded ? { paddingHorizontal: space.lg } : null;
   return (
     <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: theme.bg }}>
+      {header}
       {scroll && scrollY ? (
         <Animated.ScrollView
           contentContainerStyle={[pad, { paddingBottom: 120, gap: space.lg }, contentStyle]}
@@ -220,8 +233,8 @@ export function Card({
     backgroundColor: bg,
     borderRadius: radius.lg,
     padding: space.lg,
-    borderWidth: tone === 'surface' ? StyleSheet.hairlineWidth : 0,
-    borderColor: theme.line,
+    // Tonal surfaces, no outline: outlines everywhere were the texture of clutter.
+    borderWidth: 0,
     gap: space.md,
   };
   if (!onPress) return <View style={[base, style]}>{children}</View>;
@@ -286,7 +299,7 @@ export function Button({
   const colors = {
     primary: { bg: theme.primary, fg: theme.onPrimary, border: theme.primary },
     gold: { bg: theme.accent, fg: theme.onAccent, border: theme.accent },
-    ghost: { bg: 'transparent', fg: theme.ink, border: theme.line },
+    ghost: { bg: 'transparent', fg: theme.ink, border: theme.lineStrong },
     danger: { bg: 'transparent', fg: theme.critical, border: theme.critical },
     soft: { bg: theme.surfaceAlt, fg: theme.ink, border: theme.surfaceAlt },
     onDark: { bg: 'rgba(244,241,230,0.10)', fg: '#F4F1E6', border: 'rgba(244,241,230,0.45)' },
@@ -320,13 +333,13 @@ export function Button({
           justifyContent: 'center',
           gap: 8,
           opacity: off ? 0.5 : 1,
-          overflow: shine ? 'hidden' : undefined,
+          overflow: undefined,
         },
         style,
         { transform: [{ scale: press.scale }] },
       ]}
     >
-      {shine && !off ? <Shine times={1} delay={900} color={kind === 'gold' ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.28)'} /> : null}
+      {/* (No light sweep on buttons any more: the screen stays still.) */}
       {loading ? (
         <ActivityIndicator color={colors.fg} />
       ) : icon ? (
@@ -472,11 +485,15 @@ export function Chip({
   selected,
   onPress,
   glyph,
+  icon,
+  iconColor,
 }: {
   label: string;
   selected?: boolean;
   onPress?: () => void;
   glyph?: string;
+  icon?: IconName;
+  iconColor?: string;
 }) {
   const theme = useTheme();
   const press = usePressSpring(0.93);
@@ -487,6 +504,8 @@ export function Chip({
       onPressOut={press.onPressOut}
       hitSlop={{ top: 6, bottom: 6 }}
       accessibilityRole="button"
+      // The label alone (an icon font glyph is not part of the name).
+      accessibilityLabel={label}
       aria-selected={!!selected}
       style={{
         flexDirection: 'row',
@@ -495,13 +514,14 @@ export function Chip({
         paddingVertical: 8,
         paddingHorizontal: 12,
         borderRadius: radius.pill,
+        // Tonal: a quiet fill, and the chosen one in the main colour (no outlines).
         borderWidth: 1.5,
-        borderColor: selected ? theme.primary : theme.line,
-        backgroundColor: selected ? alpha(theme.primary, theme.dark ? 0.22 : 0.12) : theme.surface,
+        borderColor: selected ? theme.primary : 'transparent',
+        backgroundColor: selected ? alpha(theme.primary, theme.dark ? 0.24 : 0.12) : theme.surfaceAlt,
         transform: [{ scale: press.scale }],
       }}
     >
-      {glyph ? <Text style={{ fontSize: 14 }}>{glyph}</Text> : null}
+      {icon ? <Ionicons name={icon} size={16} color={iconColor ?? theme.inkSoft} /> : glyph ? <Text style={{ fontSize: 14 }}>{glyph}</Text> : null}
       <Text style={[type.small, { fontFamily: selected ? fonts.sansSemi : fonts.sans, color: theme.ink }]}>{label}</Text>
     </AnimatedPressable>
   );
@@ -512,8 +532,11 @@ export function Badge({
   tone = 'neutral',
   center,
   onDark,
+  icon,
 }: {
   label: string;
+  /** A small icon before the label (instead of text marks like ✓, which some fonts draw as √). */
+  icon?: IconName;
   tone?: 'neutral' | 'good' | 'watch' | 'critical' | 'gold';
   center?: boolean;
   /** Badge sits on the dark green hero: use light, high-contrast colors. */
@@ -536,7 +559,10 @@ export function Badge({
   }[tone];
   const c = onDark ? dark : map;
   return (
-    <View style={{ backgroundColor: c.bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4, alignSelf: center ? 'center' : 'flex-start' }}>
+    <View
+      style={{ backgroundColor: c.bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4, alignSelf: center ? 'center' : 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}
+    >
+      {icon ? <Ionicons name={icon} size={13} color={c.fg} /> : null}
       <Text style={[type.micro, { fontFamily: fonts.sansSemi, color: c.fg }]}>{label}</Text>
     </View>
   );
@@ -553,8 +579,8 @@ export function Toggle({ value, onValueChange, label }: { value: boolean; onValu
     <Switch
       value={value}
       onValueChange={onValueChange}
-      trackColor={{ true: theme.primary, false: theme.inkFaint }}
-      ios_backgroundColor={theme.inkFaint}
+      trackColor={{ true: theme.primary, false: theme.lineStrong }}
+      ios_backgroundColor={theme.lineStrong}
       thumbColor="#FFFFFF"
       accessibilityLabel={label}
       {...webKnob}
@@ -599,9 +625,9 @@ export function EmptyState({
   );
 }
 
-export function Divider() {
+export function Divider({ style }: { style?: StyleProp<ViewStyle> }) {
   const theme = useTheme();
-  return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: theme.line }} />;
+  return <View style={[{ height: StyleSheet.hairlineWidth, backgroundColor: theme.line }, style]} />;
 }
 
 export { Ionicons };

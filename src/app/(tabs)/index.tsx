@@ -31,6 +31,7 @@ import { useAutoScan } from '../../services/AutoScanProvider';
 import { useEquippedSkin, useKla } from '../../services/kla';
 import { useAchievements } from '../../services/useAchievements';
 import { markWhatsNewSeen, useWhatsNewPending } from '../../services/whatsNew';
+import { DotGrid } from '../../ui/art';
 import { AutoScanBanner } from '../../ui/AutoScanBanner';
 import { Buddy } from '../../ui/Buddy';
 import { Divider, EmptyState, IconButton, Ionicons, Money, Row, Screen, T, type IconName } from '../../ui/components';
@@ -236,6 +237,7 @@ function MoneyCard({ runway, balance, averageSatang }: { runway: Runway; balance
         style={{ borderRadius: radius.xl, overflow: 'hidden', borderWidth: theme.dark ? 1 : 0, borderColor: alpha(theme.heroInk, 0.08) }}
       >
         <LinearGradient colors={[theme.heroTop, theme.heroDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ paddingHorizontal: space.xl, paddingTop: space.lg, paddingBottom: space.lg, gap: space.sm }}>
+          <DotGrid color={theme.heroInk} />
           {halloween ? <SpookyHeroDecor /> : null}
           <Row justify="space-between">
             <T v="small" color={theme.heroInkSoft}>

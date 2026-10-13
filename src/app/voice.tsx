@@ -20,9 +20,10 @@ import type { TxKind } from '../domain/types';
 import { parseSpokenEntry, spokenCategory, type SpokenItem } from '../domain/voice';
 import { askMicPermission, listen, speechAvailable } from '../services/speech';
 import { BuddySays } from '../ui/Buddy';
+import { categoryLook } from '../ui/category';
 import { Button, Card, Chip, IconButton, Ionicons, Money, Row, T } from '../ui/components';
 import { inputBox, inputText } from '../ui/inputs';
-import { Aurora, PulseRing, Reveal, usePressSpring } from '../ui/effects';
+import { PulseRing, Reveal, usePressSpring } from '../ui/effects';
 import { useToast } from '../ui/feedback';
 import { useNative, useReduceMotion } from '../ui/motion';
 import { goBack, useLeaveWhenDone } from '../ui/nav';
@@ -194,7 +195,6 @@ export default function VoiceEntry() {
                 end={{ x: 1, y: 1 }}
                 style={{ paddingVertical: space.xl, paddingHorizontal: space.lg, alignItems: 'center', gap: space.md }}
               >
-                <Aurora cycles={listening ? 2 : 0} strength={0.3} seed={31} />
                 {canListen ? (
                   <>
                     <View style={{ width: 104, height: 104, alignItems: 'center', justifyContent: 'center' }}>
@@ -266,7 +266,7 @@ export default function VoiceEntry() {
                 value={text}
                 onChangeText={changeText}
                 placeholder="เช่น ข้าว 50 น้ำ 15"
-                placeholderTextColor={theme.inkFaint}
+                placeholderTextColor={theme.inkSoft}
                 accessibilityLabel="พิมพ์รายการแบบที่พูด"
                 multiline
                 style={[inputText(theme), { paddingHorizontal: 14, minHeight: 52, textAlignVertical: 'top' }]}
@@ -294,8 +294,8 @@ export default function VoiceEntry() {
                   <Reveal key={key} index={i} from={10} zoom>
                     <Card style={{ paddingVertical: space.md }}>
                       <Row gap={space.md}>
-                        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: theme.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
-                          <T v="h3">{cat.glyph}</T>
+                        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: categoryLook(cat.key, theme).tile, alignItems: 'center', justifyContent: 'center' }}>
+                          <Ionicons name={categoryLook(cat.key, theme).icon} size={20} color={categoryLook(cat.key, theme).ink} />
                         </View>
                         <View style={{ flex: 1, gap: 2 }}>
                           <T v="body" numberOfLines={1} style={{ fontFamily: fonts.sansSemi }}>
@@ -314,6 +314,7 @@ export default function VoiceEntry() {
                           <Money
                             satang={item.kind === 'income' ? item.amountSatang : -item.amountSatang}
                             sign
+                            decimals
                             size="h3"
                             color={item.kind === 'income' ? theme.income : theme.ink}
                           />

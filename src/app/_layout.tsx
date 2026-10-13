@@ -24,6 +24,12 @@ import { mix, useTheme } from '../ui/theme';
 // The native splash stays until the opening animation (LaunchIntro) takes over.
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
+/**
+ * A screen opened directly (the widget's (+), a web reload, a link) gets the
+ * tabs underneath it, so the (+) sheet has the app behind it and back goes home.
+ */
+export const unstable_settings = { initialRouteName: '(tabs)' };
+
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Anuphan_400Regular,
@@ -120,8 +126,8 @@ function Screens({ signedIn, needsOnboarding, inApp }: { signedIn: boolean; need
           <Stack.Screen name="drafts" />
           <Stack.Screen name="settings" />
           <Stack.Screen name="runway" />
-          {/* The (+) in the middle of the tab bar: choose how to add a transaction. */}
-          <Stack.Screen name="add" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+          {/* The (+) in the middle of the tab bar: a sheet over the current screen (it animates itself). */}
+          <Stack.Screen name="add" options={{ presentation: 'transparentModal', animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }} />
         </Stack.Protected>
       </Stack>
     </>

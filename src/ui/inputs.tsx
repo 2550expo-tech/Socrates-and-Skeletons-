@@ -5,14 +5,15 @@ import { fonts, radius, space, useTheme, type Theme } from './theme';
 
 /**
  * The one look of every text box in the app (design system): surface fill, 1.5pt border in
- * `line`, `primary` while typing, `critical` when something is wrong; radius md.
+ * `lineStrong`, `primary` while typing, `critical` when something is wrong; radius md.
  */
 export function inputBox(theme: Theme, state: { focused?: boolean; error?: boolean } = {}): ViewStyle {
   return {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: state.error ? theme.critical : state.focused ? theme.primary : theme.line,
+    // Control edge: lineStrong (≥ 3:1) so the box is visible; primary while typing.
+    borderColor: state.error ? theme.critical : state.focused ? theme.primary : theme.lineStrong,
     borderRadius: radius.md,
     backgroundColor: theme.surface,
     paddingHorizontal: 14,
@@ -78,7 +79,7 @@ export function Field({
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={theme.inkFaint}
+          placeholderTextColor={theme.inkSoft}
           keyboardType={keyboardType}
           multiline={multiline}
           maxLength={maxLength}
@@ -170,14 +171,18 @@ export function AmountField({
   flagged?: boolean;
 }) {
   const theme = useTheme();
+  // The box grows with the number, so ฿ stays right next to it (no gap in the middle).
+  const shown = value || '0.00';
+  const width = Math.min(260, Math.max(64, [...shown].reduce((w, c) => w + (c === '.' || c === ',' ? 11 : 24), 10)));
   return (
     <View style={{ alignItems: 'center', gap: space.xs, paddingVertical: space.md }}>
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
+          gap: 6,
           borderBottomWidth: 2,
-          borderBottomColor: error ? theme.critical : flagged ? theme.watch : theme.line,
+          borderBottomColor: error ? theme.critical : flagged ? theme.watch : theme.lineStrong,
           paddingHorizontal: space.md,
         }}
       >
@@ -188,15 +193,15 @@ export function AmountField({
           value={value}
           onChangeText={(s) => onChangeText(s.replace(/[^0-9.,]/g, ''))}
           placeholder="0.00"
-          placeholderTextColor={theme.inkFaint}
+          placeholderTextColor={theme.inkSoft}
           keyboardType="decimal-pad"
           style={{
             fontFamily: fonts.serif,
             fontSize: 40,
             lineHeight: 54,
-            width: 220,
+            width,
             maxWidth: '100%',
-            textAlign: 'center',
+            textAlign: 'left',
             color: color ?? theme.ink,
             paddingVertical: 4,
             fontVariant: ['tabular-nums'],

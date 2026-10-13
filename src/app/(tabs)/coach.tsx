@@ -58,6 +58,7 @@ export default function Coach() {
   const kla = useKla();
   const halloween = useHalloween();
   const [picking, setPicking] = useState(false);
+  const [showAllInsights, setShowAllInsights] = useState(false);
   const { subtitle, talking, said, speak, stop, sound, voice } = useKlaTalk();
   const [input, setInput] = useState(params.ask ?? '');
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -176,6 +177,234 @@ export default function Coach() {
   const mood: BuddyMood = busy ? 'thinking' : talking ? (rest.mood === 'worried' ? 'calm' : rest.mood) : rest.mood;
   const kW = Math.round(Math.min(214, Math.min(screenW, 440) * 0.52));
 
+  // Chat first: once a question is asked, the stage shrinks to a strip and the conversation leads.
+  const compact = msgs.length > 0;
+  const shownInsights = showAllInsights ? insights : insights.slice(0, 2);
+
+  const controls = (
+    <Row gap={space.sm} style={compact ? undefined : { marginTop: -space.sm }}>
+      <StageButton
+        icon={sound ? 'volume-high' : 'volume-mute'}
+        label={sound ? `ปิดเสียงน้อง${BUDDY_NAME}` : `เปิดเสียงน้อง${BUDDY_NAME}`}
+        small={compact}
+        onPress={() => setKlaSound(!sound)}
+      />
+      {talking ? (
+        <StageButton
+          icon="stop"
+          label={`ให้น้อง${BUDDY_NAME}หยุดพูด`}
+          small={compact}
+          onPress={() => {
+            stop();
+            setSpeakingId(null);
+          }}
+        />
+      ) : said ? (
+        <StageButton icon="refresh" label="ฟังอีกครั้ง" small={compact} onPress={() => tell(said, { mood: rest.mood === 'worried' ? 'calm' : rest.mood })} />
+      ) : null}
+      <StageButton icon="shirt" label={`เปลี่ยนชุดน้อง${BUDDY_NAME}`} expanded={picking} small={compact} onPress={() => setPicking((p) => !p)} />
+    </Row>
+  );
+
+  const bubble = (
+    <SpeechBubble tail={!compact}>
+      {busy ? (
+        <Row gap={space.sm}>
+          <TypingDots color={theme.primary} />
+          <T v="body" color={theme.inkSoft}>
+            {KLA_THINKING}
+          </T>
+        </Row>
+      ) : (
+        <T v="body" color={rest.mood === 'worried' && !talking ? theme.inkSoft : theme.ink} style={{ fontFamily: fonts.sansMedium }} numberOfLines={compact ? 3 : undefined}>
+          {subtitle ? subtitle.text : rest.text}
+        </T>
+      )}
+      {subtitle && subtitle.total > 1 ? (
+        <Row gap={4} style={{ marginTop: 6 }} justify="center">
+          {Array.from({ length: subtitle.total }, (_, i) => (
+            <View key={i} style={{ width: i === subtitle.index ? 14 : 5, height: 5, borderRadius: 3, backgroundColor: i <= subtitle.index ? theme.primary : theme.line }} />
+          ))}
+        </Row>
+      ) : null}
+    </SpeechBubble>
+  );
+
+  const character = (
+    <Pressable onPress={poke} accessibilityRole="button" accessibilityLabel={`น้อง${BUDDY_NAME}ในชุด${skinById(skin).name} แตะเพื่อฟังเคล็ดลับ`} style={{ marginTop: compact ? 0 : 2 }}>
+      <KlaStage skin={skin} mood={mood} width={compact ? 76 : kW} talking={talking} hop={hop} active={focused} onDark />
+    </Pressable>
+  );
+
+  const skinPicker = picking ? (
+    <Reveal from={8} style={{ alignSelf: 'stretch', marginTop: space.md }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm, paddingHorizontal: 2 }}>
+        {mine.map((s) => {
+          const on = s.id === skin;
+          return (
+            <Pressable
+              key={s.id}
+              onPress={() => wear(s.id)}
+              accessibilityRole="button"
+              accessibilityLabel={`ใส่ชุด${s.name}`}
+              aria-selected={on}
+              style={({ pressed }) => ({
+                width: 70,
+                alignItems: 'center',
+                paddingTop: 2,
+                paddingBottom: 6,
+                borderRadius: radius.md,
+                borderWidth: on ? 2 : 1,
+                borderColor: on ? theme.heroAccent : 'rgba(255,255,255,0.18)',
+                backgroundColor: pressed ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)',
+              })}
+            >
+              <KlaPicture skin={s.id} mood="happy" width={50} onDark extras={false} ground={false} />
+              <T v="micro" color={theme.heroInk} numberOfLines={1}>
+                {s.name}
+              </T>
+            </Pressable>
+          );
+        })}
+        <Pressable
+          onPress={() => router.push('/skins')}
+          accessibilityRole="button"
+          accessibilityLabel="ดูตู้สกินทั้งหมดและวิธีปลดล็อก"
+          style={({ pressed }) => ({
+            width: 70,
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 4,
+            borderRadius: radius.md,
+            borderWidth: 1,
+            borderStyle: 'dashed',
+            borderColor: 'rgba(255,255,255,0.35)',
+            backgroundColor: pressed ? 'rgba(255,255,255,0.2)' : 'transparent',
+          })}
+        >
+          <Ionicons name="grid" size={20} color={theme.heroAccent} />
+          <T v="micro" color={theme.heroInk} center>
+            ตู้สกิน{'\n'}ทั้งหมด
+          </T>
+        </Pressable>
+      </ScrollView>
+    </Reveal>
+  ) : null;
+
+  const noVoice =
+    sound && voice === null ? (
+      <T v="micro" color={theme.heroInkSoft} center style={{ marginTop: space.sm }}>
+        เครื่องนี้ยังไม่มีเสียงอ่านภาษาไทย {BUDDY_NAME}จะพูดเป็นตัวหนังสือแทนนะ
+      </T>
+    ) : null;
+
+  const insightList =
+    insights.length > 0 ? (
+      <View style={{ gap: space.sm }}>
+        <T v="h3" accessibilityRole="header">
+          สิ่งที่ควรรู้ตอนนี้
+        </T>
+        {shownInsights.map((i, n) => (
+          <Card
+            key={n}
+            onPress={() => {
+              tell(i.message, { mood: i.severity === 'watch' ? 'calm' : 'happy', after: IDLE });
+              toTop();
+            }}
+          >
+            <Row align="flex-start" gap={space.md}>
+              <Ionicons
+                name={i.severity === 'watch' ? 'alert-circle-outline' : i.severity === 'good' ? 'checkmark-circle-outline' : 'information-circle-outline'}
+                size={22}
+                color={i.severity === 'watch' ? theme.watch : i.severity === 'good' ? theme.good : theme.inkSoft}
+              />
+              <View style={{ flex: 1, gap: 4 }}>
+                <T v="body">{i.message}</T>
+                <T v="micro">ข้อมูล: {i.fact}</T>
+                <Row gap={4}>
+                  <Ionicons name="volume-medium-outline" size={14} color={theme.primary} />
+                  <T v="micro" color={theme.primary}>
+                    แตะให้น้อง{BUDDY_NAME}เล่า
+                  </T>
+                </Row>
+              </View>
+            </Row>
+          </Card>
+        ))}
+        {insights.length > 2 ? (
+          <Pressable
+            onPress={() => setShowAllInsights((v) => !v)}
+            accessibilityRole="button"
+            accessibilityLabel={showAllInsights ? 'ย่อสิ่งที่ควรรู้' : `ดูสิ่งที่ควรรู้อีก ${insights.length - 2} ข้อ`}
+            aria-expanded={showAllInsights}
+            hitSlop={8}
+            style={{ minHeight: 40, justifyContent: 'center', alignSelf: 'flex-start' }}
+          >
+            <Row gap={4}>
+              <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi }}>
+                {showAllInsights ? 'ย่อ' : `ดูอีก ${insights.length - 2} ข้อ`}
+              </T>
+              <Ionicons name={showAllInsights ? 'chevron-up' : 'chevron-down'} size={16} color={theme.ink} />
+            </Row>
+          </Pressable>
+        ) : null}
+      </View>
+    ) : null;
+
+  const chat = (
+    <View style={{ gap: space.sm }}>
+      <T v="h3" accessibilityRole="header">
+        คุยกับน้อง{BUDDY_NAME}
+      </T>
+      {msgs.length === 0 ? <T v="micro">{BUDDY_NAME}ตอบจากตัวเลขที่คุณยืนยันแล้วเท่านั้น ไม่เห็นรูปสลิปหรือชื่อคนที่คุณโอนให้</T> : null}
+      {msgs.map((m) => {
+        const color = m.from === 'me' ? theme.onPrimary : m.error ? theme.inkSoft : theme.ink;
+        const live = m.id === speakingId;
+        return (
+          <Reveal key={m.id} from={12} zoom style={{ alignSelf: m.from === 'me' ? 'flex-end' : 'flex-start', maxWidth: '92%' }}>
+            <Row gap={6} align="flex-end">
+              {m.from === 'coach' ? <Buddy mood={m.error ? 'worried' : 'happy'} size={34} still /> : null}
+              <View
+                style={{
+                  flexShrink: 1,
+                  backgroundColor: m.from === 'me' ? theme.primary : m.error ? theme.surfaceAlt : theme.surface,
+                  borderRadius: radius.lg,
+                  borderBottomRightRadius: m.from === 'me' ? 6 : radius.lg,
+                  borderBottomLeftRadius: m.from === 'coach' ? 6 : radius.lg,
+                  borderWidth: live ? 1.5 : 0,
+                  borderColor: theme.accent,
+                  padding: space.md,
+                  gap: 4,
+                }}
+              >
+                {m.from === 'coach' && !m.error ? (
+                  <Row justify="space-between" gap={space.sm}>
+                    <T v="micro">น้อง{BUDDY_NAME} · ตอบโดย AI</T>
+                    <Pressable
+                      onPress={() => {
+                        tell(m.text, { msgId: m.id });
+                        toTop();
+                      }}
+                      // A 44pt target around the small icon.
+                      hitSlop={14}
+                      accessibilityRole="button"
+                      accessibilityLabel={live ? `น้อง${BUDDY_NAME}กำลังพูดข้อความนี้` : 'ฟังข้อความนี้'}
+                    >
+                      <Ionicons name={live ? 'volume-high' : 'volume-medium-outline'} size={16} color={live ? theme.accentInk : theme.inkSoft} />
+                    </Pressable>
+                  </Row>
+                ) : null}
+                <T v="body" color={color} selectable>
+                  {m.text}
+                </T>
+              </View>
+            </Row>
+          </Reveal>
+        );
+      })}
+    </View>
+  );
+
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bg }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -186,254 +415,91 @@ export default function Coach() {
           keyboardShouldPersistTaps="handled"
         >
           <Row justify="space-between" align="flex-end">
-            <View style={{ gap: 2 }}>
-              <T v="label">โค้ชส่วนตัว</T>
-              <T v="h1">น้อง{BUDDY_NAME}</T>
-            </View>
+            <T v="h1" accessibilityRole="header">
+              น้อง{BUDDY_NAME}
+            </T>
             <TitleDecor />
           </Row>
 
-          {/* The stage */}
-          <KlaBackdrop floorAt={0.8}>
-            <View style={{ alignItems: 'center', paddingTop: space.lg, paddingHorizontal: space.lg, paddingBottom: space.md }}>
-              <SpeechBubble>
-                {busy ? (
-                  <Row gap={space.sm}>
-                    <TypingDots color={theme.primary} />
-                    <T v="body" color={theme.inkSoft}>
-                      {KLA_THINKING}
-                    </T>
-                  </Row>
-                ) : (
-                  <T v="body" color={rest.mood === 'worried' && !talking ? theme.inkSoft : theme.ink} style={{ fontFamily: fonts.sansMedium }}>
-                    {subtitle ? subtitle.text : rest.text}
-                  </T>
-                )}
-                {subtitle && subtitle.total > 1 ? (
-                  <Row gap={4} style={{ marginTop: 6 }} justify="center">
-                    {Array.from({ length: subtitle.total }, (_, i) => (
-                      <View key={i} style={{ width: i === subtitle.index ? 14 : 5, height: 5, borderRadius: 3, backgroundColor: i <= subtitle.index ? theme.primary : theme.line }} />
-                    ))}
-                  </Row>
-                ) : null}
-              </SpeechBubble>
-              <Pressable onPress={poke} accessibilityRole="button" accessibilityLabel={`น้อง${BUDDY_NAME}ในชุด${skinById(skin).name} แตะเพื่อฟังเคล็ดลับ`} style={{ marginTop: 2 }}>
-                <KlaStage skin={skin} mood={mood} width={kW} talking={talking} hop={hop} active={focused} onDark />
-              </Pressable>
-              <Row gap={space.sm} style={{ marginTop: -space.sm }}>
-                <StageButton
-                  icon={sound ? 'volume-high' : 'volume-mute'}
-                  label={sound ? 'เสียงเปิด' : 'เสียงปิด'}
-                  a11y={sound ? `ปิดเสียงน้อง${BUDDY_NAME}` : `เปิดเสียงน้อง${BUDDY_NAME}`}
-                  onPress={() => setKlaSound(!sound)}
-                />
-                {talking ? (
-                  <StageButton
-                    icon="stop"
-                    label="หยุด"
-                    a11y={`ให้น้อง${BUDDY_NAME}หยุดพูด`}
-                    onPress={() => {
-                      stop();
-                      setSpeakingId(null);
-                    }}
-                  />
-                ) : said ? (
-                  <StageButton icon="refresh" label="ฟังอีกครั้ง" a11y={`ให้น้อง${BUDDY_NAME}พูดอีกครั้ง`} onPress={() => tell(said, { mood: rest.mood === 'worried' ? 'calm' : rest.mood })} />
-                ) : null}
-                <StageButton icon="shirt" label="เปลี่ยนชุด" a11y={`เปลี่ยนชุดน้อง${BUDDY_NAME}`} onPress={() => setPicking((p) => !p)} />
-              </Row>
-              {picking ? (
-                <Reveal from={8} style={{ alignSelf: 'stretch', marginTop: space.md }}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm, paddingHorizontal: 2 }}>
-                    {mine.map((s) => {
-                      const on = s.id === skin;
-                      return (
-                        <Pressable
-                          key={s.id}
-                          onPress={() => wear(s.id)}
-                          accessibilityRole="button"
-                          accessibilityLabel={`ใส่ชุด${s.name}`}
-                          aria-selected={on}
-                          style={({ pressed }) => ({
-                            width: 70,
-                            alignItems: 'center',
-                            paddingTop: 2,
-                            paddingBottom: 6,
-                            borderRadius: radius.md,
-                            borderWidth: on ? 2 : 1,
-                            borderColor: on ? theme.heroAccent : 'rgba(255,255,255,0.18)',
-                            backgroundColor: pressed ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)',
-                          })}
-                        >
-                          <KlaPicture skin={s.id} mood="happy" width={50} onDark extras={false} ground={false} />
-                          <T v="micro" color={theme.heroInk} numberOfLines={1}>
-                            {s.name}
-                          </T>
-                        </Pressable>
-                      );
-                    })}
-                    <Pressable
-                      onPress={() => router.push('/skins')}
-                      accessibilityRole="button"
-                      accessibilityLabel="ดูตู้สกินทั้งหมดและวิธีปลดล็อก"
-                      style={({ pressed }) => ({
-                        width: 70,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 4,
-                        borderRadius: radius.md,
-                        borderWidth: 1,
-                        borderStyle: 'dashed',
-                        borderColor: 'rgba(255,255,255,0.35)',
-                        backgroundColor: pressed ? 'rgba(255,255,255,0.2)' : 'transparent',
-                      })}
-                    >
-                      <Ionicons name="grid" size={20} color={theme.heroAccent} />
-                      <T v="micro" color={theme.heroInk} center>
-                        ตู้สกิน{'\n'}ทั้งหมด
-                      </T>
-                    </Pressable>
-                  </ScrollView>
-                </Reveal>
-              ) : null}
-              {sound && voice === null ? (
-                <T v="micro" color={theme.heroInkSoft} center style={{ marginTop: space.sm }}>
-                  เครื่องนี้ยังไม่มีเสียงอ่านภาษาไทย {BUDDY_NAME}จะพูดเป็นตัวหนังสือแทนนะ
-                </T>
-              ) : null}
-            </View>
-          </KlaBackdrop>
+          {/* The stage: big before the first question, a strip once the conversation starts. */}
+          {compact ? (
+            <KlaBackdrop floorAt={0.9}>
+              <View style={{ padding: space.md }}>
+                <Row gap={space.sm} align="center">
+                  {character}
+                  <View style={{ flex: 1, gap: space.sm }}>
+                    {bubble}
+                    {controls}
+                  </View>
+                </Row>
+                {skinPicker}
+                {noVoice}
+              </View>
+            </KlaBackdrop>
+          ) : (
+            <KlaBackdrop floorAt={0.8}>
+              <View style={{ alignItems: 'center', paddingTop: space.lg, paddingHorizontal: space.lg, paddingBottom: space.md }}>
+                {bubble}
+                {character}
+                {controls}
+                {skinPicker}
+                {noVoice}
+              </View>
+            </KlaBackdrop>
+          )}
 
-          <View style={{ gap: space.sm }}>
-            <T v="h3">สิ่งที่ควรรู้ตอนนี้</T>
-            {insights.map((i, n) => (
-              <Reveal key={n} index={n + 1}>
-                <Card
-                  onPress={() => {
-                    tell(i.message, { mood: i.severity === 'watch' ? 'calm' : 'happy', after: IDLE });
-                    toTop();
-                  }}
-                >
-                  <Row align="flex-start" gap={space.md}>
-                    <Ionicons
-                      name={i.severity === 'watch' ? 'alert-circle-outline' : i.severity === 'good' ? 'checkmark-circle-outline' : 'information-circle-outline'}
-                      size={22}
-                      color={i.severity === 'watch' ? theme.watch : i.severity === 'good' ? theme.good : theme.inkSoft}
-                    />
-                    <View style={{ flex: 1, gap: 4 }}>
-                      <T v="body">{i.message}</T>
-                      <T v="micro">ข้อมูล: {i.fact}</T>
-                      <Row gap={4}>
-                        <Ionicons name="volume-medium-outline" size={14} color={theme.primary} />
-                        <T v="micro" color={theme.primary}>
-                          แตะให้น้อง{BUDDY_NAME}เล่า
-                        </T>
-                      </Row>
-                    </View>
-                  </Row>
-                </Card>
-              </Reveal>
-            ))}
-          </View>
-
-          <View style={{ gap: space.sm }}>
-            <T v="h3">คุยกับน้อง{BUDDY_NAME}</T>
-            {msgs.length === 0 ? <T v="micro">{BUDDY_NAME}ตอบจากตัวเลขที่คุณยืนยันแล้วเท่านั้น ไม่เห็นรูปสลิปหรือชื่อคนที่คุณโอนให้</T> : null}
-            {msgs.map((m) => {
-              const color = m.from === 'me' ? theme.onPrimary : m.error ? theme.inkSoft : theme.ink;
-              const live = m.id === speakingId;
-              return (
-                <Reveal key={m.id} from={12} zoom style={{ alignSelf: m.from === 'me' ? 'flex-end' : 'flex-start', maxWidth: '92%' }}>
-                  <Row gap={6} align="flex-end">
-                    {m.from === 'coach' ? <Buddy mood={m.error ? 'worried' : 'happy'} size={34} still /> : null}
-                    <View
-                      style={{
-                        flexShrink: 1,
-                        backgroundColor: m.from === 'me' ? theme.primary : m.error ? theme.surfaceAlt : theme.surface,
-                        borderRadius: radius.lg,
-                        borderBottomRightRadius: m.from === 'me' ? 6 : radius.lg,
-                        borderBottomLeftRadius: m.from === 'coach' ? 6 : radius.lg,
-                        borderWidth: m.from === 'coach' ? (live ? 1.5 : 1) : 0,
-                        borderColor: live ? theme.accent : theme.line,
-                        padding: space.md,
-                        gap: 4,
-                      }}
-                    >
-                      {m.from === 'coach' && !m.error ? (
-                        <Row justify="space-between" gap={space.sm}>
-                          <T v="micro">น้อง{BUDDY_NAME} · ตอบโดย AI</T>
-                          <Pressable
-                            onPress={() => {
-                              tell(m.text, { msgId: m.id });
-                              toTop();
-                            }}
-                            // A 44pt target around the small icon.
-                            hitSlop={14}
-                            accessibilityRole="button"
-                            accessibilityLabel={live ? `น้อง${BUDDY_NAME}กำลังพูดข้อความนี้` : 'ฟังข้อความนี้'}
-                          >
-                            <Ionicons name={live ? 'volume-high' : 'volume-medium-outline'} size={16} color={live ? theme.accent : theme.inkSoft} />
-                          </Pressable>
-                        </Row>
-                      ) : null}
-                      <T v="body" color={color} selectable>
-                        {m.text}
-                      </T>
-                    </View>
-                  </Row>
-                </Reveal>
-              );
-            })}
-          </View>
-
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
-            {QUICK.map((q) => (
-              <Chip key={q} label={q} onPress={() => send(q)} />
-            ))}
-          </ScrollView>
+          {compact ? chat : insightList}
+          {compact ? insightList : chat}
         </ScrollView>
 
-        <Row
-          gap={space.sm}
-          style={{ paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.sm + 26, borderTopWidth: 1, borderTopColor: theme.line, backgroundColor: theme.surface }}
-        >
-          <TextInput
-            nativeID="coach-input"
-            value={input}
-            onChangeText={setInput}
-            placeholder={`ถามน้อง${BUDDY_NAME} เช่น ซื้อรองเท้า 1,290 ได้ไหม`}
-            placeholderTextColor={theme.inkFaint}
-            accessibilityLabel={`คำถามถึงน้อง${BUDDY_NAME}`}
-            multiline
-            maxLength={400}
-            onFocus={() => setTyping(true)}
-            onBlur={() => setTyping(false)}
-            style={[inputBox(theme, { focused: typing }), inputText(theme), { maxHeight: 100, paddingVertical: 10 }]}
-          />
-          <Pressable
-            onPress={() => send(input)}
-            disabled={!input.trim() || busy}
-            accessibilityRole="button"
-            accessibilityLabel="ส่งคำถาม"
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: input.trim() && !busy ? theme.primary : theme.surfaceAlt,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Ionicons name="arrow-up" size={22} color={input.trim() && !busy ? theme.onPrimary : theme.inkFaint} />
-          </Pressable>
-        </Row>
+        {/* The composer: starter questions (only until the first one is asked or typed), then the box. */}
+        <View style={{ borderTopWidth: 1, borderTopColor: theme.line, backgroundColor: theme.surface, paddingTop: space.sm, paddingBottom: space.sm + 26, gap: space.sm }}>
+          {msgs.length === 0 && !input.trim() ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={{ flexGrow: 0 }} contentContainerStyle={{ gap: space.sm, paddingHorizontal: space.lg }}>
+              {QUICK.map((q) => (
+                <Chip key={q} label={q} onPress={() => send(q)} />
+              ))}
+            </ScrollView>
+          ) : null}
+          <Row gap={space.sm} style={{ paddingHorizontal: space.lg }}>
+            <TextInput
+              nativeID="coach-input"
+              value={input}
+              onChangeText={setInput}
+              placeholder={`ถามน้อง${BUDDY_NAME} เช่น ซื้อรองเท้า 1,290 ได้ไหม`}
+              placeholderTextColor={theme.inkSoft}
+              accessibilityLabel={`คำถามถึงน้อง${BUDDY_NAME}`}
+              multiline
+              maxLength={400}
+              onFocus={() => setTyping(true)}
+              onBlur={() => setTyping(false)}
+              style={[inputBox(theme, { focused: typing }), inputText(theme), { maxHeight: 100, paddingVertical: 10 }]}
+            />
+            <Pressable
+              onPress={() => send(input)}
+              disabled={!input.trim() || busy}
+              accessibilityRole="button"
+              accessibilityLabel="ส่งคำถาม"
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: input.trim() && !busy ? theme.primary : theme.surfaceAlt,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Ionicons name="arrow-up" size={22} color={input.trim() && !busy ? theme.onPrimary : theme.inkFaint} />
+            </Pressable>
+          </Row>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 /** The white bubble over น้องกล้า, with a tail pointing down at it. */
-function SpeechBubble({ children }: { children: React.ReactNode }) {
+function SpeechBubble({ children, tail = true }: { children: React.ReactNode; tail?: boolean }) {
   const theme = useTheme();
   return (
     <View style={{ alignSelf: 'stretch', alignItems: 'center' }} accessibilityLiveRegion="polite">
@@ -455,23 +521,26 @@ function SpeechBubble({ children }: { children: React.ReactNode }) {
       >
         {children}
       </View>
-      <View
-        style={{
-          width: 16,
-          height: 16,
-          marginTop: -9,
-          backgroundColor: theme.surface,
-          transform: [{ rotate: '45deg' }],
-          borderBottomRightRadius: 4,
-        }}
-      />
+      {tail ? (
+        <View
+          style={{
+            width: 16,
+            height: 16,
+            marginTop: -9,
+            backgroundColor: theme.surface,
+            transform: [{ rotate: '45deg' }],
+            borderBottomRightRadius: 4,
+          }}
+        />
+      ) : null}
     </View>
   );
 }
 
-/** A round, see-through button on the stage. */
-function StageButton({ icon, label, a11y, onPress }: { icon: IconName; label: string; a11y: string; onPress: () => void }) {
+/** A round, see-through icon button on the stage; its name is said by screen readers. */
+function StageButton({ icon, label, onPress, small, expanded }: { icon: IconName; label: string; onPress: () => void; small?: boolean; expanded?: boolean }) {
   const theme = useTheme();
+  const size = small ? 36 : 44;
   return (
     <Pressable
       onPress={() => {
@@ -479,23 +548,21 @@ function StageButton({ icon, label, a11y, onPress }: { icon: IconName; label: st
         onPress();
       }}
       accessibilityRole="button"
-      accessibilityLabel={a11y}
+      accessibilityLabel={label}
+      aria-expanded={expanded}
+      hitSlop={small ? 4 : 0}
       style={({ pressed }) => ({
-        flexDirection: 'row',
+        width: size,
+        height: size,
+        borderRadius: size / 2,
         alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 14,
-        minHeight: 44,
-        borderRadius: radius.pill,
-        backgroundColor: alpha(theme.heroInk, pressed ? 0.22 : 0.12),
+        justifyContent: 'center',
+        backgroundColor: alpha(theme.heroInk, pressed ? 0.24 : expanded ? 0.2 : 0.12),
         borderWidth: 1,
-        borderColor: alpha(theme.heroInk, 0.3),
+        borderColor: alpha(theme.heroInk, expanded ? 0.55 : 0.3),
       })}
     >
-      <Ionicons name={icon} size={18} color={theme.heroAccent} />
-      <T v="small" color={theme.heroInk}>
-        {label}
-      </T>
+      <Ionicons name={icon} size={small ? 17 : 20} color={theme.heroAccent} />
     </Pressable>
   );
 }

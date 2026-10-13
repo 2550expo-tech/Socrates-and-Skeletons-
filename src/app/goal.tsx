@@ -13,9 +13,9 @@ import { parseBahtToSatang, satangToInput } from '../domain/money';
 import { Button, Chip, IconButton, Row, T } from '../ui/components';
 import { ConfirmSheet, useToast } from '../ui/feedback';
 import { AmountField, Field } from '../ui/inputs';
-import { goBack, useLeaveWhenDone } from '../ui/nav';
+import { useLeaveWhenDone } from '../ui/nav';
 import { fonts, radius, space, useTheme } from '../ui/theme';
-import { HeaderDecor } from '../ui/halloween';
+import { StackHeader } from '../ui/StackHeader';
 
 export default function GoalForm() {
   const theme = useTheme();
@@ -59,11 +59,11 @@ export default function GoalForm() {
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
-          <IconButton icon="close" label="ปิด" onPress={() => goBack()} />
-          <T v="h3">{existing ? 'แก้กระปุกออม' : 'ตั้งกระปุกออมใหม่'}</T>
-          {existing ? <IconButton icon="trash-outline" label="ลบกระปุก" color={theme.critical} onPress={() => setAskDelete(true)} /> : <HeaderDecor />}
-        </Row>
+        <StackHeader
+          title={existing ? 'แก้กระปุกออม' : 'ตั้งกระปุกออมใหม่'}
+          close
+          right={existing ? <IconButton icon="trash-outline" label="ลบกระปุก" color={theme.critical} onPress={() => setAskDelete(true)} /> : undefined}
+        />
         <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxxl }} keyboardShouldPersistTaps="handled">
           <View style={{ gap: space.sm }}>
             <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi }}>

@@ -235,3 +235,47 @@ export function treeHealth(status: string, days: number | null): number {
   if (status === 'no_spending' || days === null) return 0.7;
   return Math.max(0.08, Math.min(1, days / 45));
 }
+
+/**
+ * The one texture of hero surfaces (MindPay ใหม่): a still grid of fine dots that
+ * fades out from the top-right corner. Replaces the drifting aurora, contour
+ * lines and sparkles. Never animated; hidden from screen readers; drawn as a
+ * few SVG paths (one per brightness band), which also works on the web.
+ */
+export function DotGrid({ color = '#F4F1E6', step = 12 }: { color?: string; step?: number }) {
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  const bands = useMemo(() => {
+    const { w, h } = size;
+    if (!w || !h) return [] as string[];
+    const out = ['', '', '', ''];
+    const reach = Math.min(w, h * 1.6);
+    for (let y = step / 2; y < h; y += step) {
+      for (let x = step / 2; x < w; x += step) {
+        const d = Math.hypot(w - x, y) / reach; // 0 at the top-right corner
+        if (d >= 1) continue;
+        const band = Math.min(3, Math.floor(d * 4));
+        out[band] += `M${(x - 0.9).toFixed(1)} ${y.toFixed(1)}a0.9 0.9 0 1 0 1.8 0a0.9 0.9 0 1 0 -1.8 0`;
+      }
+    }
+    return out;
+  }, [size, step]);
+  const opacity = [0.16, 0.11, 0.07, 0.035];
+  return (
+    <View
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        if (Math.round(width) !== size.w || Math.round(height) !== size.h) setSize({ w: Math.round(width), h: Math.round(height) });
+      }}
+      style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
+    >
+      {size.w ? (
+        <Svg width={size.w} height={size.h}>
+          {bands.map((d, i) => (d ? <Path key={i} d={d} fill={color} fillOpacity={opacity[i]} /> : null))}
+        </Svg>
+      ) : null}
+    </View>
+  );
+}

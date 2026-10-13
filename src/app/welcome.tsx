@@ -25,11 +25,11 @@ import {
   otpErrorMessage,
   type AuthErrorLike,
 } from '../domain/auth';
-import { ContourLines } from '../ui/art';
+import { DotGrid } from '../ui/art';
 import { KlaStage } from '../ui/kla/KlaStage';
 import { SpookyHeroDecor } from '../ui/halloween';
 import { Button, Card, Ionicons, Row, Segmented, T } from '../ui/components';
-import { Aurora, Reveal, Shine, Sparkles } from '../ui/effects';
+import { Reveal } from '../ui/effects';
 import { useToast } from '../ui/feedback';
 import { StepDots } from '../ui/StepDots';
 import { Field, PasswordField } from '../ui/inputs';
@@ -233,9 +233,7 @@ export default function Welcome() {
             gap: space.sm,
           }}
         >
-          <Aurora cycles={2} strength={0.4} seed={17} />
-          <ContourLines width={420} height={320} color={theme.heroAccent} />
-          <Sparkles count={14} cycles={3} seed={41} area={{ top: 6, bottom: 70 }} />
+          <DotGrid color={theme.heroInk} />
           {theme.colorTheme === 'halloween' ? <SpookyHeroDecor /> : null}
           {/* The cover: น้องกล้า, the MindPay mascot, says hello (and hops when tapped). */}
           <Reveal zoom from={10}>
@@ -246,7 +244,6 @@ export default function Welcome() {
           <Reveal index={2} from={14}>
             <View style={{ overflow: 'hidden', borderRadius: radius.md, marginTop: space.sm, paddingHorizontal: space.sm }}>
               <T v="display" color={theme.heroInk}>MindPay</T>
-              <Shine times={2} delay={700} color="rgba(255,236,170,0.35)" />
             </View>
           </Reveal>
           <Reveal index={3} from={12}>
@@ -525,7 +522,7 @@ function SentCard({
         value={code}
         onChangeText={change}
         placeholder="••••••"
-        placeholderTextColor={theme.inkFaint}
+        placeholderTextColor={theme.inkSoft}
         keyboardType="number-pad"
         autoComplete="one-time-code"
         textContentType="oneTimeCode"

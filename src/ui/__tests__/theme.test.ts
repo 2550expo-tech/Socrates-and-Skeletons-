@@ -61,3 +61,23 @@ describe('TC-78 colour themes stay readable', () => {
     expect(COLOR_THEMES.map((t) => t.key)).toContain('halloween');
   });
 });
+
+describe('TC-95 MindPay ใหม่: control edges and category icons stand out (WCAG 1.4.11, 3:1)', () => {
+  it('every theme, light and dark: inputs/switches use lineStrong, category icons read on their tiles', async () => {
+    const { categoryLook } = await import('../category');
+    const { CATEGORIES } = await import('../../domain/categories');
+    for (const spec of COLOR_THEMES) {
+      for (const dark of [false, true]) {
+        const t = buildTheme(spec.key, dark);
+        expect(contrast(t.lineStrong, t.surface), `${spec.key} ${dark} lineStrong`).toBeGreaterThanOrEqual(3);
+        expect(contrast(t.lineStrong, t.bg), `${spec.key} ${dark} lineStrong/bg`).toBeGreaterThanOrEqual(3);
+        for (const c of CATEGORIES) {
+          const look = categoryLook(c.key, t);
+          expect(contrast(look.ink, look.tile), `${spec.key} ${dark} ${c.key}`).toBeGreaterThanOrEqual(3);
+        }
+        // Placeholders now use inkSoft: readable as text on inputs.
+        expect(contrast(t.inkSoft, t.surface)).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+});

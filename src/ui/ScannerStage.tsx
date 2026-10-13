@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, View } from 'react-native';
 import Svg, { G, Rect } from 'react-native-svg';
 import type { Transaction } from '../domain/types';
-import { Aurora, Reveal, ScanBeam, Sparkles } from './effects';
+import { Reveal, ScanBeam } from './effects';
 import { Money, T } from './components';
 import { alpha, palette, radius, space, useTheme } from './theme';
 
@@ -44,12 +44,10 @@ export function ScannerStage({ active, latest }: { active: boolean; latest: Tran
   return (
     <View style={{ height: 152, borderRadius: radius.lg, overflow: 'hidden' }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <LinearGradient colors={[theme.hero, theme.heroDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-      <Aurora cycles={0} strength={0.28} seed={21} />
       <View style={{ position: 'absolute', left: space.xl, top: 18, width: PAPER_W, height: PAPER_H, transform: [{ rotate: '-4deg' }] }}>
         <SlipPaper />
         <ScanBeam height={PAPER_H} active={active} />
       </View>
-      <Sparkles trigger={latest?.id} count={7} cycles={1} seed={5} area={{ top: 10, bottom: 80 }} />
       <View style={{ position: 'absolute', left: PAPER_W + space.xl * 2, right: space.lg, top: 0, bottom: 0, justifyContent: 'center' }}>
         {latest ? (
           <Reveal key={latest.id} zoom from={14}>

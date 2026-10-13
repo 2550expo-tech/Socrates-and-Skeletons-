@@ -1,11 +1,11 @@
 /**
- * Settings: the numbers behind FR-6 (balance start, low line, budget), น้องกล้า
- * (voice on/off, skins), how the app looks, privacy notes, the account (email,
- * change password) and sign out.
+ * Settings, most used first: the account, the numbers behind FR-6 (balance
+ * start, reserve line, budget), how the app looks, น้องกล้า (voice, skins), slip
+ * reading on the phone, then the rest; privacy notes fold open; sign out sits
+ * at the very bottom, away from everyday taps.
  */
-import Constants from 'expo-constants';
 import { router } from 'expo-router';
-import { goBack } from '../ui/nav';
+import appConfig from '../../app.json';
 import { Children, useEffect, useState, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,24 +15,28 @@ import { useAutoScan } from '../services/AutoScanProvider';
 import { pinQuickWidget, widgetAvailable } from '../services/quickWidget';
 import { deleteAllSlipCopies, slipCopyStats } from '../services/slipCopies';
 import { forgetScanned } from '../services/slips';
-import { amountToInput, parseBahtToSatang } from '../domain/money';
-import { Button, Divider, IconButton, Ionicons, Row, Segmented, T, Toggle, type IconName } from '../ui/components';
+import { amountToInput, formatSatang, parseBahtToSatang } from '../domain/money';
+import { Button, Divider, Ionicons, Row, Segmented, T, Toggle, type IconName } from '../ui/components';
 import { setKlaSound, useKlaSound } from '../ui/kla/useKlaTalk';
 import { ThemePicker } from '../ui/ThemePicker';
 import { setThemeMode, useThemeMode, type ThemeMode } from '../ui/themeMode';
 import { ConfirmSheet, useToast } from '../ui/feedback';
 import { inputBox, inputText } from '../ui/inputs';
 import { alpha, fonts, radius, space, useTheme } from '../ui/theme';
-import { HeaderDecor } from '../ui/halloween';
+import { StackHeader } from '../ui/StackHeader';
 
 /** A titled group of rows in one card (the grouped-list look of the settings). */
-function Group({ title, children }: { title: string; children: ReactNode }) {
+function Group({ title, children }: { title?: string; children: ReactNode }) {
   const theme = useTheme();
   const rows = Children.toArray(children).filter(Boolean);
   return (
     <View style={{ gap: space.sm, marginTop: space.md }}>
-      <T v="h3">{title}</T>
-      <View style={{ backgroundColor: theme.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: theme.line, paddingHorizontal: space.lg }}>
+      {title ? (
+        <T v="h3" accessibilityRole="header">
+          {title}
+        </T>
+      ) : null}
+      <View style={{ backgroundColor: theme.surface, borderRadius: radius.lg, paddingHorizontal: space.lg }}>
         {rows.map((r, i) => (
           <View key={i}>
             {i > 0 ? <Divider /> : null}
@@ -81,6 +85,13 @@ function ToggleRow({ icon, label, hint, value, onValueChange }: { icon: IconName
   );
 }
 
+/** "10000" -> "10,000", "85.5" -> "85.50"; anything that is not an amount is left as typed. */
+function grouped(value: string): string {
+  const satang = parseBahtToSatang(value, { allowZero: true });
+  if (satang === null) return value;
+  return formatSatang(satang, { decimals: satang % 100 !== 0 });
+}
+
 /** A setting typed in place: label on the left, a short box on the right, the hint under it. */
 function InputRow({
   id,
@@ -107,6 +118,8 @@ function InputRow({
 }) {
   const theme = useTheme();
   const [focused, setFocused] = useState(false);
+  // Money reads with thousands separators ("10,000"); while typing they step aside ("10000").
+  const shown = money && !focused ? grouped(value) : value;
   return (
     <View style={{ paddingVertical: space.md, gap: 6 }}>
       <Row gap={space.md}>
@@ -118,12 +131,12 @@ function InputRow({
           <TextInput
             nativeID={id}
             accessibilityLabel={label}
-            value={value}
-            onChangeText={onChangeText}
+            value={shown}
+            onChangeText={(s) => onChangeText(money ? s.replace(/,/g, '') : s)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             placeholder={placeholder}
-            placeholderTextColor={theme.inkFaint}
+            placeholderTextColor={theme.inkSoft}
             keyboardType={money ? 'decimal-pad' : 'default'}
             maxLength={maxLength}
             style={[inputText(theme), { minWidth: 0, width: '100%', paddingVertical: 8, textAlign: money ? 'right' : 'left', color: money ? theme.primary : theme.ink, fontFamily: fonts.sansSemi }]}
@@ -165,6 +178,8 @@ export default function Settings() {
   const [busy, setBusy] = useState(false);
   const [askOut, setAskOut] = useState(false);
   const [askCopies, setAskCopies] = useState(false);
+  const [askForget, setAskForget] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
   /** Slip pictures kept on this phone (or in this browser) for this account. */
   const [copies, setCopies] = useState<{ count: number; bytes: number } | null>(null);
   useEffect(() => {
@@ -208,14 +223,9 @@ export default function Settings() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
-      <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
-        <IconButton icon="chevron-back" label="กลับ" onPress={() => goBack()} />
-        <HeaderDecor />
-      </Row>
+      <StackHeader title="ตั้งค่า" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.sm, paddingBottom: space.xxxl }} keyboardShouldPersistTaps="handled">
-          <T v="h1" style={{ marginBottom: space.sm }}>ตั้งค่า</T>
-
           <Group title="บัญชี">
             <Row gap={space.md} style={{ paddingVertical: space.md }}>
               <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: theme.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
@@ -231,9 +241,7 @@ export default function Settings() {
               </View>
             </Row>
             {repo?.mode === 'cloud' ? <LinkRow icon="key-outline" label="เปลี่ยนรหัสผ่าน" onPress={() => showAuthNotice({ kind: 'recovery' })} /> : null}
-            <LinkRow icon="log-out-outline" label={repo?.mode === 'demo' ? 'ออกจากโหมดทดลอง' : 'ออกจากระบบ'} danger onPress={() => setAskOut(true)} />
           </Group>
-
           <Group title="เงินและงบประมาณ">
             <InputRow id="st-name" icon="person-outline" label="ชื่อเล่น" value={name} onChangeText={setName} error={errors.name} maxLength={30} />
             <InputRow
@@ -271,37 +279,6 @@ export default function Settings() {
               <Button label="บันทึก" onPress={save} loading={busy} />
             </View>
           </Group>
-
-          {auto.available ? (
-            <Group title="อ่านสลิปอัตโนมัติ">
-              <ToggleRow
-                icon="images-outline"
-                label="หาสลิปใหม่ทุกครั้งที่เปิดแอป"
-                hint="ตรวจเฉพาะสลิปที่มี QR ซึ่งบันทึกลงเครื่องวันนี้ สลิปของวันก่อนหน้าเลือกเองได้ที่ปุ่ม +"
-                value={auto.prefs.autoScan}
-                onValueChange={(v) => auto.setPrefs({ autoScan: v })}
-              />
-              <ToggleRow
-                icon="checkmark-done-outline"
-                label="รวมยอดทันทีเมื่ออ่านชัด"
-                hint="สลิปที่อ่านได้มั่นใจ 80% ขึ้นไปทุกช่องจะเข้ายอดเงินเลย ส่วนที่ไม่ชัดรอให้ตรวจก่อน"
-                value={auto.prefs.autoConfirm}
-                onValueChange={(v) => auto.setPrefs({ autoConfirm: v })}
-              />
-            </Group>
-          ) : null}
-
-          <Group title="น้องกล้า">
-            <ToggleRow
-              icon="volume-medium-outline"
-              label="เสียงน้องกล้า"
-              hint="น้องกล้าพูดคำแนะนำออกเสียงในหน้าโค้ช ปิดไว้ก็ยังมีตัวหนังสือขึ้นให้อ่าน"
-              value={klaSound}
-              onValueChange={setKlaSound}
-            />
-            <LinkRow icon="shirt-outline" label="ตู้สกินน้องกล้า" onPress={() => router.push('/skins')} />
-          </Group>
-
           <Group title="หน้าตาแอป">
             <View style={{ paddingVertical: space.md, gap: space.sm }}>
               <Segmented<ThemeMode>
@@ -320,7 +297,34 @@ export default function Settings() {
               <ThemePicker />
             </View>
           </Group>
-
+          <Group title="น้องกล้า">
+            <ToggleRow
+              icon="volume-medium-outline"
+              label="เสียงน้องกล้า"
+              hint="น้องกล้าพูดคำแนะนำออกเสียงในหน้าโค้ช ปิดไว้ก็ยังมีตัวหนังสือขึ้นให้อ่าน"
+              value={klaSound}
+              onValueChange={setKlaSound}
+            />
+            <LinkRow icon="shirt-outline" label="ตู้สกินน้องกล้า" onPress={() => router.push('/skins')} />
+          </Group>
+          {auto.available ? (
+            <Group title="อ่านสลิปอัตโนมัติ">
+              <ToggleRow
+                icon="images-outline"
+                label="หาสลิปใหม่ทุกครั้งที่เปิดแอป"
+                hint="ตรวจเฉพาะสลิปที่มี QR ซึ่งบันทึกลงเครื่องวันนี้ สลิปของวันก่อนหน้าเลือกเองได้ที่ปุ่ม +"
+                value={auto.prefs.autoScan}
+                onValueChange={(v) => auto.setPrefs({ autoScan: v })}
+              />
+              <ToggleRow
+                icon="checkmark-done-outline"
+                label="รวมยอดทันทีเมื่ออ่านชัด"
+                hint="สลิปที่อ่านได้มั่นใจ 80% ขึ้นไปทุกช่องจะเข้ายอดเงินเลย ส่วนที่ไม่ชัดรอให้ตรวจก่อน"
+                value={auto.prefs.autoConfirm}
+                onValueChange={(v) => auto.setPrefs({ autoConfirm: v })}
+              />
+            </Group>
+          ) : null}
           {copies ? (
             <Group title="รูปสลิปในเครื่องนี้">
               <T v="small" style={{ paddingTop: space.md }}>
@@ -332,7 +336,6 @@ export default function Settings() {
               {copies.count > 0 ? <LinkRow icon="trash-outline" label="ลบรูปสลิปที่เก็บไว้" danger onPress={() => setAskCopies(true)} /> : null}
             </Group>
           ) : null}
-
           {widgetAvailable ? (
             <Group title="วิดเจ็ตหน้าจอโฮม">
               <LinkRow
@@ -346,7 +349,6 @@ export default function Settings() {
               />
             </Group>
           ) : null}
-
           <Group title="อื่น ๆ">
             <LinkRow icon="ribbon-outline" label="ความสำเร็จและภารกิจ" onPress={() => router.push('/achievements')} />
             <LinkRow icon="gift-outline" label="มีอะไรใหม่" onPress={() => router.push('/whatsnew')} />
@@ -354,23 +356,46 @@ export default function Settings() {
               <LinkRow
                 icon="refresh-outline"
                 label="ล้างประวัติรูปที่เคยสแกน"
-                onPress={() => forgetScanned(userId).then(() => toast({ message: 'สแกนครั้งหน้าจะตรวจทุกรูปใหม่' }))}
+                onPress={() => setAskForget(true)}
               />
             ) : null}
           </Group>
-
           <Group title="ความเป็นส่วนตัว">
-            <T v="small" style={{ paddingVertical: space.md }}>
-              • รูปในแกลเลอรีถูกตรวจบนมือถือก่อน เฉพาะรูปที่มี QR ของสลิปจะถูกส่งให้ AI (Google Gemini) อ่าน และไม่ถูกเก็บบนเซิร์ฟเวอร์ MindPay{'\n'}
-              • สลิปที่อ่านแล้วเก็บเป็นสำเนารูปไว้ในเครื่องนี้เท่านั้น (ดูได้ที่รายการนั้น) ไม่ได้อัปโหลดเก็บบน server{'\n'}
-              • ช่วงทดลองใช้ Gemini แบบฟรี ซึ่ง Google อาจเก็บข้อมูลที่ส่งไปเพื่อปรับปรุง AI ตามเงื่อนไขของ Google{'\n'}
-              • น้องกล้า (โค้ช AI) เห็นเฉพาะยอดรวมตามหมวด ไม่เห็นรูปสลิป เลขบัญชี หรือชื่อคนที่คุณโอนให้{'\n'}
-              • เสียงของน้องกล้าใช้เสียงอ่านภาษาไทยที่มากับมือถือหรือเบราว์เซอร์ของคุณ (ข้อความที่อ่านเป็นคำตอบของโค้ชเท่านั้น){'\n'}
-              • ข้อมูลรายการของคุณมองเห็นได้เฉพาะบัญชีของคุณ (Row Level Security)
-            </T>
+            <View style={{ paddingVertical: space.md, gap: space.sm }}>
+              <T v="small">
+                • ข้อมูลรายการของคุณมองเห็นได้เฉพาะบัญชีของคุณ (Row Level Security){'\n'}
+                • รูปสลิปที่อ่านแล้วเก็บเป็นสำเนาในเครื่องนี้เท่านั้น ไม่ได้อัปโหลดเก็บบน server
+                {showPrivacy ? (
+                  <>
+                    {'\n'}• รูปในแกลเลอรีถูกตรวจบนมือถือก่อน เฉพาะรูปที่มี QR ของสลิปจะถูกส่งให้ AI (Google Gemini) อ่าน และไม่ถูกเก็บบนเซิร์ฟเวอร์ MindPay{'\n'}
+                    • ช่วงทดลองใช้ Gemini แบบฟรี ซึ่ง Google อาจเก็บข้อมูลที่ส่งไปเพื่อปรับปรุง AI ตามเงื่อนไขของ Google{'\n'}
+                    • น้องกล้า (โค้ช AI) เห็นเฉพาะยอดรวมตามหมวด ไม่เห็นรูปสลิป เลขบัญชี หรือชื่อคนที่คุณโอนให้{'\n'}
+                    • เสียงของน้องกล้าใช้เสียงอ่านภาษาไทยที่มากับมือถือหรือเบราว์เซอร์ของคุณ (ข้อความที่อ่านเป็นคำตอบของโค้ชเท่านั้น)
+                  </>
+                ) : null}
+              </T>
+              <Pressable
+                onPress={() => setShowPrivacy((v) => !v)}
+                accessibilityRole="button"
+                accessibilityLabel={showPrivacy ? 'ย่อความเป็นส่วนตัว' : 'อ่านความเป็นส่วนตัวทั้งหมด 6 ข้อ'}
+                aria-expanded={showPrivacy}
+                hitSlop={8}
+                style={{ minHeight: 40, justifyContent: 'center', alignSelf: 'flex-start' }}
+              >
+                <Row gap={4}>
+                  <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi }}>
+                    {showPrivacy ? 'ย่อ' : 'อ่านทั้งหมด (6 ข้อ)'}
+                  </T>
+                  <Ionicons name={showPrivacy ? 'chevron-up' : 'chevron-down'} size={16} color={theme.ink} />
+                </Row>
+              </Pressable>
+            </View>
+          </Group>
+          <Group>
+            <LinkRow icon="log-out-outline" label={repo?.mode === 'demo' ? 'ออกจากโหมดทดลอง' : 'ออกจากระบบ'} danger onPress={() => setAskOut(true)} />
           </Group>
           <T v="micro" center style={{ marginTop: space.md }}>
-            {Constants.expoConfig?.name ?? 'MindPay'} เวอร์ชัน {Constants.expoConfig?.version ?? '1.0.0'}
+            {appConfig.expo.name} เวอร์ชัน {appConfig.expo.version}
           </T>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -386,6 +411,20 @@ export default function Settings() {
           signOut();
         }}
         onCancel={() => setAskOut(false)}
+      />
+      <ConfirmSheet
+        visible={askForget}
+        title="ล้างประวัติรูปที่เคยสแกน?"
+        body="ครั้งหน้าแอปจะตรวจทุกรูปในช่วงที่เลือกใหม่ทั้งหมด รายการที่จดไว้แล้วยังอยู่ครบ (สลิปซ้ำจะถูกจับได้เหมือนเดิม)"
+        confirmLabel="ล้างประวัติ"
+        onConfirm={() => {
+          setAskForget(false);
+          if (!userId) return;
+          forgetScanned(userId)
+            .then(() => toast({ message: 'สแกนครั้งหน้าจะตรวจทุกรูปใหม่' }))
+            .catch(() => toast({ message: 'ล้างไม่สำเร็จ', tone: 'error' }));
+        }}
+        onCancel={() => setAskForget(false)}
       />
       <ConfirmSheet
         visible={askCopies}

@@ -101,7 +101,8 @@ export function computeMissions(p: MissionInput): Mission[] {
       icon: 'calendar',
       skin: 'thai',
       progress: { value: Math.min(open, OPEN_TARGET), target: OPEN_TARGET },
-      note: open > 0 ? `ตอนนี้ต่อเนื่อง ${open} วัน ถ้าเว้นวันไหนจะเริ่มนับใหม่` : undefined,
+      // Not the recording streak: this one counts days the app was opened.
+      note: open > 0 ? `เปิดแอปต่อเนื่อง ${open} วัน (นับวันที่เปิดแอป ไม่ใช่วันที่จด) ถ้าเว้นวันไหนจะเริ่มนับใหม่` : undefined,
     },
     open >= OPEN_TARGET,
   );

@@ -1,104 +1,163 @@
 /**
  * The (+) in the middle of the tab bar: one place to add money in or out.
- * Slip from the gallery (FR-4), speak (FR-3), type an expense or add money in (FR-1).
+ * A sheet rises from the bottom over the screen you were on (it stays visible,
+ * dimmed, behind): pull today's slips (Android app), pick a slip from the
+ * gallery (FR-4), speak (FR-3), type an expense or add money in (FR-1).
  * Choosing one replaces this sheet, so closing that screen goes straight back.
+ * Close it with ✕, a tap on the dimmed area, Esc (web) or the back button.
  */
 import * as Haptics from 'expo-haptics';
 import { router, type Href } from 'expo-router';
-import { Animated, Pressable, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAutoScan } from '../services/AutoScanProvider';
-import { Ionicons, Row, T, type IconName } from '../ui/components';
-import { Reveal, usePressSpring } from '../ui/effects';
+import { Divider, IconButton, Ionicons, T, type IconName } from '../ui/components';
+import { useNative, useReduceMotion } from '../ui/motion';
 import { goBack } from '../ui/nav';
-import { alpha, fonts, radius, space, useTheme } from '../ui/theme';
+import { alpha, fonts, space, useTheme } from '../ui/theme';
 
-function Option({ icon, color, title, sub, to, onPress, index }: { icon: IconName; color: string; title: string; sub: string; to?: Href; onPress?: () => void; index: number }) {
+/** How far below its resting place the sheet starts (and leaves to). */
+const DROP = 480;
+
+function Option({ icon, color, title, sub, onPress }: { icon: IconName; color: string; title: string; sub: string; onPress: () => void }) {
   const theme = useTheme();
-  const press = usePressSpring(0.97);
   return (
-    <Reveal index={index} from={14}>
-      <Animated.View style={{ transform: [{ scale: press.scale }] }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={title}
-          onPressIn={press.onPressIn}
-          onPressOut={press.onPressOut}
-          onPress={() => {
-            Haptics.selectionAsync().catch(() => {});
-            if (onPress) onPress();
-            else if (to) router.replace(to);
-          }}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: space.md,
-            padding: space.lg,
-            borderRadius: radius.xl,
-            backgroundColor: theme.surface,
-            borderWidth: 1,
-            borderColor: theme.line,
-          }}
-        >
-          <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: alpha(color, theme.dark ? 0.2 : 0.13), alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name={icon} size={26} color={color} />
-          </View>
-          <View style={{ flex: 1, gap: 2 }}>
-            <T v="h3">{title}</T>
-            <T v="small">{sub}</T>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={theme.inkFaint} />
-        </Pressable>
-      </Animated.View>
-    </Reveal>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => {});
+        onPress();
+      }}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.md,
+        minHeight: 68,
+        paddingVertical: space.sm,
+        paddingHorizontal: space.sm,
+        marginHorizontal: -space.sm,
+        borderRadius: 16,
+        backgroundColor: pressed ? theme.surfaceAlt : 'transparent',
+      })}
+    >
+      <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: alpha(color, theme.dark ? 0.2 : 0.12), alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name={icon} size={22} color={color} />
+      </View>
+      <View style={{ flex: 1, gap: 1 }}>
+        <T v="body" style={{ fontFamily: fonts.sansSemi }}>
+          {title}
+        </T>
+        <T v="small" numberOfLines={1}>
+          {sub}
+        </T>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={theme.inkFaint} />
+    </Pressable>
   );
 }
 
 export default function AddSheet() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const auto = useAutoScan();
+  const reduce = useReduceMotion();
+  const [rise] = useState(() => new Animated.Value(reduce ? 1 : 0));
+  const leaving = useRef(false);
+  const sheet = useRef<View>(null);
+
+  useEffect(() => {
+    if (reduce) return;
+    Animated.timing(rise, { toValue: 1, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: useNative }).start();
+  }, [reduce, rise]);
+
+  /** Slide away, then leave (once, however many times it is asked). */
+  const close = useCallback(() => {
+    if (leaving.current) return;
+    leaving.current = true;
+    if (reduce) return goBack();
+    Animated.timing(rise, { toValue: 0, duration: 180, easing: Easing.in(Easing.cubic), useNativeDriver: useNative }).start(() => goBack());
+  }, [reduce, rise]);
+
+  const choose = useCallback((to: Href) => {
+    if (leaving.current) return;
+    leaving.current = true;
+    router.replace(to);
+  }, []);
+
+  // Web: Esc closes, and keyboard focus moves into the sheet.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    (sheet.current as unknown as { focus?: () => void } | null)?.focus?.();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [close]);
+
+  // Android app: read today's slips in the gallery right now (the automatic scan, on demand).
+  const pullToday = useCallback(() => {
+    auto.grantAndRun().catch(() => {});
+    close();
+  }, [auto, close]);
+
   return (
-    <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
-      <Row justify="space-between" style={{ paddingHorizontal: space.lg, paddingTop: space.md }}>
-        <Pressable
-          onPress={() => goBack()}
-          accessibilityRole="button"
-          accessibilityLabel="ยกเลิก"
-          hitSlop={8}
-          style={{ paddingHorizontal: space.lg, height: 44, borderRadius: radius.pill, backgroundColor: theme.surfaceAlt, justifyContent: 'center' }}
-        >
-          <T v="body" color={theme.inkSoft} style={{ fontFamily: fonts.sansMedium }}>
-            ยกเลิก
-          </T>
-        </Pressable>
-        <T v="h3" accessibilityRole="header">
-          เพิ่มรายการ
-        </T>
-        <View style={{ width: 84 }} />
-      </Row>
-      <View style={{ flex: 1, justifyContent: 'flex-end', padding: space.lg, paddingBottom: space.xxl, gap: space.md }}>
-        <T v="small" center style={{ marginBottom: space.sm }}>
-          เลือกวิธีที่สะดวก ทุกทางรวมเข้ายอดเงินเดียวกัน
-        </T>
+    <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+      {/* The screen underneath, dimmed; a tap here closes the sheet. */}
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: theme.overlay, opacity: rise }]}>
+        <Pressable style={{ flex: 1 }} onPress={close} accessible={false} importantForAccessibility="no" aria-hidden tabIndex={-1} />
+      </Animated.View>
+      <Animated.View
+        ref={sheet}
+        role="dialog"
+        aria-modal
+        aria-label="เพิ่มรายการ"
+        accessibilityViewIsModal
+        tabIndex={-1}
+        style={{
+          backgroundColor: theme.surface,
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          paddingHorizontal: space.lg,
+          paddingBottom: insets.bottom + space.lg,
+          outlineWidth: 0,
+          transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [DROP, 0] }) }],
+        }}
+      >
+        <View style={{ alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: theme.lineStrong, marginTop: 10 }} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: space.md, paddingBottom: space.sm }}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <T v="h3" accessibilityRole="header">
+              เพิ่มรายการ
+            </T>
+            <T v="small">ทุกทางรวมเข้ายอดเงินเดียวกัน</T>
+          </View>
+          <View style={{ marginRight: -space.sm }}>
+            <IconButton icon="close" label="ปิด" color={theme.inkSoft} onPress={close} />
+          </View>
+        </View>
         {auto.available ? (
-          // Phone app: read today's slips in the gallery right now (the automatic scan, on demand).
-          <Option
-            index={0}
-            icon="flash"
-            color={theme.accentInk}
-            title="ดึงสลิปวันนี้"
-            sub="อ่านสลิปของวันนี้ในแกลเลอรีให้ทันที"
-            onPress={() => {
-              auto.grantAndRun().catch(() => {});
-              goBack();
-            }}
-          />
+          <>
+            <Option icon="flash" color={theme.accentInk} title="ดึงสลิปวันนี้" sub="อ่านสลิปของวันนี้ในแกลเลอรีให้ทันที" onPress={pullToday} />
+            <Divider style={{ marginLeft: 44 + space.md }} />
+          </>
         ) : null}
-        <Option index={0} icon="images" color={theme.primary} title="เลือกสลิปจากแกลเลอรี" sub="แอปอ่านยอดจากสลิปให้เอง" to="/scan" />
-        <Option index={1} icon="mic" color={theme.accentInk} title="พูดรายการ" sub="พูดครั้งเดียว ได้หลายรายการ" to="/voice" />
-        <Option index={2} icon="create" color={theme.watch} title="กรอกรายจ่ายเอง" sub="จดรายจ่ายเงินสด ฯลฯ" to="/transaction" />
-        <Option index={3} icon="arrow-down-circle" color={theme.income} title="เพิ่มเงินเข้า" sub="เงินโอน เงินสด ค่าขนม" to={{ pathname: '/transaction', params: { kind: 'income' } }} />
-      </View>
-    </SafeAreaView>
+        <Option icon="images" color={theme.primary} title="เลือกสลิปจากแกลเลอรี" sub="แอปอ่านยอดจากสลิปให้เอง" onPress={() => choose('/scan')} />
+        <Divider style={{ marginLeft: 44 + space.md }} />
+        <Option icon="mic" color={theme.primary} title="พูดรายการ" sub="พูดครั้งเดียว ได้หลายรายการ" onPress={() => choose('/voice')} />
+        <Divider style={{ marginLeft: 44 + space.md }} />
+        <Option icon="create" color={theme.primary} title="กรอกรายจ่ายเอง" sub="จดรายจ่ายเงินสด ฯลฯ" onPress={() => choose('/transaction')} />
+        <Divider style={{ marginLeft: 44 + space.md }} />
+        <Option
+          icon="arrow-down-circle"
+          color={theme.income}
+          title="เพิ่มเงินเข้า"
+          sub="เงินโอน เงินสด ค่าขนม"
+          onPress={() => choose({ pathname: '/transaction', params: { kind: 'income' } })}
+        />
+      </Animated.View>
+    </View>
   );
 }

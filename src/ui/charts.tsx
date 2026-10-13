@@ -6,8 +6,9 @@ import { useEffect, useState } from 'react';
 import { Animated, Easing, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
 import { formatBaht } from '../domain/money';
-import type { CategoryTotal, DayTotal } from '../domain/summary';
-import { Row, T } from './components';
+import type { CategoryTotal, TrendBucket } from '../domain/summary';
+import { categoryLook } from './category';
+import { Ionicons, Row, T } from './components';
 import { GrowBar } from './effects';
 import { useNative, useReduceMotion } from './motion';
 import { fonts, space, useTheme } from './theme';
@@ -41,40 +42,44 @@ function RisingBar({ x, top, width, height, color, opacity, delay }: { x: number
   );
 }
 
-const WEEKDAY_SHORT = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
-
-/** Daily expense bars with a dashed line at the average. */
-export function DayBars({ days, averageSatang, height = 140 }: { days: DayTotal[]; averageSatang?: number; height?: number }) {
+/**
+ * Expense bars over time (days or months, from `spendingTrend`), with an optional
+ * dashed line at the daily average. The current day/month is gold and full
+ * strength; the biggest bar carries its amount.
+ */
+export function TrendBars({ buckets, averageSatang, height = 140, label }: { buckets: TrendBucket[]; averageSatang?: number; height?: number; label: string }) {
   const theme = useTheme();
   const [width, setWidth] = useState(0);
   const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);
-  const max = Math.max(1, ...days.map((d) => d.expenseSatang), averageSatang ?? 0);
+  const max = Math.max(1, ...buckets.map((d) => d.expenseSatang), averageSatang ?? 0);
   const top = 18;
   const bottom = 22;
   const plotH = height - top - bottom;
-  const gap = 8;
-  const barW = width > 0 ? (width - gap * (days.length - 1)) / days.length : 0;
+  // Many bars (30 days): narrow gaps so each bar keeps some width.
+  const gap = buckets.length > 14 ? 3 : 8;
+  const barW = width > 0 ? (width - gap * (buckets.length - 1)) / buckets.length : 0;
   const y = (v: number) => top + plotH - (v / max) * plotH;
-  const peak = days.reduce((best, d) => (d.expenseSatang > best.expenseSatang ? d : best), days[0]);
+  const peak = buckets.reduce((best, d) => (d.expenseSatang > best.expenseSatang ? d : best), buckets[0]);
+  const peakIndex = buckets.indexOf(peak);
+  const summary = peak && peak.expenseSatang > 0 ? `${label} สูงสุด ${formatBaht(peak.expenseSatang, { decimals: false })}` : `${label} ยังไม่มีรายจ่าย`;
 
   return (
-    <View onLayout={onLayout} style={{ height }} accessibilityLabel={`รายจ่าย ${days.length} วันล่าสุด`}>
+    <View onLayout={onLayout} style={{ height }} accessibilityRole="image" accessibilityLabel={summary}>
       {/* Bars first, then the lines and labels drawn over them. */}
       {width > 0
-        ? days.map((d, i) => {
+        ? buckets.map((d, i) => {
             const h = Math.max(d.expenseSatang > 0 ? 3 : 0, top + plotH - y(d.expenseSatang));
-            const isToday = i === days.length - 1;
             return (
               <RisingBar
-                key={d.day}
+                key={d.key}
                 x={i * (barW + gap)}
                 top={top + plotH - h}
                 width={barW}
                 height={h}
-                color={isToday ? theme.accent : theme.primary}
-                // Today stands out by brightness as well as colour (in some dark themes the two are close).
-                opacity={isToday ? 1 : 0.5}
-                delay={120 + i * 55}
+                color={d.current ? theme.accent : theme.primary}
+                // The current one stands out by brightness as well as colour (in some dark themes the two are close).
+                opacity={d.current ? 1 : 0.5}
+                delay={120 + Math.min(i, 14) * 45}
               />
             );
           })
@@ -82,27 +87,24 @@ export function DayBars({ days, averageSatang, height = 140 }: { days: DayTotal[
       {width > 0 ? (
         <Svg width={width} height={height} style={{ position: 'absolute', left: 0, top: 0 }}>
           <Line x1={0} x2={width} y1={top + plotH} y2={top + plotH} stroke={theme.line} strokeWidth={1} />
-          {days.map((d, i) => {
-            const x = i * (barW + gap);
-            const isToday = i === days.length - 1;
-            const dow = new Date(`${d.day}T00:00:00Z`).getUTCDay();
-            return [
+          {buckets.map((d, i) =>
+            d.label ? (
               <SvgText
-                key={`l${d.day}`}
-                x={x + barW / 2}
+                key={`l${d.key}`}
+                x={Math.min(width - 12, Math.max(12, i * (barW + gap) + barW / 2))}
                 y={height - 6}
                 fontSize={11}
-                fontFamily={fonts.sansMedium}
-                fill={isToday ? theme.ink : theme.inkSoft}
+                fontFamily={d.current ? fonts.sansSemi : fonts.sansMedium}
+                fill={d.current ? theme.ink : theme.inkSoft}
                 textAnchor="middle"
               >
-                {isToday ? 'วันนี้' : WEEKDAY_SHORT[dow]}
-              </SvgText>,
-            ];
-          })}
+                {d.label}
+              </SvgText>
+            ) : null,
+          )}
           {peak && peak.expenseSatang > 0 ? (
             <SvgText
-              x={Math.min(width - 4, Math.max(4, days.indexOf(peak) * (barW + gap) + barW / 2))}
+              x={Math.min(width - 18, Math.max(18, peakIndex * (barW + gap) + barW / 2))}
               y={Math.max(11, y(peak.expenseSatang) - 5)}
               fontSize={10}
               fontFamily={fonts.sansSemi}
@@ -129,7 +131,18 @@ export function DayBars({ days, averageSatang, height = 140 }: { days: DayTotal[
   );
 }
 
-/** Horizontal bars for categories, biggest first. */
+/** A category's icon on its soft tile (the same look as in the list rows). */
+function CategoryIcon({ k, size = 28 }: { k: string; size?: number }) {
+  const theme = useTheme();
+  const look = categoryLook(k, theme);
+  return (
+    <View style={{ width: size, height: size, borderRadius: size * 0.32, backgroundColor: look.tile, alignItems: 'center', justifyContent: 'center' }}>
+      <Ionicons name={look.icon} size={size * 0.58} color={look.ink} />
+    </View>
+  );
+}
+
+/** Horizontal bars for categories, biggest first, each in its category colour. */
 export function CategoryBars({ items, limit = 5 }: { items: CategoryTotal[]; limit?: number }) {
   const theme = useTheme();
   const shown = items.slice(0, limit);
@@ -138,40 +151,26 @@ export function CategoryBars({ items, limit = 5 }: { items: CategoryTotal[]; lim
     <View style={{ gap: space.md }}>
       {shown.map((c, i) => (
         <View key={c.key} style={{ gap: 6 }}>
-          <Row justify="space-between">
-            <Row gap={6} style={{ flex: 1 }}>
-              <T v="body">{c.glyph}</T>
-              <T v="small" color={theme.ink} numberOfLines={1} style={{ flex: 1 }}>
-                {c.label}
-              </T>
-            </Row>
+          <Row gap={space.sm}>
+            <CategoryIcon k={c.key} />
+            <T v="small" color={theme.ink} numberOfLines={1} style={{ flex: 1 }}>
+              {c.label}
+            </T>
             <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi, fontVariant: ['tabular-nums'] }}>
               {formatBaht(c.totalSatang, { decimals: false })}
             </T>
-            <T v="micro" style={{ width: 38, textAlign: 'right', fontVariant: ['tabular-nums'] }}>
+            <T v="micro" style={{ width: 40, textAlign: 'right', fontVariant: ['tabular-nums'] }}>
               {Math.round(c.share * 100)}%
             </T>
           </Row>
-          <GrowBar
-            value={c.totalSatang / max}
-            color={i === 0 ? theme.accent : theme.primary}
-            opacity={i === 0 ? 1 : Math.max(0.3, 0.55 - i * 0.06)}
-            track={theme.surfaceAlt}
-            delay={100 + i * 90}
-          />
+          <GrowBar value={c.totalSatang / max} color={categoryLook(c.key, theme).color} track={theme.surfaceAlt} delay={100 + i * 90} />
         </View>
       ))}
     </View>
   );
 }
 
-/**
- * Categorical colours for the spending donut (validated palette, fixed order:
- * the biggest category always gets slot 1). Dark mode uses the same hues stepped
- * for a dark surface. More than five categories fold into "อื่น ๆ" (grey).
- */
-const DONUT_LIGHT = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4'];
-const DONUT_DARK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181'];
+/** More than five categories fold into "อื่น ๆ" (grey) so slices stay tellable apart. */
 const DONUT_SLOTS = 5;
 
 function arcPath(cx: number, cy: number, r: number, start: number, end: number): string {
@@ -191,16 +190,17 @@ function arcPath(cx: number, cy: number, r: number, start: number, end: number):
  */
 export function CategoryDonut({ items, size = 190 }: { items: CategoryTotal[]; size?: number }) {
   const theme = useTheme();
-  const colors = theme.dark ? DONUT_DARK : DONUT_LIGHT;
   const total = items.reduce((s, c) => s + c.totalSatang, 0);
   const top = items.slice(0, DONUT_SLOTS);
   const rest = items.slice(DONUT_SLOTS);
+  // Colour follows the category (the same as its icon in the list), never its rank.
   const slices = [
-    ...top.map((c, i) => ({ key: c.key, label: `${c.glyph} ${c.label}`, satang: c.totalSatang, color: colors[i] })),
+    ...top.map((c) => ({ key: c.key, label: c.label, satang: c.totalSatang, color: categoryLook(c.key, theme).color, icon: true })),
     ...(rest.length
-      ? [{ key: 'rest', label: `อื่น ๆ (${rest.length} หมวด)`, satang: rest.reduce((s, c) => s + c.totalSatang, 0), color: theme.inkFaint }]
+      ? [{ key: 'rest', label: `อื่น ๆ (${rest.length} หมวด)`, satang: rest.reduce((s, c) => s + c.totalSatang, 0), color: theme.inkFaint, icon: false }]
       : []),
   ];
+  const lead = top[0];
   const stroke = 22;
   const r = (size - stroke) / 2;
   const c = size / 2;
@@ -210,7 +210,12 @@ export function CategoryDonut({ items, size = 190 }: { items: CategoryTotal[]; s
   return (
     <View style={{ gap: space.lg }}>
       <View style={{ alignItems: 'center' }}>
-        <View style={{ width: size, height: size }}>
+        <View
+          style={{ width: size, height: size }}
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={slices.map((sl) => `${sl.label} ${total > 0 ? Math.round((sl.satang / total) * 100) : 0}%`).join(', ')}
+        >
           <Svg width={size} height={size}>
             <Circle cx={c} cy={c} r={r} stroke={theme.surfaceAlt} strokeWidth={stroke} fill="none" />
             {total > 0
@@ -224,25 +229,38 @@ export function CategoryDonut({ items, size = 190 }: { items: CategoryTotal[]; s
                 })
               : null}
           </Svg>
-          <View pointerEvents="none" style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }}>
-            <T v="micro">รายจ่ายรวม</T>
-            <T v="h3" style={{ fontVariant: ['tabular-nums'] }}>
-              {formatBaht(total, { decimals: false })}
-            </T>
-          </View>
+          {/* The middle names the biggest slice (the total is already shown above the chart). */}
+          {lead && total > 0 ? (
+            <View pointerEvents="none" style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+              <CategoryIcon k={lead.key} size={34} />
+              <T v="h2" style={{ fontVariant: ['tabular-nums'] }}>
+                {Math.round((lead.totalSatang / total) * 100)}%
+              </T>
+              <T v="micro" numberOfLines={1} style={{ maxWidth: size * 0.55, textAlign: 'center' }}>
+                {lead.label}
+              </T>
+            </View>
+          ) : null}
         </View>
       </View>
       <View style={{ gap: space.sm }}>
         {slices.map((sl) => (
           <Row key={sl.key} gap={space.sm}>
-            <View style={{ width: 12, height: 12, borderRadius: 4, backgroundColor: sl.color }} />
+            {sl.icon ? (
+              <CategoryIcon k={sl.key} />
+            ) : (
+              <View style={{ width: 28, height: 28, borderRadius: 9, backgroundColor: theme.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="ellipsis-horizontal" size={16} color={theme.inkSoft} />
+              </View>
+            )}
+            <View style={{ width: 4, height: 18, borderRadius: 2, backgroundColor: sl.color }} />
             <T v="small" color={theme.ink} numberOfLines={1} style={{ flex: 1 }}>
               {sl.label}
             </T>
             <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi, fontVariant: ['tabular-nums'] }}>
               {formatBaht(sl.satang, { decimals: false })}
             </T>
-            <T v="micro" style={{ width: 38, textAlign: 'right', fontVariant: ['tabular-nums'] }}>
+            <T v="micro" style={{ width: 40, textAlign: 'right', fontVariant: ['tabular-nums'] }}>
               {total > 0 ? Math.round((sl.satang / total) * 100) : 0}%
             </T>
           </Row>

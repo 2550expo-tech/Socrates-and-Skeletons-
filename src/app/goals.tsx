@@ -18,8 +18,8 @@ import { Reveal, useCelebrate } from '../ui/effects';
 import { useToast } from '../ui/feedback';
 import { Field } from '../ui/inputs';
 import { Jar } from '../ui/Jar';
-import { goBack } from '../ui/nav';
 import { fonts, space, useTheme } from '../ui/theme';
+import { StackHeader } from '../ui/StackHeader';
 
 const QUICK = [2_000, 5_000, 10_000, 50_000];
 
@@ -129,11 +129,7 @@ export default function Goals() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
-      <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
-        <IconButton icon="chevron-back" label="กลับ" onPress={() => goBack()} />
-        <T v="h3">กระปุกออม</T>
-        <IconButton icon="add-circle" label="ตั้งกระปุกใหม่" color={theme.primary} onPress={() => router.push('/goal')} />
-      </Row>
+      <StackHeader title="กระปุกออม" right={<IconButton icon="add-circle" label="ตั้งกระปุกใหม่" color={theme.primary} onPress={() => router.push('/goal')} />} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxxl }} keyboardShouldPersistTaps="handled">
           {goals.length === 0 ? (

@@ -53,7 +53,7 @@ export function bkkTime(at: Date | string): string {
 /**
  * Number of calendar days (including today) covered by each range.
  * The same definition is used by the dashboard (FR-2) and the slip scanner (FR-4),
- * so "1 เดือน" always means the same 30 days everywhere in the app.
+ * so "30 วัน" always means the same 30 days everywhere in the app (it was labelled "1 เดือน" before).
  */
 export const RANGE_DAYS: Record<RangeKey, number> = {
   today: 1,
@@ -66,7 +66,7 @@ export const RANGE_DAYS: Record<RangeKey, number> = {
 export const RANGE_LABEL: Record<RangeKey, string> = {
   today: 'วันนี้',
   '7d': '7 วัน',
-  '1m': '1 เดือน',
+  '1m': '30 วัน',
   '6m': '6 เดือน',
   '1y': '1 ปี',
 };

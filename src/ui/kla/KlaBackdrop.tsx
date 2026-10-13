@@ -1,13 +1,13 @@
 /**
- * The little stage น้องกล้า stands on: the colour theme's hero gradient, soft
- * drifting light, a spotlight behind the character and a lit floor under it,
+ * The little stage น้องกล้า stands on: the colour theme's hero gradient, a still
+ * dot texture, a spotlight behind the character and a lit floor under it,
  * so the big character reads as standing in a space rather than on a card.
  */
 import { LinearGradient } from 'expo-linear-gradient';
 import { useId, type ReactNode } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
-import { Aurora } from '../effects';
+import { DotGrid } from '../art';
 import { SpookyBackdropDecor } from '../halloween';
 import { radius, useTheme } from '../theme';
 
@@ -26,7 +26,7 @@ export function KlaBackdrop({
   return (
     <View style={[{ borderRadius: radius.xl, overflow: 'hidden' }, style]}>
       <LinearGradient colors={[theme.heroTop, theme.hero, theme.heroDeep]} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} />
-      <Aurora cycles={2} strength={0.3} seed={11} />
+      <DotGrid color={theme.heroInk} />
       <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: 'absolute', left: 0, top: 0 }}>
         <Defs>
           <RadialGradient id={`${id}spot`} cx="50%" cy="50%" r="50%">

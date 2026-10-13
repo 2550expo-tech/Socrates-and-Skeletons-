@@ -14,10 +14,11 @@ import { formatThaiDay } from '../domain/dates';
 import { formatBaht } from '../domain/money';
 import { monthRecap } from '../domain/recap';
 import { useAchievements } from '../services/useAchievements';
-import { treeHealth, MoneyTree } from '../ui/art';
+import { DotGrid, MoneyTree, treeHealth } from '../ui/art';
 import { Buddy } from '../ui/Buddy';
+import { categoryLook } from '../ui/category';
 import { Button, Ionicons, Row, T } from '../ui/components';
-import { Aurora, GrowBar, Reveal, Sparkles, useCelebrate } from '../ui/effects';
+import { GrowBar, Reveal, Sparkles, useCelebrate } from '../ui/effects';
 import { useCountUp, useNative, useReduceMotion } from '../ui/motion';
 import { goBack } from '../ui/nav';
 import { fonts, space, useTheme } from '../ui/theme';
@@ -121,9 +122,9 @@ export default function Recap() {
         <View style={{ alignItems: 'center', gap: space.md, alignSelf: 'stretch' }}>
           <Line>เงินไปที่ไหนมากที่สุด</Line>
           <Reveal index={1} zoom>
-            <T v="display" center style={{ fontSize: 72, lineHeight: 96 }}>
-              {top.glyph}
-            </T>
+            <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: 'rgba(244,241,230,0.12)', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name={categoryLook(top.key, theme).icon} size={48} color={theme.heroAccent} />
+            </View>
           </Reveal>
           <Line index={2} big>
             {top.label}
@@ -134,7 +135,7 @@ export default function Recap() {
               <Reveal key={c.key} index={4 + i}>
                 <View style={{ gap: 6 }}>
                   <Row justify="space-between">
-                    <T v="small" color={INK}>{`${c.glyph} ${c.label}`}</T>
+                    <T v="small" color={INK}>{c.label}</T>
                     <T v="small" color={SOFT}>{formatBaht(c.amountSatang, { decimals: false })}</T>
                   </Row>
                   <GrowBar value={c.share} color={i === 0 ? theme.heroAccent : '#7FD1A8'} track="rgba(244,241,230,0.12)" height={10} delay={500 + i * 150} />
@@ -317,7 +318,7 @@ export default function Recap() {
   return (
     <View style={{ flex: 1, backgroundColor: colors[2] }}>
       <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ flex: 1 }}>
-        <Aurora key={`aurora-${index}-${round}`} cycles={1} strength={0.4} seed={index * 7 + 3} />
+        <DotGrid color="#F4F1E6" />
         {index === last ? <Sparkles key={`stars-${round}`} count={12} cycles={2} /> : null}
         <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
           {/* progress, one segment per screen */}

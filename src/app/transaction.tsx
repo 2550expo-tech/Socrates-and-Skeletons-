@@ -19,8 +19,9 @@ import { Button, Card, Chip, IconButton, Ionicons, Row, Segmented, T } from '../
 import { ConfirmSheet, useToast } from '../ui/feedback';
 import { AmountField, Field } from '../ui/inputs';
 import { fonts, radius, space, useTheme } from '../ui/theme';
-import { HeaderDecor } from '../ui/halloween';
 import { SlipCopy } from '../ui/SlipCopy';
+import { categoryLook } from '../ui/category';
+import { StackHeader } from '../ui/StackHeader';
 
 export default function TransactionForm() {
   const theme = useTheme();
@@ -44,6 +45,12 @@ export default function TransactionForm() {
   const [note, setNote] = useState(existing?.note ?? '');
   const [busy, setBusy] = useState(false);
   const [askDelete, setAskDelete] = useState(false);
+  const [askDiscard, setAskDiscard] = useState(false);
+  // What the form started with, to tell whether closing would lose anything typed.
+  const [start] = useState(() => ({ kind: startKind, amount, title, category, day, time, note }));
+  const dirty =
+    kind !== start.kind || amount !== start.amount || title !== start.title || category !== start.category || day !== start.day || time !== start.time || note !== start.note;
+  const close = () => (dirty && !busy ? setAskDiscard(true) : goBack());
   const [amountError, setAmountError] = useState<string | null>(null);
   // Web only: the browser build has no native date picker, so dates are typed.
   const [dayText, setDayText] = useState(() => { const [y, m, d] = day.split('-'); return `${d}/${m}/${Number(y) + 543}`; });
@@ -181,15 +188,12 @@ export default function TransactionForm() {
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
-          <IconButton icon="close" label="ปิด" onPress={() => goBack()} />
-          <T v="h3">{!existing ? (kind === 'income' ? 'เพิ่มเงินเข้า' : 'จดรายการ') : isDraft ? 'ตรวจสลิป' : 'แก้ไขรายการ'}</T>
-          {existing ? (
-            <IconButton icon="trash-outline" label="ลบรายการ" color={theme.critical} onPress={() => setAskDelete(true)} />
-          ) : (
-            <HeaderDecor />
-          )}
-        </Row>
+        <StackHeader
+          title={!existing ? (kind === 'income' ? 'เพิ่มเงินเข้า' : 'จดรายการ') : isDraft ? 'ตรวจสลิป' : 'แก้ไขรายการ'}
+          close
+          onBack={close}
+          right={existing ? <IconButton icon="trash-outline" label="ลบรายการ" color={theme.critical} onPress={() => setAskDelete(true)} /> : undefined}
+        />
 
         <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxxl }} keyboardShouldPersistTaps="handled">
           {isDraft ? (
@@ -276,7 +280,8 @@ export default function TransactionForm() {
                 <Chip
                   key={c.key}
                   label={c.label}
-                  glyph={c.glyph}
+                  icon={categoryLook(c.key, theme).icon}
+                  iconColor={categoryLook(c.key, theme).ink}
                   selected={category === c.key}
                   onPress={() => {
                     setCategory(c.key);
@@ -357,11 +362,23 @@ export default function TransactionForm() {
       <ConfirmSheet
         visible={askDelete}
         title="ลบรายการนี้?"
-        body={isDraft ? 'แบบร่างจากสลิปนี้จะถูกลบ ถ้าสแกนรูปเดิมอีกครั้งจะอ่านใหม่ได้' : 'ยอดคงเหลือและ Money Runway จะคำนวณใหม่ทันที กดเลิกทำได้ภายใน 5 วินาที'}
+        body={isDraft ? 'แบบร่างจากสลิปนี้จะถูกลบ ถ้าสแกนรูปเดิมอีกครั้งจะอ่านใหม่ได้' : 'ยอดคงเหลือและ Money Runway จะคำนวณใหม่ทันที กดเลิกทำได้ภายใน 10 วินาที'}
         confirmLabel="ลบรายการ"
         destructive
         onConfirm={doDelete}
         onCancel={() => setAskDelete(false)}
+      />
+      <ConfirmSheet
+        visible={askDiscard}
+        title="ทิ้งสิ่งที่แก้ไว้?"
+        body={existing ? 'การแก้ไขนี้ยังไม่ได้บันทึก ถ้าปิดตอนนี้รายการจะเหมือนเดิม' : 'รายการนี้ยังไม่ได้บันทึก ถ้าปิดตอนนี้จะไม่ถูกจดไว้'}
+        confirmLabel="ทิ้งและปิด"
+        destructive
+        onConfirm={() => {
+          setAskDiscard(false);
+          goBack();
+        }}
+        onCancel={() => setAskDiscard(false)}
       />
     </SafeAreaView>
   );

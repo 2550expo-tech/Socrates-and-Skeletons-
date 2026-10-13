@@ -1,6 +1,6 @@
 /**
  * MindPay motion effects: entrance reveals, springy presses, light sweeps,
- * sparkles, glowing auroras, confetti and more.
+ * sparkles, rings, growing bars and confetti.
  *
  * Rules every effect here follows:
  * - Only transform and opacity move, on the UI thread on phones (native
@@ -17,13 +17,12 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useId,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
 import { Animated, Easing, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
-import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { useNative, useReduceMotion } from './motion';
 import { palette, useTheme } from './theme';
 
@@ -172,97 +171,6 @@ export function Shine({
           <LinearGradient colors={['rgba(255,255,255,0)', color, 'rgba(255,255,255,0)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={{ flex: 1 }} />
         </Animated.View>
       ) : null}
-    </View>
-  );
-}
-
-/**
- * Soft glowing clouds of color behind a surface. They drift gently a few times
- * after appearing, then rest. Put it inside a container with overflow: 'hidden'.
- */
-export function Aurora({
-  colors: given,
-  strength = 0.34,
-  cycles = 1,
-  seed = 3,
-}: {
-  colors?: string[];
-  strength?: number;
-  /** How many times the clouds drift there and back (0 = still). */
-  cycles?: number;
-  seed?: number;
-}) {
-  const reduce = useReduceMotion();
-  const theme = useTheme();
-  // Clouds in the colour theme: its bright accent, its main colour and a soft tint.
-  const colorsKey = given ? given.join(',') : `${theme.heroAccent},${theme.primary},${theme.heroInkSoft}`;
-  const colors = useMemo(() => colorsKey.split(','), [colorsKey]);
-  const id = useId().replace(/[^a-zA-Z0-9]/g, '');
-  const [size, setSize] = useState({ w: 0, h: 0 });
-  const [v] = useState(() => new Animated.Value(0));
-  const blobs = useMemo(() => {
-    const rnd = seeded(seed);
-    return colors.map((color, i) => ({
-      color,
-      x: [0.78, 0.12, 0.55][i % 3] + (rnd() - 0.5) * 0.12,
-      y: [0.12, 0.85, 0.5][i % 3] + (rnd() - 0.5) * 0.12,
-      r: 0.55 + rnd() * 0.25,
-      dx: (rnd() - 0.5) * 60,
-      dy: (rnd() - 0.5) * 40,
-    }));
-  }, [colors, seed]);
-  useEffect(() => {
-    if (reduce || !cycles || !size.w) return;
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(v, { toValue: 1, duration: 3600, easing: Easing.inOut(Easing.sin), useNativeDriver: useNative }),
-        Animated.timing(v, { toValue: 0, duration: 3600, easing: Easing.inOut(Easing.sin), useNativeDriver: useNative }),
-      ]),
-      { iterations: cycles },
-    );
-    anim.start();
-    return () => anim.stop();
-  }, [reduce, cycles, size.w, v]);
-  const base = Math.max(size.w, size.h);
-  return (
-    <View
-      pointerEvents="none"
-      style={StyleSheet.absoluteFill}
-      onLayout={(e: LayoutChangeEvent) => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
-      {...hidden}
-    >
-      {size.w
-        ? blobs.map((b, i) => {
-            const d = base * b.r;
-            return (
-              <Animated.View
-                key={i}
-                style={{
-                  position: 'absolute',
-                  left: size.w * b.x - d / 2,
-                  top: size.h * b.y - d / 2,
-                  width: d,
-                  height: d,
-                  transform: [
-                    { translateX: v.interpolate({ inputRange: [0, 1], outputRange: [0, b.dx] }) },
-                    { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [0, b.dy] }) },
-                  ],
-                }}
-              >
-                <Svg width={d} height={d}>
-                  <Defs>
-                    <RadialGradient id={`${id}a${i}`} cx="50%" cy="50%" r="50%">
-                      <Stop offset="0" stopColor={b.color} stopOpacity={strength} />
-                      <Stop offset="0.55" stopColor={b.color} stopOpacity={strength * 0.35} />
-                      <Stop offset="1" stopColor={b.color} stopOpacity={0} />
-                    </RadialGradient>
-                  </Defs>
-                  <Circle cx={d / 2} cy={d / 2} r={d / 2} fill={`url(#${id}a${i})`} />
-                </Svg>
-              </Animated.View>
-            );
-          })
-        : null}
     </View>
   );
 }
@@ -504,30 +412,6 @@ export function TypingDots({ color, size = 7 }: { color: string; size?: number }
       })}
     </View>
   );
-}
-
-/**
- * Text that writes itself out quickly (the coach's answers). Mount it with a
- * `key` per message; with Reduce motion the whole text shows at once.
- */
-export function Typewriter({ text, children, maxMs = 1400 }: { text: string; children: (shown: string) => ReactNode; maxMs?: number }) {
-  const reduce = useReduceMotion();
-  const chars = useMemo(() => Array.from(text), [text]);
-  const [n, setN] = useState(0);
-  useEffect(() => {
-    if (reduce) return;
-    const began = Date.now();
-    const total = Math.min(maxMs, Math.max(350, chars.length * 12));
-    let frame = 0;
-    const step = () => {
-      const t = Math.min(1, (Date.now() - began) / total);
-      setN(Math.ceil(chars.length * (1 - Math.pow(1 - t, 2))));
-      if (t < 1) frame = requestAnimationFrame(step);
-    };
-    frame = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(frame);
-  }, [chars, reduce, maxMs]);
-  return <>{children(reduce || n >= chars.length ? text : chars.slice(0, n).join(''))}</>;
 }
 
 /** A light beam that sweeps down and up over a picture of a slip while scanning. */

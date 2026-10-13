@@ -6,9 +6,12 @@
  * from the home card, settings from the gear on the home screen. The Android
  * home-screen widget shows the same numbers (useQuickWidgetSync).
  *
+ * The bar sits flat at the bottom (no raised dark capsule, glow or ring): the
+ * Quick Access is one quiet tonal capsule with the gold (+) on its left and
+ * "วันนี้ใช้ไป / ฿x" on its right.
+ *
  * Motion: a soft pill slides to the chosen tab and its icon pops; the (+)
- * sends out gold ripples a few times when the app opens, and keeps rippling
- * while the automatic scan is reading today's slips.
+ * ripples gold only while the automatic scan is reading today's slips.
  */
 import { router } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
@@ -97,6 +100,7 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
   const auto = useAutoScan();
   const press = usePressSpring(0.9);
   const spentToday = useSpentToday();
+  const scanning = auto.state.phase === 'scanning';
   const routes = state.routes;
   const half = Math.ceil(routes.length / 2);
   // Centre of each tab, measured after layout, so the pill can slide there.
@@ -178,63 +182,54 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
         />
       ) : null}
       {routes.slice(0, half).map((r, i) => tab(r, i))}
-      {/* Quick Access: the (+) with today's spending right beside it, raised above the bar. */}
-      <View style={{ width: QUICK_W, alignItems: 'center' }}>
+      {/* Quick Access: the gold (+) with today's spending right beside it, in one tonal capsule. */}
+      <View style={{ width: QUICK_W, alignItems: 'center', justifyContent: 'center' }}>
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            height: 58,
-            marginTop: -24,
-            marginBottom: 6,
+            height: 50,
             padding: 4,
             paddingRight: 12,
             gap: 8,
-            borderRadius: 29,
-            backgroundColor: theme.hero,
-            borderWidth: 2,
-            borderColor: theme.accent,
-            shadowColor: theme.accent,
-            shadowOpacity: 0.3,
-            shadowRadius: 10,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 8,
+            borderRadius: 25,
+            backgroundColor: theme.surfaceAlt,
           }}
         >
-          <View style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}>
-            <PulseRing size={48} active times={auto.state.phase === 'scanning' ? 'always' : 3} color={theme.accent} />
+          <View style={{ width: 42, height: 42, alignItems: 'center', justifyContent: 'center' }}>
+            <PulseRing size={42} active={scanning} times="always" color={theme.accent} />
             <Animated.View style={{ transform: [{ scale: press.scale }] }}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="เพิ่มรายการ"
                 onPressIn={press.onPressIn}
                 onPressOut={press.onPressOut}
-                hitSlop={4}
+                hitSlop={6}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
                   router.push('/add');
                 }}
-                style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center' }}
+                style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center' }}
               >
-                <Ionicons name="add" size={30} color={theme.onAccent} />
+                <Ionicons name="add" size={28} color={theme.onAccent} />
               </Pressable>
             </Animated.View>
           </View>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`วันนี้ใช้ไป ${shortBaht(spentToday)} ดูรายการวันนี้`}
-            hitSlop={6}
+            hitSlop={8}
             onPress={() => {
               Haptics.selectionAsync().catch(() => {});
               router.navigate('/transactions');
             }}
-            style={{ minWidth: 44, gap: 0 }}
+            style={{ minWidth: 48, minHeight: 42, justifyContent: 'center' }}
           >
-            <Text style={[type.micro, { color: theme.heroInkSoft, fontSize: 10, lineHeight: 13 }]} numberOfLines={1}>
+            <Text style={[type.micro, { color: theme.inkSoft }]} numberOfLines={1}>
               วันนี้ใช้ไป
             </Text>
             <Text
-              style={{ fontFamily: fonts.sansSemi, fontSize: 15, lineHeight: 19, color: theme.heroAccent, fontVariant: ['tabular-nums'] }}
+              style={{ fontFamily: fonts.sansSemi, fontSize: 15, lineHeight: 19, color: theme.ink, fontVariant: ['tabular-nums'] }}
               numberOfLines={1}
               adjustsFontSizeToFit
             >

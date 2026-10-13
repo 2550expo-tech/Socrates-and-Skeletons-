@@ -516,6 +516,25 @@ try {
     await page.waitForTimeout(600);
     await shot(page, '12b-add-sheet');
     check('(+) opens the add sheet: slip, voice, type an expense, money in', sheet);
+    // It is a sheet over the screen you were on (home stays underneath), and Esc closes it.
+    const over = await shown(page.getByRole('dialog', { name: 'เพิ่มรายการ' }).first());
+    const homeUnder = (await page.locator('[aria-label*="ยอดคงเหลือ ฿"]').count()) > 0;
+    await page.keyboard.press('Escape');
+    const escClosed = await gone(page, 'เลือกสลิปจากแกลเลอรี');
+    check('(+) sheet: a dialog over the current screen; Esc closes it', over && homeUnder && escClosed, `dialog=${over} home=${homeUnder} esc=${escClosed}`);
+    // Typing then closing asks before throwing the typing away.
+    await page.getByRole('button', { name: 'เพิ่มรายการ', exact: true }).first().click();
+    await page.getByRole('button', { name: 'กรอกรายจ่ายเอง', exact: true }).first().click();
+    await page.fill('#tx-amount', '45');
+    await button(page, 'ปิด').click();
+    const askedDiscard = await visible(page, 'ทิ้งสิ่งที่แก้ไว้?');
+    await button(page, 'ยกเลิก').click();
+    const stillThere = (await page.locator('#tx-amount').inputValue().catch(() => '')) === '45';
+    check('Add: closing with something typed asks first ("ทิ้งสิ่งที่แก้ไว้?"), and cancelling keeps it', askedDiscard && stillThere, `asked=${askedDiscard} kept=${stillThere}`);
+    await page.fill('#tx-amount', '');
+    await button(page, 'ปิด').click();
+    await gone(page, 'จ่ายให้ / ซื้ออะไร');
+    await page.getByRole('button', { name: 'เพิ่มรายการ', exact: true }).first().click();
     await page.getByRole('button', { name: 'กรอกรายจ่ายเอง', exact: true }).first().click();
     await visible(page, 'จ่ายให้ / ซื้ออะไร');
     await button(page, 'บันทึกรายการ').click();
@@ -696,6 +715,15 @@ try {
     await button(page, 'ถามโค้ชเรื่องนี้').click();
     const asked = await page.locator('#coach-input').inputValue().catch(() => '');
     check('Runway: "ask the coach" opens the coach with the question ready', asked.includes('฿2,000'), asked);
+    // Opening /add directly (a reload, the Android widget's +): the sheet comes up over the app, and closing it lands on home.
+    await page.goto(`${APP}add`);
+    await introGone(page);
+    const coldSheet = await visible(page, 'เลือกสลิปจากแกลเลอรี', 8000);
+    // (The app underneath is hidden from screen readers by the modal dialog, so look in the page itself.)
+    const tabsUnder = (await page.locator('[aria-label*="ยอดคงเหลือ ฿"]').count()) > 0;
+    await page.getByRole('dialog', { name: 'เพิ่มรายการ' }).getByRole('button', { name: 'ปิด', exact: true }).click();
+    const landedHome = (await gone(page, 'เลือกสลิปจากแกลเลอรี')) && (await visible(page, 'ยอดคงเหลือ', 8000));
+    check('(+) sheet opened directly: shown over the app, and closing it lands on home', coldSheet && tabsUnder && landedHome, `sheet=${coldSheet} tabs=${tabsUnder} home=${landedHome}`);
     await ctx.close();
   }
 
@@ -950,7 +978,10 @@ try {
     await page.goto(`${APP}settings`);
     await introGone(page);
     await page.getByRole('button', { name: 'มีอะไรใหม่', exact: true }).first().click();
-    const news = (await visible(page, 'ตั้งเป้าของที่อยากได้')) && (await visible(page, 'อ่านสลิปแม่นขึ้น ทุกธนาคาร'));
+    // The latest news is open; older ones are titles that open on a tap.
+    const latest = await visible(page, 'หน้าตาใหม่ โล่งตาขึ้น');
+    await page.getByRole('button', { name: 'กระปุกออม', exact: true }).first().click();
+    const news = latest && (await visible(page, 'ตั้งเป้าของที่อยากได้')) && (await visible(page, 'อ่านสลิปแม่นขึ้น ทุกธนาคาร'));
     await page.waitForTimeout(900);
     await shot(page, '30-whats-new');
     check('What\'s new: the new features, each with a way to try it', news);
@@ -1008,10 +1039,22 @@ try {
     await shot(page, '27a-transactions-search');
     check('รายการ: grouped by day ("วันนี้ • weekday"), and the search finds an item', grouped && found, `grouped=${grouped}`);
     await page.fill('#tx-search', '');
-    await page.getByRole('button', { name: 'รายรับ', exact: true }).first().click();
+    const txScreen = page.getByTestId('transactions-screen');
+    await txScreen.getByRole('tab', { name: 'รายรับ', exact: true }).first().click();
     await page.waitForTimeout(600);
-    check('รายการ: the "รายรับ" chip shows money in only', (await onScreen('เงินจากแม่')) > 0 && (await onScreen('ค่ารถ')) === 0);
-    await page.getByRole('button', { name: 'ทั้งหมด', exact: true }).first().click();
+    check('รายการ: the "รายรับ" switch shows money in only', (await onScreen('เงินจากแม่')) > 0 && (await onScreen('ค่ารถ')) === 0);
+    await txScreen.getByRole('tab', { name: 'ทั้งหมด', exact: true }).first().click();
+    // Categories stay folded away until "หมวด ▾" is tapped; choosing one filters the list.
+    const catsHidden = (await txScreen.getByRole('button', { name: 'ทุกหมวด', exact: true }).filter({ visible: true }).count()) === 0;
+    await txScreen.getByRole('button', { name: 'เลือกหมวด', exact: true }).first().click();
+    await txScreen.getByRole('button', { name: 'เดินทาง', exact: true }).first().click();
+    await page.waitForTimeout(600);
+    const byCategory = (await onScreen('ค่ารถ')) > 0 && (await onScreen('เงินจากแม่')) === 0 && (await shown(txScreen.getByRole('button', { name: 'หมวด เดินทาง เปลี่ยนหมวด' }).first()));
+    check('รายการ: "หมวด ▾" opens the categories; choosing เดินทาง shows only that category', catsHidden && byCategory, `hidden=${catsHidden}`);
+    await txScreen.getByRole('button', { name: 'หมวด เดินทาง เปลี่ยนหมวด' }).first().click();
+    await txScreen.getByRole('button', { name: 'ทุกหมวด', exact: true }).first().click();
+    // Each day's header says what went out that day.
+    check('รายการ: each day header shows what was spent ("ใช้ ฿…")', await shown(txScreen.getByText(/^ใช้ ฿[\d,]+$/).filter({ visible: true }).first()));
     // Spending calendar: one tap away; each day shaded by spending; tap a day to see only it.
     await button(page, 'ดูปฏิทินการใช้จ่าย').click();
     const calendarShown = (await visible(page, 'มีเงินเข้า')) && (await visible(page, 'เทียบกับวันที่ใช้ตามปกติ'));
@@ -1031,8 +1074,14 @@ try {
     await page.waitForTimeout(1200);
     await shot(page, '27b-stats');
     check('สถิติ: total spending, items, average per day and the category breakdown', statsShown);
-    await page.getByRole('tab', { name: 'แท่ง', exact: true }).first().click();
-    check('สถิติ: the breakdown switches between a donut and bars', (await page.getByRole('tab', { name: 'แท่ง', exact: true }).first().getAttribute('aria-selected')) === 'true');
+    // The trend follows the range: 30 daily bars, then one bar per month for 6 months.
+    const daily = await visible(page, 'รายจ่ายรายวัน 30 วัน');
+    await pickPeriod(page, '6 เดือน');
+    const monthly = (await visible(page, 'รายจ่ายรายเดือน 6 เดือน')) && (await visible(page, 'เดือนนี้นับถึงวันนี้'));
+    await page.waitForTimeout(900);
+    await shot(page, '27c-stats-6-months');
+    check('สถิติ: the trend follows the range (30 daily bars; months for 6 เดือน)', daily && monthly, `daily=${daily} monthly=${monthly}`);
+    await pickPeriod(page, '30 วัน');
 
     // Month recap (from สถิติ): a story of full screens that moves on by itself; tap right for the next one.
     await page.getByText(/^สรุปเดือน/).filter({ visible: true }).first().click();
@@ -1075,6 +1124,8 @@ try {
     await page.waitForTimeout(900);
     await shot(page, '33-skins-thai-locked');
     check('Mission -> its skin in the collection: ชุดไทย, locked, with how to unlock it', thaiLocked);
+    // Skins that can no longer be collected are folded away at the bottom.
+    await button(page, 'สกินที่หมดเวลาแล้ว').click();
     await button(page, 'สกิน สงกรานต์ 2569').click();
     check('Skins: a limited skin whose time has passed says it can no longer be collected', await visible(page, 'สกินลิมิเต็ด · หมดเวลาแล้ว หาไม่ได้อีก'));
     await button(page, 'สกิน บัณฑิตการเงิน').click();
@@ -1087,7 +1138,7 @@ try {
     // The coach is now น้องกล้า, big, wearing the chosen skin; the three coach tones are gone.
     await page.goto(`${APP}coach`);
     await introGone(page);
-    check('Coach: the big น้องกล้า wears the chosen skin', (await visible(page, 'โค้ชส่วนตัว')) && (await shown(button(page, 'น้องกล้าในชุดบัณฑิตการเงิน'))));
+    check('Coach: the big น้องกล้า wears the chosen skin', await shown(button(page, 'น้องกล้าในชุดบัณฑิตการเงิน')));
     check('Coach: the three coach tones are gone', (await page.getByText('โค้ชตรงประเด็น').count()) === 0);
     await button(page, 'น้องกล้าในชุดบัณฑิตการเงิน').click();
     const talks = (await visible(page, 'เก็บสลิปไว้ในเครื่องได้เลย')) && (await shown(button(page, 'ให้น้องกล้าหยุดพูด')));
@@ -1095,7 +1146,7 @@ try {
     await shot(page, '35-coach-kla-talking');
     check('Coach: tapping น้องกล้า -> it talks (subtitle, and a stop button while talking)', talks);
     await button(page, 'ให้น้องกล้าหยุดพูด').click();
-    check('Coach: stop -> quiet, with "ฟังอีกครั้ง"', await visible(page, 'ฟังอีกครั้ง'));
+    check('Coach: stop -> quiet, with "ฟังอีกครั้ง"', await shown(button(page, 'ฟังอีกครั้ง')));
     await button(page, 'ปิดเสียงน้องกล้า').click();
     check('Coach: the sound can be turned off', await shown(button(page, 'เปิดเสียงน้องกล้า')));
     await button(page, 'เปิดเสียงน้องกล้า').click();

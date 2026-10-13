@@ -5,7 +5,6 @@
  * Opened from the flame on the home screen.
  */
 import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,14 +14,13 @@ import { skinById } from '../domain/skins';
 import { useKla } from '../services/kla';
 import { useAchievements } from '../services/useAchievements';
 import { BuddySays } from '../ui/Buddy';
-import { Button, IconButton, Ionicons, Row, T, type IconName } from '../ui/components';
-import { Aurora, GrowBar, PulseRing, Reveal, Sparkles } from '../ui/effects';
+import { Button, Ionicons, Row, T, type IconName } from '../ui/components';
+import { GrowBar, PulseRing, Reveal } from '../ui/effects';
 import { KlaPicture } from '../ui/kla/KlaPicture';
 import { Medal } from '../ui/Medal';
 import { useCountUp, useReduceMotion } from '../ui/motion';
-import { goBack } from '../ui/nav';
 import { alpha, fonts, radius, space, useTheme } from '../ui/theme';
-import { HeaderDecor } from '../ui/halloween';
+import { StackHeader } from '../ui/StackHeader';
 
 const WEEKDAY = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
@@ -48,77 +46,62 @@ export default function Achievements() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
-      <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
-        <IconButton icon="chevron-back" label="กลับ" onPress={() => goBack()} />
-        <T v="h3">ความสำเร็จ</T>
-        <HeaderDecor />
-      </Row>
+      <StackHeader title="ความสำเร็จ" />
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxxl }}>
-        {/* Streak */}
+        {/* Streak: days with at least one record (the app-open mission below counts something else). */}
         <Reveal zoom>
-          <View style={{ borderRadius: radius.xl, overflow: 'hidden' }}>
-            <LinearGradient
-              colors={[theme.heroTop, theme.hero, theme.heroDeep]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={{ padding: space.xl, gap: space.md }}
-            >
-              <Aurora cycles={1} strength={0.35} seed={7} />
-              {streak.today ? <Sparkles count={8} cycles={1} area={{ top: 6, bottom: 50 }} /> : null}
-              <Row gap={space.lg}>
-                <View style={{ width: 76, height: 76, alignItems: 'center', justifyContent: 'center' }}>
-                  <PulseRing size={76} active={streak.today} times={2} color={theme.heroAccent} />
-                  <View
-                    style={{
-                      width: 68,
-                      height: 68,
-                      borderRadius: 34,
-                      backgroundColor: alpha(theme.heroAccent, 0.14),
-                      borderWidth: 2,
-                      borderColor: streak.today ? theme.heroAccent : alpha(theme.heroInk, 0.35),
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Ionicons name="flame" size={38} color={streak.today ? '#F29E4C' : theme.heroInkSoft} />
-                  </View>
+          <View style={{ backgroundColor: theme.surface, borderRadius: radius.xl, padding: space.lg, gap: space.lg }}>
+            <Row gap={space.lg}>
+              <View style={{ width: 68, height: 68, alignItems: 'center', justifyContent: 'center' }}>
+                <PulseRing size={68} active={streak.today} times={2} color={theme.accent} />
+                <View
+                  style={{
+                    width: 60,
+                    height: 60,
+                    borderRadius: 30,
+                    backgroundColor: streak.today ? alpha('#F29E4C', theme.dark ? 0.22 : 0.16) : theme.surfaceAlt,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons name="flame" size={32} color={streak.today ? '#E8833A' : theme.inkFaint} />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <T v="small" color={theme.heroInkSoft}>จดต่อเนื่อง</T>
-                  <T v="h1" color={theme.heroAccent}>
-                    {shown} <T v="body" color={theme.heroInk}>วัน</T>
-                  </T>
-                  <T v="small" color={theme.heroInkSoft}>สถิติสูงสุด {streak.best} วัน</T>
-                </View>
-              </Row>
-              <View
-                style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
-                accessible
-                accessibilityLabel={`14 วันล่าสุด จด ${streak.recent.filter((d) => d.active).length} วัน`}
-              >
-                {streak.recent.map((d, i) => {
-                  const isToday = i === streak.recent.length - 1;
-                  const weekday = new Date(`${d.day}T12:00:00Z`).getUTCDay();
-                  return (
-                    <View key={d.day} style={{ alignItems: 'center', gap: 4 }}>
-                      <View
-                        style={{
-                          width: 16,
-                          height: 16,
-                          borderRadius: 8,
-                          backgroundColor: d.active ? theme.heroAccent : 'transparent',
-                          borderWidth: isToday ? 2 : 1.5,
-                          borderColor: d.active ? theme.heroAccent : isToday ? theme.heroInk : alpha(theme.heroInk, 0.3),
-                        }}
-                      />
-                      <T v="micro" color={isToday ? theme.heroInk : theme.heroInkSoft}>
-                        {WEEKDAY[weekday]}
-                      </T>
-                    </View>
-                  );
-                })}
               </View>
-            </LinearGradient>
+              <View style={{ flex: 1 }}>
+                <T v="small">จดรายการต่อเนื่อง</T>
+                <T v="h1" color={theme.accentInk} style={{ fontVariant: ['tabular-nums'] }}>
+                  {shown} <T v="body" color={theme.ink}>วัน</T>
+                </T>
+                <T v="micro">สถิติสูงสุด {streak.best} วัน · นับวันที่จดอย่างน้อย 1 รายการ</T>
+              </View>
+            </Row>
+            <View
+              style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+              accessible
+              accessibilityLabel={`14 วันล่าสุด จด ${streak.recent.filter((d) => d.active).length} วัน`}
+            >
+              {streak.recent.map((d, i) => {
+                const isToday = i === streak.recent.length - 1;
+                const weekday = new Date(`${d.day}T12:00:00Z`).getUTCDay();
+                return (
+                  <View key={d.day} style={{ alignItems: 'center', gap: 4 }}>
+                    <View
+                      style={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: 8,
+                        backgroundColor: d.active ? theme.accent : 'transparent',
+                        borderWidth: isToday ? 2 : 1.5,
+                        borderColor: d.active ? theme.accent : isToday ? theme.ink : theme.lineStrong,
+                      }}
+                    />
+                    <T v="micro" color={isToday ? theme.ink : theme.inkSoft}>
+                      {WEEKDAY[weekday]}
+                    </T>
+                  </View>
+                );
+              })}
+            </View>
           </View>
         </Reveal>
 

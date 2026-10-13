@@ -1,7 +1,8 @@
 /**
  * ตู้สกินน้องกล้า: every skin, how to get it, and the one น้องกล้า wears.
- * Mission skins show the mission's progress; limited skins show their window,
- * and once it has passed they are marked "สกินลิมิเต็ด · หมดเวลาแล้ว".
+ * Mission skins show the mission's progress; limited skins show their window.
+ * Limited skins whose time has passed (and that were not collected) are folded
+ * away at the bottom ("สกินที่หมดเวลาแล้ว"), marked "สกินลิมิเต็ด · หมดเวลาแล้ว".
  * Rules: src/domain/skins.ts and src/domain/missions.ts.
  */
 import * as Haptics from 'expo-haptics';
@@ -13,19 +14,19 @@ import { useApp } from '../data/AppProvider';
 import { missionForSkin } from '../domain/missions';
 import { isSkinId, SKINS, skinState, skinStatusLine, type Skin, type SkinId, type SkinState } from '../domain/skins';
 import { useKla } from '../services/kla';
-import { Badge, Button, IconButton, Ionicons, Row, T } from '../ui/components';
+import { Badge, Button, Ionicons, Row, T } from '../ui/components';
 import { GrowBar, Reveal } from '../ui/effects';
 import { useToast } from '../ui/feedback';
 import { KlaBackdrop } from '../ui/kla/KlaBackdrop';
 import { KlaPicture } from '../ui/kla/KlaPicture';
 import { KlaStage } from '../ui/kla/KlaStage';
-import { goBack } from '../ui/nav';
 import { fonts, radius, space, useTheme } from '../ui/theme';
-import { CandyArt, HeaderDecor, PumpkinArt, useHalloween } from '../ui/halloween';
+import { CandyArt, PumpkinArt, useHalloween } from '../ui/halloween';
 import { setColorTheme } from '../ui/themeMode';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatThaiDay } from '../domain/dates';
 import { HALLOWEEN } from '../domain/halloween';
+import { StackHeader } from '../ui/StackHeader';
 
 export default function Skins() {
   const theme = useTheme();
@@ -64,6 +65,10 @@ export default function Skins() {
   const toUnlock = SKINS.filter((s) => s.kind === 'mission' && states.get(s.id)!.kind !== 'owned');
   const spooky = SKINS.filter((s) => s.event === 'halloween2569' && states.get(s.id)!.kind !== 'owned');
   const limited = SKINS.filter((s) => s.kind === 'limited' && !s.event && states.get(s.id)!.kind !== 'owned');
+  const limitedOpen = limited.filter((s) => states.get(s.id)!.kind !== 'limited_ended');
+  const limitedEnded = limited.filter((s) => states.get(s.id)!.kind === 'limited_ended');
+  // Opened on an ended skin (from a link): show that part straight away.
+  const [showEnded, setShowEnded] = useState(() => limitedEnded.some((s) => s.id === picked));
 
   function wear() {
     equip(skin.id);
@@ -75,11 +80,7 @@ export default function Skins() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
-      <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
-        <IconButton icon="chevron-back" label="กลับ" onPress={() => goBack()} />
-        <T v="h3">ตู้สกินน้องกล้า</T>
-        <HeaderDecor />
-      </Row>
+      <StackHeader title="ตู้สกินน้องกล้า" />
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxxl }}>
         <Reveal zoom>
           <KlaBackdrop floorAt={0.62}>
@@ -181,12 +182,41 @@ export default function Skins() {
           </Section>
         ) : null}
 
-        {limited.length ? (
+        {limitedOpen.length ? (
           <Section title="สกินลิมิเต็ด" hint="แจกเฉพาะช่วงเวลา เปิดแอปในช่วงนั้นก็ได้เลย พ้นช่วงแล้วหาไม่ได้อีก">
-            {limited.map((s, i) => (
+            {limitedOpen.map((s, i) => (
               <SkinCard key={s.id} skin={s} state={states.get(s.id)!} index={i} picked={picked === s.id} onPress={() => setPicked(s.id)} />
             ))}
           </Section>
+        ) : null}
+
+        {/* Skins that can no longer be collected: out of the way, one tap to look. */}
+        {limitedEnded.length ? (
+          <View style={{ gap: space.sm }}>
+            <Pressable
+              onPress={() => setShowEnded((v) => !v)}
+              accessibilityRole="button"
+              aria-expanded={showEnded}
+              accessibilityLabel={`สกินที่หมดเวลาแล้ว ${limitedEnded.length} ชุด`}
+              hitSlop={8}
+              style={{ minHeight: 44, justifyContent: 'center' }}
+            >
+              <Row gap={4}>
+                <Ionicons name="time-outline" size={16} color={theme.inkSoft} />
+                <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi }}>
+                  สกินที่หมดเวลาแล้ว ({limitedEnded.length})
+                </T>
+                <Ionicons name={showEnded ? 'chevron-up' : 'chevron-down'} size={16} color={theme.ink} />
+              </Row>
+            </Pressable>
+            {showEnded ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+                {limitedEnded.map((s, i) => (
+                  <SkinCard key={s.id} skin={s} state={states.get(s.id)!} index={i} picked={picked === s.id} onPress={() => setPicked(s.id)} />
+                ))}
+              </View>
+            ) : null}
+          </View>
         ) : null}
       </ScrollView>
     </SafeAreaView>
@@ -224,7 +254,7 @@ function SkinAction({
   if (state.kind === 'owned') {
     return equipped ? (
       <View style={{ marginTop: space.xs }}>
-        <Badge label="✓ น้องกล้าใส่ชุดนี้อยู่" tone="gold" onDark center />
+        <Badge label="น้องกล้าใส่ชุดนี้อยู่" icon="checkmark" tone="gold" onDark center />
       </View>
     ) : (
       <View style={{ alignSelf: 'stretch', marginTop: space.xs }}>
@@ -369,10 +399,12 @@ function SkinCard({
             <GrowBar value={progress.value / progress.target} color={theme.primary} track={theme.surfaceAlt} height={5} />
           </View>
         ) : null}
-        <T v="micro" center color={worn ? theme.primary : theme.inkSoft} numberOfLines={1}>
-          {worn ? '✓ ' : ''}
-          {label}
-        </T>
+        <Row gap={2} style={{ justifyContent: 'center' }}>
+          {worn ? <Ionicons name="checkmark" size={13} color={theme.primary} /> : null}
+          <T v="micro" center color={worn ? theme.primary : theme.inkSoft} numberOfLines={1}>
+            {label}
+          </T>
+        </Row>
       </Pressable>
     </Reveal>
   );
