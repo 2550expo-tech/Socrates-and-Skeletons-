@@ -6,9 +6,11 @@
 import { Storage } from './storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
+import { isAuthRetryableFetchError } from '@supabase/supabase-js';
 import { authErrorMessage, authLinkErrorMessage, parseAuthLink } from '../domain/auth';
 import { bkkDayKey, msUntilNextBkkMidnight } from '../domain/dates';
 import { applyDeposit, reservedSatang, type GoalInput, type SavingsGoal } from '../domain/goals';
+import { loadErrorOf, type LoadErrorKind } from '../domain/loadError';
 import { averageDailyExpense, computeRunway } from '../domain/runway';
 import { computeBalance } from '../domain/summary';
 import type { Profile, Transaction, TransactionInput } from '../domain/types';
@@ -41,7 +43,11 @@ async function usedLinks(): Promise<string[]> {
   }
 }
 
-type AuthStatus = 'loading' | 'signedOut' | 'ready';
+/**
+ * 'offline': a saved session exists but could not be checked (no internet at launch, after the
+ * access token expired). The user is not signed out; the app waits for the connection.
+ */
+type AuthStatus = 'loading' | 'signedOut' | 'ready' | 'offline';
 
 /** One-time message shown over any screen after an account event. */
 export type AuthNotice =
@@ -65,7 +71,14 @@ interface AppContextValue {
   /** Put money into a goal (or take it out with a negative amount). */
   depositToGoal(id: string, deltaSatang: number): Promise<SavingsGoal>;
   removeGoal(id: string): Promise<void>;
+  /** A failed load, in plain Thai (never the raw technical text). */
   loadError: string | null;
+  /** 'expired' means signing in again is the way out. */
+  loadErrorKind: LoadErrorKind | null;
+  /** The savings goals could not be loaded: the list shown may be out of date (or empty). */
+  goalsError: boolean;
+  /** 'offline' status: try the saved session again. */
+  retryConnection(): Promise<void>;
   refreshing: boolean;
   refresh(): Promise<void>;
   startDemo(): Promise<void>;
@@ -108,6 +121,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [carrySatang, setCarry] = useState(0);
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadErrorKind, setLoadErrorKind] = useState<LoadErrorKind | null>(null);
+  const [goalsError, setGoalsError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [authNotice, setAuthNotice] = useState<AuthNotice | null>(null);
   const [today, setToday] = useState(() => bkkDayKey(Date.now()));
@@ -134,10 +149,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const loadAll = useCallback(async (r: Repo) => {
     const gen = ++loadGen.current;
     localChanges.current = new Map();
-    setLoadError(null);
+    // The last error stays on screen until a load succeeds (a retry in progress never flashes
+    // the money screens with no data behind them).
     try {
-      // Goals never block the app: if they cannot be loaded, the rest still works.
-      const [p, list, g] = await Promise.all([r.getProfile(), r.listTransactions(), r.listGoals().catch(() => [] as SavingsGoal[])]);
+      // Goals never block the app: if they cannot be loaded, the rest still works, the goals
+      // already on screen stay (never replaced by an empty list) and the screens say so.
+      const [p, list, g] = await Promise.all([r.getProfile(), r.listTransactions(), r.listGoals().catch(() => null)]);
       if (gen !== loadGen.current || repoRef.current !== r) return;
       // A slip saved by the automatic scan during the load is not lost when the list arrives.
       const changes = localChanges.current;
@@ -146,11 +163,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setProfile(p);
       setTxs([...kept, ...fresh]);
       setCarry(list.carrySatang);
-      setGoals(g);
+      if (g) setGoals(g);
+      setGoalsError(g === null);
+      setLoadError(null);
+      setLoadErrorKind(null);
       setStatus('ready');
     } catch (e) {
       if (gen !== loadGen.current || repoRef.current !== r) return;
-      setLoadError(e instanceof Error ? e.message : 'โหลดข้อมูลไม่สำเร็จ');
+      const info = loadErrorOf(e);
+      setLoadError(info.message);
+      setLoadErrorKind(info.kind);
       setStatus('ready');
     }
   }, []);
@@ -163,6 +185,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setTxs([]);
         setCarry(0);
         setGoals([]);
+        setGoalsError(false);
       }
       activeUserRef.current = id;
       repoRef.current = r;
@@ -183,6 +206,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTxs([]);
     setCarry(0);
     setGoals([]);
+    setGoalsError(false);
+    setLoadError(null);
+    setLoadErrorKind(null);
     setStatus('signedOut');
     // The home-screen widget (Android) stops showing this account's numbers.
     clearWidget().catch(() => {});
@@ -277,6 +303,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [activateRepo]);
 
+  /**
+   * Open the saved session. Offline with an expired access token, Supabase cannot check it:
+   * that is not a sign-out, so the app says it is waiting for the internet instead of showing
+   * the sign-in screen (and signs in by itself once the token is refreshed).
+   */
+  const checkSession = useCallback(async () => {
+    if (!supabase) return;
+    const { data, error } = await supabase.auth.getSession();
+    const id = data.session?.user.id;
+    if (id) {
+      if (activeUserRef.current !== id) await activateRepo(createCloudRepo(id), id);
+    } else if (!activeUserRef.current) setStatus(error && isAuthRetryableFetchError(error) ? 'offline' : 'signedOut');
+  }, [activateRepo]);
+
   // Decide the starting mode once, then follow Supabase auth changes.
   useEffect(() => {
     let cancelled = false;
@@ -292,12 +332,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (!cancelled) setStatus('signedOut');
         return;
       }
-      const { data } = await supabase.auth.getSession();
-      if (cancelled) return;
-      const id = data.session?.user.id;
-      if (id) {
-        if (activeUserRef.current !== id) await activateRepo(createCloudRepo(id), id);
-      } else if (!activeUserRef.current) setStatus('signedOut');
+      await checkSession();
     })();
 
     const sub = supabase?.auth.onAuthStateChange((event, session) => {
@@ -324,7 +359,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       sub?.data.subscription.unsubscribe();
       stopLinks();
     };
-  }, [activateRepo, clear, handleAuthLink]);
+  }, [activateRepo, clear, handleAuthLink, checkSession]);
 
   const need = () => {
     if (!repoRef.current) throw new Error('ยังไม่ได้เข้าสู่ระบบ');
@@ -366,6 +401,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (repoRef.current === r) setGoals((list) => list.filter((x) => x.id !== id));
       },
       loadError,
+      loadErrorKind,
+      goalsError,
+      async retryConnection() {
+        await checkSession();
+      },
       refreshing,
       async refresh() {
         if (!repoRef.current) return;
@@ -450,7 +490,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       today,
       newDay,
     }),
-    [status, repo, userId, profile, txs, carrySatang, goals, loadError, refreshing, authNotice, today, newDay, loadAll, activateRepo, clear],
+    [status, repo, userId, profile, txs, carrySatang, goals, loadError, loadErrorKind, goalsError, refreshing, authNotice, today, newDay, loadAll, activateRepo, clear, checkSession],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

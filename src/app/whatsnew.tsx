@@ -9,6 +9,9 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BUDDY_NAME } from '../domain/buddy';
+import { bkkDayKey, formatThaiDay } from '../domain/dates';
+import { HALLOWEEN, halloweenOn } from '../domain/halloween';
+import { skinById } from '../domain/skins';
 import { markWhatsNewSeen } from '../services/whatsNew';
 import { BuddySays } from '../ui/Buddy';
 import { Button, Card, Divider, Ionicons, Row, T } from '../ui/components';
@@ -25,7 +28,20 @@ function openFeature(href: Href) {
   else router.push(href);
 }
 
-const FEATURES: { icon: IconName; colors: [string, string]; title: string; body: string; action?: { label: string; href: Href } }[] = [
+type Feature = { icon: IconName; colors: [string, string]; title: string; body: string; action?: { label: string; href: Href } };
+
+/** A dated offer, worded from its real window so it never promises something that has ended. */
+function halloweenNews(today: string): string {
+  const intro = 'ธีมหลอน ๆ น่ารัก ๆ สีม่วงมืดกับส้มฟักทอง มีค้างคาวบิน';
+  if (today > HALLOWEEN.to) return `${intro} ยังเลือกธีมนี้ได้ในหน้าตั้งค่า ส่วนกิจกรรมจับผีแลกชุดจบไปแล้ว`;
+  return `${intro} ผีน้อยให้จับรับลูกอม แลกสกินผีหัวฟักทอง แฟรงเกนสไตน์ แม่มดน้อย แวมไพร์ มัมมี่ และผีน้อยผ้าขาว (ถึง ${formatThaiDay(HALLOWEEN.to, { year: false })})`;
+}
+function pioneerNews(today: string): string {
+  const w = skinById('pioneer').window!;
+  return today >= w.from && today <= w.to ? ` ตอนนี้แจกชุดผู้บุกเบิกถึง ${formatThaiDay(w.to, { year: false })}` : '';
+}
+
+const features = (today: string): Feature[] => [
   {
     icon: 'sparkles-outline',
     colors: ['#1F7A52', '#0E3B2C'],
@@ -50,8 +66,8 @@ const FEATURES: { icon: IconName; colors: [string, string]; title: string; body:
     icon: 'moon',
     colors: ['#3B1E5C', '#120822'],
     title: 'ธีมฮาโลวีน 👻',
-    body: 'ธีมหลอน ๆ น่ารัก ๆ สีม่วงมืดกับส้มฟักทอง มีค้างคาวบิน ผีน้อยให้จับรับลูกอม แลกสกินผีหัวฟักทอง แฟรงเกนสไตน์ แม่มดน้อย แวมไพร์ มัมมี่ และผีน้อยผ้าขาว (ถึง 2 พ.ย.)',
-    action: { label: 'ลองธีมฮาโลวีน', href: '/settings' },
+    body: halloweenNews(today),
+    action: { label: halloweenOn(today) ? 'ลองธีมฮาโลวีน' : 'เลือกธีม', href: '/settings' },
   },
   {
     icon: 'chatbubbles',
@@ -64,7 +80,7 @@ const FEATURES: { icon: IconName; colors: [string, string]; title: string; body:
     icon: 'shirt',
     colors: ['#C9A227', '#7A5A0E'],
     title: 'ตู้สกินและภารกิจการเงิน',
-    body: `ทำภารกิจการเงินในหน้าความสำเร็จเพื่อปลดล็อกชุดให้น้อง${BUDDY_NAME} เช่น เปิดแอปติดต่อกัน 30 วันได้ชุดไทย และมีสกินลิมิเต็ดตามเทศกาล ตอนนี้แจกชุดผู้บุกเบิกถึง 31 ต.ค.`,
+    body: `ทำภารกิจการเงินในหน้าความสำเร็จเพื่อปลดล็อกชุดให้น้อง${BUDDY_NAME} เช่น เปิดแอปติดต่อกัน 30 วันได้ชุดไทย และมีสกินลิมิเต็ดตามเทศกาล${pioneerNews(today)}`,
     action: { label: 'เปิดตู้สกิน', href: '/skins' },
   },
   {
@@ -140,7 +156,7 @@ const FEATURES: { icon: IconName; colors: [string, string]; title: string; body:
 /** How many of the newest stay open at the top. */
 const LATEST = 3;
 
-function FeatureIcon({ f, size }: { f: (typeof FEATURES)[number]; size: number }) {
+function FeatureIcon({ f, size }: { f: Feature; size: number }) {
   return (
     <LinearGradient colors={f.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: size, height: size, borderRadius: size > 40 ? radius.md : radius.sm, alignItems: 'center', justifyContent: 'center' }}>
       <Ionicons name={f.icon} size={Math.round(size * 0.52)} color={palette.goldSoft} />
@@ -151,6 +167,7 @@ function FeatureIcon({ f, size }: { f: (typeof FEATURES)[number]; size: number }
 export default function WhatsNew() {
   const theme = useTheme();
   const [open, setOpen] = useState<string | null>(null);
+  const [news] = useState(() => features(bkkDayKey(Date.now())));
   useEffect(() => {
     markWhatsNewSeen();
   }, []);
@@ -159,7 +176,7 @@ export default function WhatsNew() {
       <StackHeader title="มีอะไรใหม่" close />
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.md, paddingBottom: space.xxxl }}>
         <BuddySays mood="cheer">{`อัปเดตใหม่มาแล้ว! ${BUDDY_NAME}เตรียมของเล่นใหม่ไว้หลายอย่างเลย`}</BuddySays>
-        {FEATURES.slice(0, LATEST).map((f, i) => (
+        {news.slice(0, LATEST).map((f, i) => (
           <Reveal key={f.title} index={i} from={14}>
             <Card style={{ gap: space.sm }}>
               <Row gap={space.md} align="flex-start">
@@ -181,7 +198,7 @@ export default function WhatsNew() {
           ก่อนหน้านี้
         </T>
         <Card style={{ gap: 0, paddingVertical: space.xs }}>
-          {FEATURES.slice(LATEST).map((f, i) => {
+          {news.slice(LATEST).map((f, i) => {
             const isOpen = open === f.title;
             return (
               <View key={f.title}>
@@ -191,7 +208,7 @@ export default function WhatsNew() {
                   accessibilityRole="button"
                   accessibilityLabel={f.title}
                   aria-expanded={isOpen}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 52, paddingVertical: space.sm }}
+                  style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 52, paddingVertical: space.sm, opacity: pressed ? 0.7 : 1 })}
                 >
                   <FeatureIcon f={f} size={32} />
                   <T v="body" style={{ flex: 1, fontFamily: fonts.sansMedium }}>

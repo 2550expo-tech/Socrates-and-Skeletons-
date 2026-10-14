@@ -6,8 +6,8 @@
  * calendar (FR-2) is one tap away (the calendar icon). Tap a row to edit or
  * delete it; add new ones with (+).
  */
-import { router } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, SectionList, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp, useMoney } from '../../data/AppProvider';
@@ -20,7 +20,7 @@ import type { Transaction, TxKind } from '../../domain/types';
 import { Button, Card, Chip, Divider, EmptyState, IconButton, Ionicons, Row, Segmented, T } from '../../ui/components';
 import { Buddy } from '../../ui/Buddy';
 import { SpendCalendar } from '../../ui/SpendCalendar';
-import { TxRow } from '../../ui/TxRow';
+import { TX_DIVIDER_INSET, TxRow } from '../../ui/TxRow';
 import { categoryLook } from '../../ui/category';
 import { inputBox, inputText } from '../../ui/inputs';
 import { alpha, fonts, radius, space, useTheme } from '../../ui/theme';
@@ -49,6 +49,18 @@ export default function Transactions() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [month, setMonth] = useState(today.slice(0, 7));
   const [day, setDay] = useState<string | null>(null);
+  // Opened from Quick Access ("วันนี้ใช้ไป"): start over with every item, so today's are on top.
+  const { fresh } = useLocalSearchParams<{ fresh?: string }>();
+  const [freshSeen, setFreshSeen] = useState(fresh);
+  if (fresh !== freshSeen) {
+    setFreshSeen(fresh);
+    setKind('all');
+    setCat(null);
+    setShowCats(false);
+    setQuery('');
+    setDay(null);
+    setShowCalendar(false);
+  }
   const cal = useMemo(() => spendCalendar(txs, month, today), [txs, month, today]);
   // Months that can be shown: back to the oldest with records, never past this month.
   const oldest = useMemo(() => recapMonths(txs).at(-1) ?? today.slice(0, 7), [txs, today]);
@@ -82,10 +94,13 @@ export default function Transactions() {
   }, [txs, kind, cat, query, day]);
 
   const toTop = () => list.current?.getScrollResponder()?.scrollTo({ y: 0, animated: true });
+  useEffect(() => {
+    if (fresh) toTop();
+  }, [fresh]);
 
   return (
     <SafeAreaView testID="transactions-screen" edges={['top']} style={{ flex: 1, backgroundColor: theme.bg }}>
-      <View style={{ paddingHorizontal: space.lg, gap: space.md, paddingTop: space.md, paddingBottom: space.xs }}>
+      <View style={{ paddingHorizontal: space.lg, gap: space.md, paddingTop: space.sm, paddingBottom: space.xs }}>
         <Row justify="space-between">
           <Row gap={space.sm} align="flex-end">
             <T v="h1" accessibilityRole="header">
@@ -104,7 +119,7 @@ export default function Transactions() {
             }}
           />
         </Row>
-        <View style={[inputBox(theme, { focused: searching }), { gap: space.sm, borderRadius: radius.pill, backgroundColor: theme.surfaceAlt, borderColor: searching ? theme.primary : theme.surfaceAlt }]}>
+        <View style={[inputBox(theme, { focused: searching }), { gap: space.sm, borderRadius: radius.pill }]}>
           <Ionicons name="search" size={18} color={theme.inkSoft} />
           <TextInput
             nativeID="tx-search"
@@ -188,11 +203,11 @@ export default function Transactions() {
           </ScrollView>
         ) : null}
         {drafts.length > 0 ? (
-          <Card onPress={() => router.push('/drafts')} style={{ paddingVertical: space.md, borderColor: theme.accent, borderWidth: 1.5 }}>
+          <Card onPress={() => router.push('/drafts')} style={{ paddingVertical: space.md, borderColor: theme.accentInk, borderWidth: 1.5 }}>
             <Row gap={space.sm}>
               <Ionicons name="receipt-outline" size={20} color={theme.accentInk} />
               <T v="body" style={{ flex: 1 }}>สลิปรอยืนยัน {drafts.length} รายการ</T>
-              <Ionicons name="chevron-forward" size={18} color={theme.inkFaint} />
+              <Ionicons name="chevron-forward" size={18} color={theme.inkSoft} />
             </Row>
           </Card>
         ) : null}
@@ -255,12 +270,12 @@ export default function Transactions() {
                 borderTopRightRadius: first ? radius.lg : 0,
                 borderBottomLeftRadius: last ? radius.lg : 0,
                 borderBottomRightRadius: last ? radius.lg : 0,
-                paddingHorizontal: space.md,
+                paddingHorizontal: space.lg,
                 paddingTop: first ? space.xs : 0,
                 paddingBottom: last ? space.xs : 0,
               }}
             >
-              {first ? null : <Divider style={{ marginLeft: 52 }} />}
+              {first ? null : <Divider style={{ marginLeft: TX_DIVIDER_INSET }} />}
               <TxRow tx={item} />
             </View>
           );

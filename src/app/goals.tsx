@@ -6,14 +6,15 @@
  */
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
+import { KeyboardAvoid } from '../ui/KeyboardAvoid';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../data/AppProvider';
 import { BUDDY_NAME } from '../domain/buddy';
 import { goalLine, goalProgress, reservedSatang, type SavingsGoal } from '../domain/goals';
 import { formatBaht, parseBahtToSatang } from '../domain/money';
 import { BuddySays } from '../ui/Buddy';
-import { Button, Card, Chip, IconButton, Money, Row, T } from '../ui/components';
+import { Button, Card, Chip, IconButton, Ionicons, Money, Row, T } from '../ui/components';
 import { Reveal, useCelebrate } from '../ui/effects';
 import { useToast } from '../ui/feedback';
 import { Field } from '../ui/inputs';
@@ -123,16 +124,31 @@ function GoalCard({ goal, index }: { goal: SavingsGoal; index: number }) {
 
 export default function Goals() {
   const theme = useTheme();
-  const { goals } = useApp();
+  const { goals, goalsError, refresh, refreshing } = useApp();
   const reserved = reservedSatang(goals);
   const doneCount = goals.filter((g) => g.savedSatang >= g.targetSatang).length;
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
       <StackHeader title="กระปุกออม" right={<IconButton icon="add-circle" label="ตั้งกระปุกใหม่" color={theme.primary} onPress={() => router.push('/goal')} />} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoid>
         <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxxl }} keyboardShouldPersistTaps="handled">
-          {goals.length === 0 ? (
+          {goalsError ? (
+            // Never the "first jar" invitation when the list simply failed to load (it would invite duplicates).
+            <Card tone="accent" style={{ gap: space.sm }}>
+              <Row gap={space.sm}>
+                <Ionicons name="cloud-offline-outline" size={20} color={theme.watch} />
+                <T v="body" style={{ flex: 1, fontFamily: fonts.sansSemi }}>
+                  โหลดกระปุกไม่สำเร็จ
+                </T>
+              </Row>
+              <T v="small" color={theme.ink}>
+                {goals.length ? 'รายการด้านล่างอาจยังไม่อัปเดต' : 'กระปุกที่ตั้งไว้ยังอยู่ในบัญชี แค่ยังโหลดมาแสดงไม่ได้'}
+              </T>
+              <Button label="ลองอีกครั้ง" kind="soft" small icon="refresh" loading={refreshing} onPress={() => refresh()} style={{ alignSelf: 'flex-start' }} />
+            </Card>
+          ) : null}
+          {goals.length === 0 && goalsError ? null : goals.length === 0 ? (
             <>
               <BuddySays mood="happy">{`อยากได้อะไร ตั้งเป็นกระปุกไว้เลย แล้วหยอดทีละนิด ${BUDDY_NAME}จะช่วยบอกว่าต้องเก็บวันละเท่าไรถึงจะทัน`}</BuddySays>
               <View style={{ alignItems: 'center', paddingVertical: space.lg }}>
@@ -147,7 +163,7 @@ export default function Goals() {
                   <T v="small" color={theme.ink}>
                     กันไว้ในกระปุกทั้งหมด
                   </T>
-                  <T v="h3">{formatBaht(reserved, { decimals: false })}</T>
+                  <Money satang={reserved} size="h3" decimals={false} />
                 </Row>
                 <T v="micro" color={theme.ink}>
                   เงินในกระปุกไม่นับเป็นเงินที่ใช้ได้ในหน้า “เงินพอถึง”{doneCount ? ` · ครบเป้าแล้ว ${doneCount} กระปุก` : ''}
@@ -160,7 +176,7 @@ export default function Goals() {
             </>
           )}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAvoid>
     </SafeAreaView>
   );
 }

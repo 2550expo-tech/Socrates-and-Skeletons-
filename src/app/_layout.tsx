@@ -15,6 +15,7 @@ import { NotoSerifThai_600SemiBold, NotoSerifThai_700Bold } from '@expo-google-f
 import { AppProvider, useApp } from '../data/AppProvider';
 import { AutoScanProvider } from '../services/AutoScanProvider';
 import { AuthNoticeHost } from '../ui/AuthNotice';
+import { ConnectionProblem } from '../ui/ConnectionProblem';
 import { CelebrationProvider } from '../ui/effects';
 import { ToastProvider } from '../ui/feedback';
 import { LaunchIntro } from '../ui/LaunchIntro';
@@ -80,7 +81,7 @@ function WebFrame({ children }: { children: ReactNode }) {
 
 function Navigator({ ready }: { ready: boolean }) {
   const theme = useTheme();
-  const { status, repo, profile } = useApp();
+  const { status, repo, profile, loadError, loadErrorKind, refresh, retryConnection, signOut } = useApp();
   const loading = !ready || status === 'loading';
   const [introDone, setIntroDone] = useState(false);
   const finishIntro = useCallback(() => setIntroDone(true), []);
@@ -92,7 +93,26 @@ function Navigator({ ready }: { ready: boolean }) {
   return (
     <>
       <StatusBar style={!introDone || theme.dark ? 'light' : 'dark'} />
-      {loading ? null : <Screens signedIn={signedIn} needsOnboarding={needsOnboarding} inApp={inApp} />}
+      {loading ? null : status === 'offline' ? (
+        // A saved session that could not be checked (no internet at launch): not signed out.
+        <ConnectionProblem
+          title="ยังเชื่อมต่ออินเทอร์เน็ตไม่ได้"
+          body="บัญชีของคุณยังอยู่ ต่ออินเทอร์เน็ตแล้วกดลองอีกครั้ง หรือรอสักครู่ แอปจะเข้าให้เอง"
+          onRetry={retryConnection}
+          onSignOut={signOut}
+        />
+      ) : signedIn && !profile && loadError ? (
+        // The account's data could not be loaded at all: never open the money screens with made-up numbers.
+        <ConnectionProblem
+          title={loadErrorKind === 'expired' ? 'ต้องเข้าสู่ระบบใหม่' : 'โหลดข้อมูลไม่สำเร็จ'}
+          body={loadError}
+          onRetry={refresh}
+          onSignOut={signOut}
+          signInFirst={loadErrorKind === 'expired'}
+        />
+      ) : (
+        <Screens signedIn={signedIn} needsOnboarding={needsOnboarding} inApp={inApp} />
+      )}
       {loading || !introDone ? null : <AuthNoticeHost />}
       {loading || !introDone ? null : <UpdateBanner />}
       <LaunchIntro ready={!loading} fontsReady={ready} onDone={finishIntro} />

@@ -65,6 +65,7 @@ export type ScanAction =
       message?: string;
       confirmed?: boolean;
     }
+  | { type: 'retryFailed' }
   | { type: 'reset' };
 
 export const initialScanState = (range: RangeKey = '7d'): ScanState => ({
@@ -134,6 +135,13 @@ export function scanReducer(state: ScanState, action: ScanAction): ScanState {
       const remaining = items.some((i) => i.status === 'queued' || i.status === 'working');
       if (!remaining) next.phase = 'done';
       return next;
+    }
+
+    case 'retryFailed': {
+      // After a finished scan: the photos that could not be read go back in the queue and run again.
+      if (state.phase !== 'done' || !state.items.some((i) => i.status === 'failed')) return state;
+      const items = state.items.map((i) => (i.status === 'failed' ? { ...i, status: 'queued' as const, message: undefined } : i));
+      return { ...state, phase: 'running', items, runId: state.runId + 1 };
     }
 
     case 'reset':

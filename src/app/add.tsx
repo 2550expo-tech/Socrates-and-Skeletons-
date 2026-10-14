@@ -11,11 +11,12 @@ import { router, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useApp } from '../data/AppProvider';
 import { useAutoScan } from '../services/AutoScanProvider';
 import { Divider, IconButton, Ionicons, T, type IconName } from '../ui/components';
 import { useNative, useReduceMotion } from '../ui/motion';
 import { goBack } from '../ui/nav';
-import { alpha, fonts, space, useTheme } from '../ui/theme';
+import { alpha, fonts, radius, space, useTheme } from '../ui/theme';
 
 /** How far below its resting place the sheet starts (and leaves to). */
 const DROP = 480;
@@ -38,11 +39,11 @@ function Option({ icon, color, title, sub, onPress }: { icon: IconName; color: s
         paddingVertical: space.sm,
         paddingHorizontal: space.sm,
         marginHorizontal: -space.sm,
-        borderRadius: 16,
+        borderRadius: radius.md,
         backgroundColor: pressed ? theme.surfaceAlt : 'transparent',
       })}
     >
-      <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: alpha(color, theme.dark ? 0.2 : 0.12), alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 44, height: 44, borderRadius: radius.tile, backgroundColor: alpha(color, theme.dark ? 0.2 : 0.12), alignItems: 'center', justifyContent: 'center' }}>
         <Ionicons name={icon} size={22} color={color} />
       </View>
       <View style={{ flex: 1, gap: 1 }}>
@@ -53,7 +54,7 @@ function Option({ icon, color, title, sub, onPress }: { icon: IconName; color: s
           {sub}
         </T>
       </View>
-      <Ionicons name="chevron-forward" size={18} color={theme.inkFaint} />
+      <Ionicons name="chevron-forward" size={18} color={theme.inkSoft} />
     </Pressable>
   );
 }
@@ -62,6 +63,8 @@ export default function AddSheet() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const auto = useAutoScan();
+  // The demo cannot read slips (it has no account for the AI); say so before the tap, not after.
+  const demo = useApp().repo?.mode === 'demo';
   const reduce = useReduceMotion();
   const [rise] = useState(() => new Animated.Value(reduce ? 1 : 0));
   const leaving = useRef(false);
@@ -118,8 +121,8 @@ export default function AddSheet() {
         tabIndex={-1}
         style={{
           backgroundColor: theme.surface,
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
+          borderTopLeftRadius: radius.xl,
+          borderTopRightRadius: radius.xl,
           paddingHorizontal: space.lg,
           paddingBottom: insets.bottom + space.lg,
           outlineWidth: 0,
@@ -144,7 +147,7 @@ export default function AddSheet() {
             <Divider style={{ marginLeft: 44 + space.md }} />
           </>
         ) : null}
-        <Option icon="images" color={theme.primary} title="เลือกสลิปจากแกลเลอรี" sub="แอปอ่านยอดจากสลิปให้เอง" onPress={() => choose('/scan')} />
+        <Option icon="images" color={theme.primary} title="เลือกสลิปจากแกลเลอรี" sub={demo ? 'ต้องใช้บัญชีจริง' : 'แอปอ่านยอดจากสลิปให้เอง'} onPress={() => choose('/scan')} />
         <Divider style={{ marginLeft: 44 + space.md }} />
         <Option icon="mic" color={theme.primary} title="พูดรายการ" sub="พูดครั้งเดียว ได้หลายรายการ" onPress={() => choose('/voice')} />
         <Divider style={{ marginLeft: 44 + space.md }} />

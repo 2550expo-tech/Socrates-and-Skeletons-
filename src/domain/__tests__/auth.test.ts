@@ -53,13 +53,13 @@ describe('Sign-in messages', () => {
   it('TC-46 explains each Supabase error in Thai', () => {
     expect(authErrorMessage({ code: 'invalid_credentials', status: 400, message: 'Invalid login credentials' })).toContain('ลืมรหัสผ่าน');
     expect(authErrorMessage({ code: 'email_not_confirmed' })).toContain('ยังไม่ได้ยืนยันอีเมล');
-    expect(authErrorMessage({ code: 'over_email_send_rate_limit', status: 429 })).toContain('ชั่วโมงละ 2 ฉบับ');
+    expect(authErrorMessage({ code: 'over_email_send_rate_limit', status: 429 })).toContain('ส่งอีเมลบ่อยเกินไป');
     expect(authErrorMessage({ code: 'weak_password' })).toContain('เดาง่าย');
     expect(authErrorMessage({ name: 'AuthRetryableFetchError', message: 'Failed to fetch', status: 0 })).toContain('อินเทอร์เน็ต');
     expect(authErrorMessage({ message: 'Invalid login credentials' })).toContain('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
-    expect(authErrorMessage({ message: 'Something new' })).toBe('ทำรายการไม่สำเร็จ (Something new)');
+    expect(authErrorMessage({ message: 'Something new' })).toBe('ทำรายการไม่สำเร็จ ลองใหม่อีกครั้ง');
     expect(authErrorMessage(null)).toContain('ลองใหม่');
-    expect(authErrorMessage({ code: 'email_address_not_authorized' })).toContain('Confirm email');
+    expect(authErrorMessage({ code: 'email_address_not_authorized' })).toContain('ส่งอีเมลยืนยันไปที่อีเมลนี้ไม่ได้');
   });
 
   it('TC-48 accepts the 6-digit code from the email however it is pasted', () => {

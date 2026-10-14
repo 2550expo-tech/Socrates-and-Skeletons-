@@ -81,7 +81,7 @@ export default function Onboarding() {
             value={floor}
             onChangeText={setFloor}
             keyboardType="decimal-pad"
-            hint="Money Runway จะนับวันจนเงินเหลือเท่านี้ ค่าเริ่มต้น ฿500"
+            hint="แอปนับว่าเงินพอใช้กี่วัน จนยอดเหลือเท่านี้ ค่าเริ่มต้น ฿500"
             error={errors.floor}
           />
           <Field

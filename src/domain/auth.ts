@@ -92,13 +92,13 @@ export function authErrorMessage(error: AuthErrorLike | null | undefined): strin
     case 'same_password':
       return 'รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสเดิม';
     case 'over_email_send_rate_limit':
-      return 'ส่งอีเมลบ่อยเกินไป ระบบอีเมลแบบฟรีส่งได้ชั่วโมงละ 2 ฉบับ รอสักพักแล้วลองใหม่';
+      return 'ส่งอีเมลบ่อยเกินไป รอสักพัก (ประมาณหนึ่งชั่วโมง) แล้วลองใหม่';
     case 'over_request_rate_limit':
       return 'ลองบ่อยเกินไป รอสักครู่แล้วลองใหม่';
     case 'email_address_invalid':
       return 'ใช้อีเมลนี้ไม่ได้ ลองอีเมลอื่น';
     case 'email_address_not_authorized':
-      return 'ระบบยังส่งอีเมลยืนยันไปที่อีเมลนี้ไม่ได้ (อีเมลฟรีของ Supabase ส่งได้เฉพาะอีเมลของทีมผู้พัฒนา) แจ้งผู้ดูแลให้ปิด Confirm email หรือตั้งค่า SMTP';
+      return 'ตอนนี้ส่งอีเมลยืนยันไปที่อีเมลนี้ไม่ได้ ลองใหม่ภายหลัง หรือแจ้งทีม MindPay';
     case 'signup_disabled':
     case 'email_provider_disabled':
       return 'ตอนนี้ปิดรับสมัครสมาชิกอยู่';
@@ -118,7 +118,8 @@ export function authErrorMessage(error: AuthErrorLike | null | undefined): strin
   if (error.status === 429) return 'ลองบ่อยเกินไป รอสักครู่แล้วลองใหม่';
   if (msg.includes('invalid login credentials')) return authErrorMessage({ code: 'invalid_credentials' });
   if (msg.includes('email not confirmed')) return authErrorMessage({ code: 'email_not_confirmed' });
-  return error.message ? `ทำรายการไม่สำเร็จ (${error.message})` : 'ทำรายการไม่สำเร็จ ลองใหม่อีกครั้ง';
+  // Never the raw server text (English, technical).
+  return 'ทำรายการไม่สำเร็จ ลองใหม่อีกครั้ง';
 }
 
 /** Message for a wrong or expired code typed from the email. */

@@ -11,7 +11,8 @@
 import * as Haptics from 'expo-haptics';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Keyboard, Platform, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
+import { KeyboardAvoid } from '../../ui/KeyboardAvoid';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp, useMoney } from '../../data/AppProvider';
 import { BUDDY_NAME, buddyPoke, type BuddyMood } from '../../domain/buddy';
@@ -25,7 +26,8 @@ import { SKINS, skinById, type SkinId } from '../../domain/skins';
 import { askCoach, CoachError } from '../../services/coach';
 import { useEquippedSkin, useKla } from '../../services/kla';
 import { Buddy } from '../../ui/Buddy';
-import { Card, Chip, Ionicons, Row, T, type IconName } from '../../ui/components';
+import { Button, Card, Chip, Ionicons, Row, T, type IconName } from '../../ui/components';
+import { DemoUpgrade } from '../../ui/DemoUpgrade';
 import { Reveal, TypingDots } from '../../ui/effects';
 import { TitleDecor, useHalloween } from '../../ui/halloween';
 import { KlaBackdrop } from '../../ui/kla/KlaBackdrop';
@@ -40,6 +42,10 @@ interface Msg {
   from: 'me' | 'coach';
   text: string;
   error?: boolean;
+  /** A failed answer keeps the question, so it can be asked again with one tap. */
+  retry?: { question: string; askId: number };
+  /** The demo cannot ask the AI: offer the way to a real account. */
+  demo?: boolean;
 }
 
 const QUICK = ['สรุปสัปดาห์นี้ให้หน่อย', 'หมวดไหนควรลดก่อน', 'ซื้อของ 500 บาทวันนี้ได้ไหม', 'ทำยังไงให้เงินพอถึงสิ้นเดือน'];
@@ -113,11 +119,17 @@ export default function Coach() {
 
   async function send(text: string) {
     const q = text.trim();
-    if (!q || busy || !profile) return;
+    if (!q || busy) return;
+    if (!profile) {
+      // Nothing to answer from yet: say so instead of doing nothing.
+      setRest({ text: 'ยังโหลดข้อมูลของคุณไม่เสร็จ ลองอีกครั้งในอีกสักครู่นะ', mood: 'worried' });
+      return;
+    }
     setInput('');
     Keyboard.dismiss();
     stop();
-    setMsgs((m) => [...m, { id: ++seq.current, from: 'me', text: q }]);
+    const askId = ++seq.current;
+    setMsgs((m) => [...m, { id: askId, from: 'me', text: q }]);
     setBusy(true);
     toTop();
     try {
@@ -146,7 +158,8 @@ export default function Coach() {
       tell(answer, { msgId: id });
     } catch (e) {
       const text = e instanceof CoachError ? e.message : `ติดต่อ${BUDDY_NAME}ไม่ได้ตอนนี้ ลองใหม่อีกครั้งนะ`;
-      setMsgs((m) => [...m, { id: ++seq.current, from: 'coach', text, error: true }]);
+      const demo = repo?.mode === 'demo';
+      setMsgs((m) => [...m, { id: ++seq.current, from: 'coach', text, error: true, demo, retry: demo ? undefined : { question: q, askId } }]);
       // Problems are shown, not read aloud.
       setRest({ text, mood: 'worried' });
     } finally {
@@ -400,6 +413,26 @@ export default function Coach() {
                 <T v="body" color={color} selectable>
                   {m.text}
                 </T>
+                {m.retry && !busy ? (
+                  <Button
+                    label="ถามอีกครั้ง"
+                    kind="soft"
+                    small
+                    icon="refresh"
+                    style={{ alignSelf: 'flex-start', marginTop: 4 }}
+                    onPress={() => {
+                      const r = m.retry!;
+                      // The failed pair goes; the question is asked again as new.
+                      setMsgs((list) => list.filter((x) => x.id !== m.id && x.id !== r.askId));
+                      send(r.question);
+                    }}
+                  />
+                ) : null}
+                {m.demo ? (
+                  <View style={{ marginTop: 4 }}>
+                    <DemoUpgrade />
+                  </View>
+                ) : null}
               </View>
             </Row>
           </Reveal>
@@ -410,7 +443,7 @@ export default function Coach() {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: theme.bg }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoid>
         <ScrollView
           ref={scroll}
           // Same header spacing as the other tabs (title starts `sm` below the safe area).
@@ -495,7 +528,7 @@ export default function Coach() {
             </Pressable>
           </Row>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoid>
     </SafeAreaView>
   );
 }

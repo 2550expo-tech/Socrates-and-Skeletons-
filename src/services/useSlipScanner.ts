@@ -230,6 +230,11 @@ export function useSlipScanner(initialRange: RangeKey = '1m') {
       setNotice(null);
       apply({ type: 'resume' });
     },
+    /** Read the photos that failed once more (after a finished scan). */
+    retryFailed: () => {
+      setNotice(null);
+      apply({ type: 'retryFailed' });
+    },
     reset: () => {
       setNotice(null);
       setSkippedKnown(0);

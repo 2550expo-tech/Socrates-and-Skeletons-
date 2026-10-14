@@ -25,7 +25,9 @@
       "blockedPermissions": [
         "android.permission.CAMERA",
         "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.READ_MEDIA_AUDIO"
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ]
     },
     "web": {
@@ -111,7 +113,7 @@
     "updates": {
       "url": "https://u.expo.dev/eb06a5c2-48ad-4602-bbaa-f4af2bcce7f0",
       "requestHeaders": {
-        "expo-channel-name": "production"
+        "expo-channel-name": "production-v2"
       },
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0

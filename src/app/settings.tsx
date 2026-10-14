@@ -6,8 +6,9 @@
  */
 import { router } from 'expo-router';
 import appConfig from '../../app.json';
-import { Children, useEffect, useState, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Children, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoid } from '../ui/KeyboardAvoid';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../data/AppProvider';
 import { supabase } from '../data/supabase';
@@ -24,6 +25,8 @@ import { ConfirmSheet, useToast } from '../ui/feedback';
 import { inputBox, inputText } from '../ui/inputs';
 import { alpha, fonts, radius, space, useTheme } from '../ui/theme';
 import { StackHeader } from '../ui/StackHeader';
+import { useConfirmLeave } from '../ui/nav';
+import type { Profile } from '../domain/types';
 
 /** A titled group of rows in one card (the grouped-list look of the settings). */
 function Group({ title, children }: { title?: string; children: ReactNode }) {
@@ -51,7 +54,7 @@ function Group({ title, children }: { title?: string; children: ReactNode }) {
 function RowIcon({ icon, color }: { icon: IconName; color: string }) {
   const theme = useTheme();
   return (
-    <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: alpha(color, theme.dark ? 0.2 : 0.12), alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ width: 36, height: 36, borderRadius: radius.tile, backgroundColor: alpha(color, theme.dark ? 0.2 : 0.12), alignItems: 'center', justifyContent: 'center' }}>
       <Ionicons name={icon} size={19} color={color} />
     </View>
   );
@@ -61,27 +64,42 @@ function LinkRow({ icon, label, onPress, danger }: { icon: IconName; label: stri
   const theme = useTheme();
   const color = danger ? theme.critical : theme.primary;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md, minHeight: 56 }}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md, minHeight: 56, opacity: pressed ? 0.6 : 1 })}
+    >
       <RowIcon icon={icon} color={color} />
       <T v="body" color={danger ? theme.critical : theme.ink} style={{ flex: 1 }}>
         {label}
       </T>
-      <Ionicons name="chevron-forward" size={18} color={theme.inkFaint} />
+      <Ionicons name="chevron-forward" size={18} color={theme.inkSoft} />
     </Pressable>
   );
 }
 
+/** A setting that is on or off: the whole row is the switch (an easy target, also on the web). */
 function ToggleRow({ icon, label, hint, value, onValueChange }: { icon: IconName; label: string; hint?: string; value: boolean; onValueChange: (v: boolean) => void }) {
   const theme = useTheme();
   return (
-    <Row gap={space.md} style={{ paddingVertical: space.md }}>
+    <Pressable
+      onPress={() => onValueChange(!value)}
+      accessibilityRole="switch"
+      accessibilityLabel={label}
+      aria-checked={value}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md, opacity: pressed ? 0.7 : 1 })}
+    >
       <RowIcon icon={icon} color={theme.primary} />
       <View style={{ flex: 1 }}>
         <T v="body">{label}</T>
         {hint ? <T v="micro">{hint}</T> : null}
       </View>
-      <Toggle value={value} onValueChange={onValueChange} label={label} />
-    </Row>
+      {/* The row speaks for the switch; the switch itself is just the picture of it. */}
+      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
+        <Toggle value={value} onValueChange={onValueChange} label={label} />
+      </View>
+    </Pressable>
   );
 }
 
@@ -118,8 +136,7 @@ function InputRow({
 }) {
   const theme = useTheme();
   const [focused, setFocused] = useState(false);
-  // Money reads with thousands separators ("10,000"); while typing they step aside ("10000").
-  const shown = money && !focused ? grouped(value) : value;
+  const input = useRef<TextInput>(null);
   return (
     <View style={{ paddingVertical: space.md, gap: 6 }}>
       <Row gap={space.md}>
@@ -127,21 +144,27 @@ function InputRow({
         <T v="body" style={{ flex: 1 }}>
           {label}
         </T>
-        <View style={[inputBox(theme, { focused, error: !!error }), { width: 132, paddingHorizontal: 10 }]}>
+        <Pressable onPress={() => input.current?.focus()} accessible={false} style={[inputBox(theme, { focused, error: !!error }), { width: 132, minHeight: 46, paddingHorizontal: 10 }]}>
           <TextInput
+            ref={input}
             nativeID={id}
             accessibilityLabel={label}
-            value={shown}
-            onChangeText={(s) => onChangeText(money ? s.replace(/,/g, '') : s)}
+            // The text never changes when the box gets focus (that would move the caret and add to the
+            // old number). Money is tidied into "10,000" when leaving the box.
+            value={value}
+            onChangeText={onChangeText}
             onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
+            onBlur={() => {
+              setFocused(false);
+              if (money) onChangeText(grouped(value));
+            }}
             placeholder={placeholder}
             placeholderTextColor={theme.inkSoft}
             keyboardType={money ? 'decimal-pad' : 'default'}
             maxLength={maxLength}
-            style={[inputText(theme), { minWidth: 0, width: '100%', paddingVertical: 8, textAlign: money ? 'right' : 'left', color: money ? theme.primary : theme.ink, fontFamily: fonts.sansSemi }]}
+            style={[inputText(theme), { minWidth: 0, width: '100%', paddingVertical: 10, textAlign: money ? 'right' : 'left', color: money ? theme.primary : theme.ink, fontFamily: fonts.sansSemi }]}
           />
-        </View>
+        </Pressable>
       </Row>
       {error ? (
         <T v="small" color={theme.critical} style={{ marginLeft: 48 }}>
@@ -156,10 +179,37 @@ function InputRow({
   );
 }
 
+/** A big jump in a money setting is checked once more before it is saved (a typo of one extra zero changes every number). */
+const BIG_SATANG = 100_000_000; // ฿1,000,000
+
 export default function Settings() {
   const theme = useTheme();
+  const { profile, refresh, refreshing } = useApp();
+  // The form starts from the account's real numbers, so it opens only once they are loaded
+  // (saving defaults over them would erase the opening balance).
+  if (!profile) {
+    return (
+      <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
+        <StackHeader title="ตั้งค่า" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.xl, gap: space.md }}>
+          <T v="h3" center>
+            ยังโหลดข้อมูลบัญชีไม่ได้
+          </T>
+          <T v="small" center>
+            ตั้งค่าเงินได้เมื่อโหลดข้อมูลของคุณเสร็จ
+          </T>
+          <Button label="ลองอีกครั้ง" icon="refresh" loading={refreshing} onPress={() => refresh()} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+  return <SettingsForm key={profile.id} profile={profile} />;
+}
+
+function SettingsForm({ profile }: { profile: Profile }) {
+  const theme = useTheme();
   const toast = useToast();
-  const { profile, repo, userId, saveProfile, signOut, showAuthNotice } = useApp();
+  const { repo, userId, saveProfile, signOut, showAuthNotice } = useApp();
   const [email, setEmail] = useState<string | null>(null);
   useEffect(() => {
     if (repo?.mode !== 'cloud' || !supabase) return;
@@ -171,11 +221,13 @@ export default function Settings() {
   const auto = useAutoScan();
   const themeMode = useThemeMode();
   const klaSound = useKlaSound();
-  const [name, setName] = useState(profile?.displayName ?? '');
-  const [opening, setOpening] = useState(amountToInput(profile?.openingBalanceSatang ?? 0));
-  const [floor, setFloor] = useState(amountToInput(profile?.runwayFloorSatang ?? 50_000));
-  const [budget, setBudget] = useState(amountToInput(profile?.monthlyBudgetSatang));
+  const [name, setName] = useState(profile.displayName);
+  const [opening, setOpening] = useState(grouped(amountToInput(profile.openingBalanceSatang)));
+  const [floor, setFloor] = useState(grouped(amountToInput(profile.runwayFloorSatang)));
+  const [budget, setBudget] = useState(grouped(amountToInput(profile.monthlyBudgetSatang)));
   const [busy, setBusy] = useState(false);
+  /** A save waiting for "these numbers are right" (a very big amount). */
+  const [checkBig, setCheckBig] = useState<{ patch: Partial<Profile>; lines: string[] } | null>(null);
   const [askOut, setAskOut] = useState(false);
   const [askCopies, setAskCopies] = useState(false);
   const [askForget, setAskForget] = useState(false);
@@ -196,21 +248,21 @@ export default function Settings() {
 
   // Satang are kept (the fields show them), and ฿0 is a fine balance or reserve.
   const money = (s: string) => parseBahtToSatang(s, { allowZero: true });
+  const o = money(opening);
+  const f = money(floor);
+  const b = budget.trim() ? parseBahtToSatang(budget) : null;
+  const dirty =
+    name.trim() !== profile.displayName ||
+    o !== profile.openingBalanceSatang ||
+    f !== profile.runwayFloorSatang ||
+    (budget.trim() ? b : null) !== (profile.monthlyBudgetSatang ?? null);
+  // Leaving with typed numbers that were not saved asks first (also Android back / browser back).
+  const leaveGuard = useConfirmLeave(dirty && !busy);
 
-  async function save() {
-    const e: Record<string, string> = {};
-    const o = money(opening);
-    const f = money(floor);
-    const b = budget.trim() ? parseBahtToSatang(budget) : null;
-    if (!name.trim()) e.name = 'ใส่ชื่อเล่น';
-    if (o === null) e.opening = 'ใส่เป็นตัวเลข';
-    if (f === null) e.floor = 'ใส่เป็นตัวเลข';
-    if (budget.trim() && b === null) e.budget = 'ใส่เป็นตัวเลข หรือเว้นว่าง';
-    setErrors(e);
-    if (Object.keys(e).length) return;
+  async function store(patch: Partial<Profile>) {
     setBusy(true);
     try {
-      await saveProfile({ displayName: name.trim(), openingBalanceSatang: o!, runwayFloorSatang: f!, monthlyBudgetSatang: b });
+      await saveProfile(patch);
       toast({ message: 'บันทึกการตั้งค่าแล้ว' });
     } catch {
       toast({ message: 'บันทึกไม่สำเร็จ', tone: 'error' });
@@ -219,12 +271,44 @@ export default function Settings() {
     }
   }
 
-  const initial = (profile?.displayName || email || 'M').trim().charAt(0).toUpperCase();
+  async function save() {
+    const e: Record<string, string> = {};
+    if (!name.trim()) e.name = 'ใส่ชื่อเล่น';
+    if (o === null) e.opening = 'ใส่เป็นตัวเลข';
+    if (f === null) e.floor = 'ใส่เป็นตัวเลข';
+    if (budget.trim() && b === null) e.budget = 'ใส่เป็นตัวเลข หรือเว้นว่าง';
+    setErrors(e);
+    if (Object.keys(e).length) return;
+    // Only what was changed is sent (nothing else is overwritten).
+    const patch: Partial<Profile> = {};
+    if (name.trim() !== profile.displayName) patch.displayName = name.trim();
+    if (o !== profile.openingBalanceSatang) patch.openingBalanceSatang = o!;
+    if (f !== profile.runwayFloorSatang) patch.runwayFloorSatang = f!;
+    if (b !== (profile.monthlyBudgetSatang ?? null)) patch.monthlyBudgetSatang = b;
+    if (!Object.keys(patch).length) {
+      toast({ message: 'ไม่มีอะไรเปลี่ยน' });
+      return;
+    }
+    const big = (label: string, value: number | null | undefined, before: number | null) =>
+      value != null && value !== before && (value >= BIG_SATANG || (before != null && before > 0 && value > before * 10)) ? `${label} ${formatSatang(value, { decimals: value % 100 !== 0 })} บาท` : null;
+    const lines = [
+      big('ยอดเงินตอนเริ่ม', patch.openingBalanceSatang, profile.openingBalanceSatang),
+      big('เงินสำรองขั้นต่ำ', patch.runwayFloorSatang, profile.runwayFloorSatang),
+      big('งบต่อเดือน', patch.monthlyBudgetSatang, profile.monthlyBudgetSatang),
+    ].filter((x): x is string => !!x);
+    if (lines.length) {
+      setCheckBig({ patch, lines });
+      return;
+    }
+    await store(patch);
+  }
+
+  const initial = (profile.displayName || email || 'M').trim().charAt(0).toUpperCase();
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
-      <StackHeader title="ตั้งค่า" />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <StackHeader title="ตั้งค่า" onBack={leaveGuard.requestLeave} />
+      <KeyboardAvoid>
         <ScrollView contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.sm, paddingBottom: space.xxxl }} keyboardShouldPersistTaps="handled">
           <Group title="บัญชี">
             <Row gap={space.md} style={{ paddingVertical: space.md }}>
@@ -236,7 +320,7 @@ export default function Settings() {
                 )}
               </View>
               <View style={{ flex: 1 }}>
-                <T v="h3" numberOfLines={1}>{profile?.displayName || 'ผู้ใช้ MindPay'}</T>
+                <T v="h3" numberOfLines={1}>{profile.displayName || 'ผู้ใช้ MindPay'}</T>
                 <T v="small" numberOfLines={1}>{repo?.mode === 'demo' ? 'โหมดทดลอง (ข้อมูลในเครื่อง)' : (email ?? 'บัญชี MindPay')}</T>
               </View>
             </Row>
@@ -261,7 +345,7 @@ export default function Settings() {
               value={floor}
               onChangeText={setFloor}
               money
-              hint="Money Runway นับวันจนยอดเงินเหลือเท่านี้"
+              hint="แอปนับว่าเงินพอใช้กี่วัน จนยอดเหลือเท่านี้"
               error={errors.floor}
             />
             <InputRow
@@ -367,8 +451,8 @@ export default function Settings() {
                 • รูปสลิปที่อ่านแล้วเก็บเป็นสำเนาในเครื่องนี้เท่านั้น ไม่ได้อัปโหลดเก็บบน server
                 {showPrivacy ? (
                   <>
-                    {'\n'}• รูปในแกลเลอรีถูกตรวจบนมือถือก่อน เฉพาะรูปที่มี QR ของสลิปจะถูกส่งให้ AI (Google Gemini) อ่าน และไม่ถูกเก็บบนเซิร์ฟเวอร์ MindPay{'\n'}
-                    • ช่วงทดลองใช้ Gemini แบบฟรี ซึ่ง Google อาจเก็บข้อมูลที่ส่งไปเพื่อปรับปรุง AI ตามเงื่อนไขของ Google{'\n'}
+                    {'\n'}• รูปในแกลเลอรีถูกตรวจบนมือถือก่อน เฉพาะรูปที่มี QR ของสลิปจะถูกส่งให้ AI (Google Gemini หรือ Anthropic Claude ตามที่ระบบตั้งไว้) อ่าน และไม่ถูกเก็บบนเซิร์ฟเวอร์ MindPay{'\n'}
+                    • ถ้าใช้ Gemini แบบฟรี Google อาจเก็บข้อมูลที่ส่งไปเพื่อปรับปรุง AI ตามเงื่อนไขของ Google{'\n'}
                     • น้องกล้า (โค้ช AI) เห็นเฉพาะยอดรวมตามหมวด ไม่เห็นรูปสลิป เลขบัญชี หรือชื่อคนที่คุณโอนให้{'\n'}
                     • เสียงของน้องกล้าใช้เสียงอ่านภาษาไทยที่มากับมือถือหรือเบราว์เซอร์ของคุณ (ข้อความที่อ่านเป็นคำตอบของโค้ชเท่านั้น)
                   </>
@@ -398,7 +482,7 @@ export default function Settings() {
             {appConfig.expo.name} เวอร์ชัน {appConfig.expo.version}
           </T>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAvoid>
 
       <ConfirmSheet
         visible={askOut}
@@ -411,6 +495,27 @@ export default function Settings() {
           signOut();
         }}
         onCancel={() => setAskOut(false)}
+      />
+      <ConfirmSheet
+        visible={leaveGuard.asking}
+        title="ทิ้งสิ่งที่แก้ไว้?"
+        body="ตัวเลขที่แก้ในหน้านี้ยังไม่ได้บันทึก ถ้าออกตอนนี้จะกลับเป็นค่าเดิม"
+        confirmLabel="ทิ้งและออก"
+        destructive
+        onConfirm={leaveGuard.leave}
+        onCancel={leaveGuard.stay}
+      />
+      <ConfirmSheet
+        visible={!!checkBig}
+        title="ตัวเลขนี้ถูกไหม?"
+        body={`${checkBig?.lines.join(' · ') ?? ''} ซึ่งสูงกว่าปกติมาก ตรวจว่าไม่ได้พิมพ์ศูนย์เกิน`}
+        confirmLabel="ถูกแล้ว บันทึก"
+        onConfirm={() => {
+          const patch = checkBig?.patch;
+          setCheckBig(null);
+          if (patch) store(patch);
+        }}
+        onCancel={() => setCheckBig(null)}
       />
       <ConfirmSheet
         visible={askForget}

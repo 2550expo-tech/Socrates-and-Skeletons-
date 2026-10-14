@@ -18,7 +18,7 @@ for (const name of ['apple-touch-icon.png', 'icon-192.png', 'icon-512.png']) {
 const manifest = {
   name: 'MindPay ใหม่',
   short_name: 'MindPay ใหม่',
-  description: 'เพื่อนการเงินที่อ่านสลิปและบอกว่าเงินพอถึงวันไหน',
+  description: 'แอปจดเงินของนักศึกษา อ่านสลิปให้เอง และบอกว่าเงินพอใช้ถึงวันไหน',
   lang: 'th',
   start_url: `${base}/`,
   scope: `${base}/`,
@@ -39,14 +39,23 @@ const tags = [
   '<meta name="mobile-web-app-capable" content="yes">',
   '<meta name="apple-mobile-web-app-title" content="MindPay ใหม่">',
   '<meta name="apple-mobile-web-app-status-bar-style" content="default">',
+  `<meta name="description" content="${manifest.description}">`,
   // Brand green while the app loads, so the page does not flash white before the opening animation.
   `<style>html, body { background-color: ${FOREST}; }</style>`,
 ].join('\n    ');
 
 const indexPath = join(dist, 'index.html');
-const html = readFileSync(indexPath, 'utf8');
+let html = readFileSync(indexPath, 'utf8');
 if (!html.includes('</head>')) throw new Error(`${indexPath} has no </head>`);
 if (!html.includes('rel="manifest"')) {
-  writeFileSync(indexPath, html.replace('</head>', `    ${tags}\n  </head>`));
+  html = html.replace('</head>', `    ${tags}\n  </head>`);
 }
+// The page is Thai: browsers should not offer to translate it, and screen readers use a Thai voice.
+html = html.replace(/<html lang="[^"]*">/, '<html lang="th">');
+// viewport-fit=cover: on iPhones the home-screen app learns the safe areas (home indicator),
+// so the tab bar and bottom buttons are not drawn under it.
+html = html.replace(/<meta name="viewport" content="([^"]*)"\s*\/?>/, (whole, content) =>
+  content.includes('viewport-fit') ? whole : `<meta name="viewport" content="${content}, viewport-fit=cover" />`,
+);
+writeFileSync(indexPath, html);
 console.log(`Home-screen settings added (base "${base || '/'}")`);

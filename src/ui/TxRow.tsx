@@ -7,9 +7,12 @@ import { FLAG_LABEL, type ReviewFlag } from '../domain/slip';
 import type { Transaction } from '../domain/types';
 import { categoryLook } from './category';
 import { Badge, Ionicons, Money, Row, T } from './components';
-import { space, useTheme } from './theme';
+import { radius, space, useTheme } from './theme';
 
-/** One transaction in a list. Tapping opens it for editing (FR-1). */
+/** Dividers between rows start where the text does (after the 40pt tile and its gap), on every list. */
+export const TX_DIVIDER_INSET = 40 + space.md;
+
+/** One transaction in a list. Tapping opens it for editing (FR-1). Lists put rows on a surface card with space.lg at the sides. */
 /**
  * `dayLabel`: "เมื่อวาน", "11 ต.ค."… shown before the time where items from different days are mixed
  * (the home screen's latest items), so yesterday is never mistaken for today.
@@ -32,7 +35,7 @@ export function TxRow({ tx, showTime = true, dayLabel }: { tx: Transaction; show
           style={{
             width: 40,
             height: 40,
-            borderRadius: 12,
+            borderRadius: radius.tile,
             backgroundColor: draft ? theme.accentSoft : look.tile,
             alignItems: 'center',
             justifyContent: 'center',

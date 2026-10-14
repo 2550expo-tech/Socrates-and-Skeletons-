@@ -7,7 +7,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BUDDY_NAME } from '../domain/buddy';
 import type { Mission } from '../domain/missions';
@@ -23,6 +23,7 @@ import { Medal } from '../ui/Medal';
 import { useCountUp, useReduceMotion } from '../ui/motion';
 import { alpha, fonts, radius, space, useTheme } from '../ui/theme';
 import { StackHeader } from '../ui/StackHeader';
+import { SectionHead } from '../ui/SectionHead';
 
 const WEEKDAY = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
@@ -70,7 +71,7 @@ export default function Achievements() {
                       justifyContent: 'center',
                     }}
                   >
-                    <Ionicons name="flame" size={32} color={streak.today ? '#F29E4C' : theme.heroInkSoft} />
+                    <Ionicons name="flame" size={32} color={streak.today ? theme.heroStreak : theme.heroInkSoft} />
                   </View>
                 </View>
                 <View style={{ flex: 1 }}>
@@ -120,12 +121,7 @@ export default function Achievements() {
 
         {/* Money missions: each one unlocks a skin for น้องกล้า */}
         <View style={{ gap: space.sm }}>
-          <Row justify="space-between">
-            <T v="h3">ภารกิจการเงิน</T>
-            <T v="small">
-              สำเร็จ {missions.filter((m) => m.done).length}/{missions.length}
-            </T>
-          </Row>
+          <SectionHead title="ภารกิจการเงิน" right={<T v="small">สำเร็จ {missions.filter((m) => m.done).length}/{missions.length}</T>} />
           <T v="micro">ทำภารกิจสำเร็จ แล้วน้องกล้าจะได้ชุดใหม่ใส่</T>
           {missions.map((m, i) => (
             <Reveal key={m.id} index={i} from={10}>
@@ -136,12 +132,7 @@ export default function Achievements() {
         </View>
 
         {/* Badges */}
-        <Row justify="space-between">
-          <T v="h3">เหรียญของฉัน</T>
-          <T v="small">
-            ได้แล้ว {earned}/{badges.length}
-          </T>
-        </Row>
+        <SectionHead title="เหรียญของฉัน" right={<T v="small">ได้แล้ว {earned}/{badges.length}</T>} />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: space.lg }}>
           {badges.map((b, i) => (
             <Reveal key={b.id} index={i} from={12} zoom style={{ width: '33.33%', alignItems: 'center' }}>
@@ -179,9 +170,9 @@ function MissionCard({ mission: m, onPress }: { mission: Mission; onPress: () =>
         gap: space.md,
         backgroundColor: theme.surface,
         borderRadius: radius.lg,
-        // Like Card: a hairline, and the accent at 1.5pt for what is done.
-        borderWidth: m.done ? 1.5 : StyleSheet.hairlineWidth,
-        borderColor: m.done ? theme.accent : theme.line,
+        // Like Card: no outline; what is done gets a gold edge that reads on the card (accentInk).
+        borderWidth: 1.5,
+        borderColor: m.done ? theme.accentInk : 'transparent',
         padding: space.md,
         opacity: pressed ? 0.88 : 1,
       })}

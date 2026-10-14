@@ -62,6 +62,12 @@ export interface Theme {
   heroInkSoft: string;
   /** Money in, on hero surfaces (light green that reads on every hero gradient). */
   heroIncome: string;
+  /** Money running out, on hero surfaces (a light red that reads on every hero gradient). */
+  heroCritical: string;
+  /** The lit streak flame (a warm orange that stands out from the page, 3:1). */
+  streak: string;
+  /** The lit streak flame on hero surfaces. */
+  heroStreak: string;
   overlay: string;
 }
 
@@ -145,7 +151,7 @@ export const COLOR_THEMES: ColorThemeSpec[] = [
     key: 'amber',
     name: 'ทองอำพัน',
     nameEn: 'Golden Amber',
-    hero: ['#8C5E14', '#63400C', '#3C2607'],
+    hero: ['#7A5211', '#63400C', '#3C2607'],
     heroDarkTop: '#754E10',
     heroAccent: '#F5D37A',
     heroBare: '#B49A6C',
@@ -157,7 +163,7 @@ export const COLOR_THEMES: ColorThemeSpec[] = [
     key: 'sunset',
     name: 'ส้มพระอาทิตย์',
     nameEn: 'Sunset Copper',
-    hero: ['#A5471F', '#7A3216', '#471B0B'],
+    hero: ['#933E1B', '#7A3216', '#471B0B'],
     heroDarkTop: '#8C3C1A',
     heroAccent: '#F2C882',
     heroBare: '#C08E78',
@@ -226,6 +232,13 @@ function inkOf(color: string, backgrounds: string[]): string {
   return c;
 }
 
+/** A colour moved towards `target` step by step until it reads at `ratio` on every background given. */
+function towards(color: string, target: string, backgrounds: string[], ratio = 4.5): string {
+  let c = color;
+  for (let i = 0; i < 30 && backgrounds.some((bg) => contrast(c, bg) < ratio); i++) c = mix(c, target, 0.88);
+  return c;
+}
+
 /** A divider colour moved towards the ink until it reads at 3:1 on every background (control edges). */
 function strongLine(line: string, ink: string, backgrounds: string[]): string {
   let c = line;
@@ -233,11 +246,16 @@ function strongLine(line: string, ink: string, backgrounds: string[]): string {
   return c;
 }
 
+const HERO_INK = '#F4F1E6';
+const HERO_STREAK = '#F29E4C';
+
 export function buildTheme(key: ColorThemeKey, dark: boolean): Theme {
   const spec = COLOR_THEMES.find((t) => t.key === key) ?? COLOR_THEMES[0];
   const mode = dark ? spec.dark : spec.light;
   const sem = dark ? SEMANTIC.dark : SEMANTIC.light;
   const soft = (c: string) => (dark ? mix(c, mode.surface, 0.16) : mix(c, '#FFFFFF', 0.12));
+  const heroTop = dark ? spec.heroDarkTop : spec.hero[0];
+  const heroStops = [heroTop, spec.hero[1]];
   return {
     dark,
     colorTheme: spec.key,
@@ -250,14 +268,18 @@ export function buildTheme(key: ColorThemeKey, dark: boolean): Theme {
     watchSoft: soft(sem.watch),
     criticalSoft: soft(sem.critical),
     expense: mode.ink,
-    heroTop: dark ? spec.heroDarkTop : spec.hero[0],
+    heroTop,
     hero: spec.hero[1],
     heroDeep: spec.hero[2],
     heroAccent: spec.heroAccent,
     heroBare: spec.heroBare,
-    heroInk: '#F4F1E6',
-    heroInkSoft: spec.heroInkSoft,
-    heroIncome: '#9BE8BF',
+    heroInk: HERO_INK,
+    // Text sits at the top of the gradient too, where it is lightest: lift the light inks until they read there.
+    heroInkSoft: towards(spec.heroInkSoft, HERO_INK, heroStops),
+    heroIncome: towards('#9BE8BF', '#FFFFFF', heroStops),
+    heroCritical: towards('#FFB4A8', '#FFFFFF', heroStops),
+    streak: dark ? HERO_STREAK : towards('#E07B2E', '#000000', [mode.bg, mode.surface], 3),
+    heroStreak: towards(HERO_STREAK, '#FFFFFF', heroStops, 3),
   };
 }
 
@@ -324,10 +346,13 @@ export const fonts = {
 };
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28, xxxl: 40 };
-export const radius = { sm: 8, md: 14, lg: 20, xl: 28, pill: 999 };
+// tile: the square behind an icon (36–44pt); small 28pt tiles use sm.
+export const radius = { sm: 8, tile: 12, md: 14, lg: 20, xl: 28, pill: 999 };
 
 /** Type scale (size / line height). Thai needs generous line height for vowels above and below. */
 export const type = {
+  // The one big number on a hero card (days the money lasts), the same on home and Money Runway.
+  hero: { fontSize: 56, lineHeight: 64 },
   display: { fontSize: 38, lineHeight: 52 },
   h1: { fontSize: 24, lineHeight: 34 },
   h2: { fontSize: 20, lineHeight: 30 },

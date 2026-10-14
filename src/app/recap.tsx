@@ -206,7 +206,7 @@ export default function Recap() {
           </Row>
           <Reveal index={5}>
             <Row gap={space.sm} style={{ backgroundColor: 'rgba(244,241,230,0.10)', borderRadius: 999, paddingHorizontal: space.lg, paddingVertical: space.sm }}>
-              <Ionicons name="flame" size={20} color="#F29E4C" />
+              <Ionicons name="flame" size={20} color={theme.heroStreak} />
               <T v="body" color={INK}>
                 จดต่อเนื่องสูงสุด {streak.best} วัน
               </T>

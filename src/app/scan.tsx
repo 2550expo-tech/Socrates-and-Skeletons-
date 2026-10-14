@@ -12,9 +12,11 @@
  */
 import { router } from 'expo-router';
 import { goBack } from '../ui/nav';
+import { DemoUpgrade } from '../ui/DemoUpgrade';
 import { useEffect, useMemo, useRef } from 'react';
 import { Linking, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StackHeader } from '../ui/StackHeader';
 import { useApp } from '../data/AppProvider';
 import { BUDDY_NAME } from '../domain/buddy';
 import { relativeDayLabel } from '../domain/dates';
@@ -25,15 +27,14 @@ import { useAutoScan } from '../services/AutoScanProvider';
 import { galleryAvailable } from '../services/slips';
 import { useSlipScanner } from '../services/useSlipScanner';
 import { Buddy, BuddySays } from '../ui/Buddy';
-import { Button, Card, Divider, IconButton, Ionicons, ProgressBar, Row, T } from '../ui/components';
+import { Button, Card, Divider, Ionicons, ProgressBar, Row, T } from '../ui/components';
 import { useToast } from '../ui/feedback';
 import { Reveal } from '../ui/effects';
 import { PeriodSummary } from '../ui/PeriodSummary';
 import { ScannerStage } from '../ui/ScannerStage';
-import { TxRow } from '../ui/TxRow';
+import { TX_DIVIDER_INSET, TxRow } from '../ui/TxRow';
 import { radius, space, useTheme } from '../ui/theme';
 import { WaitNotice } from '../ui/WaitNotice';
-import { HeaderDecor } from '../ui/halloween';
 
 export default function Scan() {
   const theme = useTheme();
@@ -86,15 +87,14 @@ export default function Scan() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
-      <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
-        <IconButton icon="close" label="ปิด" onPress={() => goBack()} />
-        <T v="h3">สแกนสลิป</T>
-        <HeaderDecor />
-      </Row>
+      <StackHeader title="สแกนสลิป" close />
 
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxxl }}>
         {demo ? (
-          <BuddySays mood="calm">โหมดทดลองยังอ่านสลิปไม่ได้นะ เพราะต้องใช้เซิร์ฟเวอร์ เข้าสู่ระบบด้วยบัญชีจริง แล้ว{BUDDY_NAME}จะอ่านให้เลย</BuddySays>
+          <>
+            <BuddySays mood="calm">โหมดทดลองยังอ่านสลิปไม่ได้นะ เพราะต้องใช้เซิร์ฟเวอร์ สมัครหรือเข้าสู่ระบบด้วยบัญชีจริง แล้ว{BUDDY_NAME}จะอ่านให้เลย</BuddySays>
+            <DemoUpgrade />
+          </>
         ) : null}
 
         {/* Web: one tap to choose photos, then everything else is automatic */}
@@ -171,7 +171,9 @@ export default function Scan() {
                   {done
                     ? recorded.length > 0
                       ? `อ่านเสร็จแล้ว ได้ ${recorded.length} รายการ`
-                      : 'อ่านเสร็จแล้ว ไม่พบสลิปใหม่'
+                      : counts.failed > 0
+                        ? `อ่านไม่ได้ ${counts.failed} รูป`
+                        : 'อ่านเสร็จแล้ว ไม่พบสลิปใหม่'
                     : paused
                       ? 'หยุดไว้ชั่วคราว'
                       : `${BUDDY_NAME}กำลังอ่านสลิป ${counts.finished}/${counts.total}`}
@@ -193,6 +195,9 @@ export default function Scan() {
                 </T>
                 <Button label="เลือกรูปเอง" kind="soft" small icon="hand-left-outline" onPress={s.loadPicked} />
               </View>
+            ) : null}
+            {done && counts.failed > 0 ? (
+              <Button label={`ลองรูปที่อ่านไม่ได้อีกครั้ง (${counts.failed})`} kind="soft" small icon="refresh" onPress={s.retryFailed} />
             ) : null}
             {running && s.waiting ? <WaitNotice until={s.waiting} /> : null}
             {running ? <Button label="หยุดชั่วคราว" kind="soft" small icon="pause" onPress={s.pause} /> : null}
@@ -227,9 +232,10 @@ export default function Scan() {
                       สุทธิ {formatBaht(g.netSatang, { sign: true, decimals: false })}
                     </T>
                   </Row>
-                  {g.items.map((t) => (
+                  {g.items.map((t, j) => (
                     <View key={t.id}>
-                      <Divider />
+                      {/* Under the day's heading a full rule; between rows the shared inset. */}
+                      <Divider style={j > 0 ? { marginLeft: TX_DIVIDER_INSET } : undefined} />
                       <TxRow tx={t} />
                     </View>
                   ))}
@@ -244,7 +250,7 @@ export default function Scan() {
           <Row gap={6}>
             <Ionicons name="shield-checkmark-outline" size={16} color={theme.inkSoft} />
             <T v="micro" style={{ flex: 1 }}>
-              รูปสลิปส่งให้ AI (Google Gemini) อ่านครั้งเดียว ไม่ถูกเก็บบนเซิร์ฟเวอร์ MindPay (รายละเอียดในตั้งค่า) · สลิปที่อ่านชัดทุกช่องรวมในยอดทันที ส่วนที่ไม่ชัดรอให้ตรวจ (ปิดได้ในตั้งค่า)
+              รูปสลิปส่งให้ AI (Google Gemini หรือ Anthropic Claude) อ่านครั้งเดียว ไม่ถูกเก็บบนเซิร์ฟเวอร์ MindPay (รายละเอียดในตั้งค่า) · สลิปที่อ่านชัดทุกช่องรวมในยอดทันที ส่วนที่ไม่ชัดรอให้ตรวจ (ปิดได้ในตั้งค่า)
             </T>
           </Row>
         </View>

@@ -107,6 +107,19 @@ export async function processSlipImage(opts: {
     };
   } catch (e) {
     if (e instanceof DuplicateSlipError) return { status: 'duplicate', amountSatang: c.amountSatang, label, message: 'มีรายการนี้แล้ว' };
-    throw e;
+    // Saving failed after the slip was read: not this photo's fault. As a reader error the whole
+    // run pauses with the right message (and the photo is tried again later) instead of every
+    // following photo using up another AI read and failing to save too.
+    throw saveError(e);
   }
+}
+
+/** A failed save, as the error the scanners already handle for the whole run. */
+function saveError(e: unknown): SlipReaderError {
+  const err = (e ?? {}) as { status?: unknown; code?: unknown; message?: unknown; name?: unknown };
+  const text = [err.name, err.message, err.code].filter((x) => typeof x === 'string').join(' ').toLowerCase();
+  if (err.status === 401 || err.code === 'PGRST301' || /\bjwt\b|unauthori[sz]ed|row-level security/.test(text)) {
+    return new SlipReaderError('unauthorized', READER_MESSAGES.unauthorized);
+  }
+  return new SlipReaderError('network', READER_MESSAGES.network);
 }

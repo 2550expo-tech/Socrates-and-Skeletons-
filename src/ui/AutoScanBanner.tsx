@@ -99,7 +99,7 @@ export function AutoScanBanner() {
             <T v="h3">{BUDDY_NAME}เจอสลิปใหม่ {state.drafts} ใบ</T>
           )}
           <T v="small">
-            {state.confirmed.length > 0 ? 'ยอดเงินและ Money Runway คำนวณใหม่แล้ว' : ''}
+            {state.confirmed.length > 0 ? 'ยอดเงินและวันที่เงินพอใช้คำนวณใหม่แล้ว' : ''}
             {state.drafts > 0 ? `${state.confirmed.length > 0 ? ' · ' : ''}ต้องตรวจ ${state.drafts} รายการที่อ่านไม่ชัด` : ''}
           </T>
         </View>

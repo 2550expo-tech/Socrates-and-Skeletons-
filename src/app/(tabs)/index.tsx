@@ -22,7 +22,7 @@ import { pickAttention, type AttentionItem, type PromoItem, type PromoTurn } fro
 import { budgetToday } from '../../domain/budget';
 import type { BuddyMood } from '../../domain/buddy';
 import { bkkDayKey, formatThaiDay, formatThaiMonth, previousMonth, relativeDayLabel, thaiWeekday } from '../../domain/dates';
-import { halloweenOn } from '../../domain/halloween';
+import { HALLOWEEN, halloweenOn } from '../../domain/halloween';
 import { formatBaht } from '../../domain/money';
 import { recapToOffer } from '../../domain/recap';
 import { monthEndCheck, type Runway } from '../../domain/runway';
@@ -40,11 +40,13 @@ import { closeHalloweenInvite, GhostArt, HalloweenStrip, SpookyHeroDecor, useHal
 import { KlaPicture } from '../../ui/kla/KlaPicture';
 import { Medal } from '../../ui/Medal';
 import { useCountUp, useReduceMotion } from '../../ui/motion';
+import { DemoUpgrade } from '../../ui/DemoUpgrade';
 import { monthEndStatus, railLabel, RunwayRail } from '../../ui/RunwayRail';
-import { TxRow } from '../../ui/TxRow';
+import { TX_DIVIDER_INSET, TxRow } from '../../ui/TxRow';
 import { useToast } from '../../ui/feedback';
 import { alpha, fonts, radius, space, useTheme } from '../../ui/theme';
 import { setColorTheme } from '../../ui/themeMode';
+import { SectionHead } from '../../ui/SectionHead';
 
 /** Badges already celebrated in this session (the home screen can mount again). */
 const celebrated = new Set<string>();
@@ -111,7 +113,7 @@ function Streak({ days, today }: { days: number; today: boolean }) {
       accessibilityLabel={`จดต่อเนื่อง ${days} วัน ดูความสำเร็จ`}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 2, height: 44, paddingHorizontal: 6 }}
     >
-      <Ionicons name={today ? 'flame' : 'flame-outline'} size={20} color={today ? '#E07B2E' : theme.inkSoft} />
+      <Ionicons name={today ? 'flame' : 'flame-outline'} size={20} color={today ? theme.streak : theme.inkSoft} />
       <T v="body" color={theme.ink} style={{ fontFamily: fonts.sansSemi, fontVariant: ['tabular-nums'] }}>
         {days}
       </T>
@@ -143,6 +145,8 @@ function AttentionRow({
   emphasis?: boolean;
 }) {
   const theme = useTheme();
+  // The whole card shows the press (the close button is its own target).
+  const [pressed, setPressed] = useState(false);
   return (
     <View
       style={{
@@ -153,19 +157,21 @@ function AttentionRow({
         paddingRight: onClose ? space.xs : space.md,
         paddingVertical: space.sm,
         borderRadius: radius.lg,
-        backgroundColor: theme.surface,
+        backgroundColor: pressed ? theme.surfaceAlt : theme.surface,
         borderWidth: emphasis ? 1.5 : 0,
-        borderColor: theme.accent,
+        borderColor: theme.accentInk,
       }}
     >
       <Pressable
         onPress={onPress}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
         disabled={!onPress}
         accessibilityRole={onPress ? 'button' : undefined}
         accessibilityLabel={onPress ? `${title}${sub ? ` ${sub}` : ''}${action ? ` ${action}` : ''}` : undefined}
         style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 48 }}
       >
-        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: theme.surfaceAlt, alignItems: 'center', justifyContent: 'center', overflow: 'visible' }}>
+        <View style={{ width: 40, height: 40, borderRadius: radius.tile, backgroundColor: pressed ? theme.surface : theme.surfaceAlt, alignItems: 'center', justifyContent: 'center', overflow: 'visible' }}>
           {art ?? <Ionicons name={icon ?? 'notifications-outline'} size={20} color={theme.ink} />}
         </View>
         <View style={{ flex: 1, gap: 0 }}>
@@ -196,7 +202,7 @@ function MoneyCard({ runway, balance, averageSatang }: { runway: Runway; balance
   const status = monthEndStatus(check);
   // Counts only when the number changes (after a save), never from 0 when the screen appears.
   const daysShown = useCountUp(runway.days ?? 0, !reduce && runway.days !== null && !runway.capped, 700);
-  const statusColor = status.tone === 'good' ? theme.heroIncome : status.tone === 'bad' ? '#FFB4A8' : theme.heroInkSoft;
+  const statusColor = status.tone === 'good' ? theme.heroIncome : status.tone === 'bad' ? theme.heroCritical : theme.heroInkSoft;
   const label = railLabel(check);
 
   const figure = (label: string, children: React.ReactNode) => (
@@ -233,7 +239,7 @@ function MoneyCard({ runway, balance, averageSatang }: { runway: Runway; balance
             </T>
           ) : (
             <Row gap={space.sm} align="flex-end">
-              <T v="display" color={theme.heroAccent} style={{ fontSize: 56, lineHeight: 64, fontVariant: ['tabular-nums'] }}>
+              <T v="hero" color={theme.heroAccent} style={{ fontVariant: ['tabular-nums'] }}>
                 {runway.status === 'below_floor' ? 0 : runway.capped ? '365+' : daysShown}
               </T>
               <View style={{ paddingBottom: 9, gap: 0 }}>
@@ -259,10 +265,10 @@ function MoneyCard({ runway, balance, averageSatang }: { runway: Runway; balance
           </Row>
           <View style={{ height: 1, backgroundColor: alpha(theme.heroInk, 0.14), marginVertical: space.xs }} />
           <Row gap={space.md} align="flex-start">
-            {figure('ยอดคงเหลือ', <Money satang={balance} size="body" decimals={false} color={theme.heroInk} style={{ fontFamily: fonts.sansSemi, fontSize: 17, lineHeight: 26 }} />)}
+            {figure('ยอดคงเหลือ', <Money satang={balance} size="h3" color={theme.heroInk} />)}
             {figure(
               'ใช้เฉลี่ยต่อวัน (7 วัน)',
-              <Money satang={averageSatang} size="body" decimals={false} color={theme.heroInk} style={{ fontFamily: fonts.sansSemi, fontSize: 17, lineHeight: 26 }} />,
+              <Money satang={averageSatang} size="h3" decimals={false} color={theme.heroInk} />,
             )}
           </Row>
         </LinearGradient>
@@ -287,7 +293,7 @@ function BudgetCard() {
         onPress={() => router.push('/settings')}
         accessibilityRole="button"
         accessibilityLabel="ตั้งงบรายเดือน รู้ว่าแต่ละวันใช้ได้เท่าไร"
-        style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.lg, backgroundColor: theme.surface }}
+        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg, borderRadius: radius.lg, backgroundColor: pressed ? theme.surfaceAlt : theme.surface })}
       >
         <Ionicons name="wallet-outline" size={22} color={theme.ink} />
         <View style={{ flex: 1 }}>
@@ -366,7 +372,7 @@ function BudgetCard() {
 
 export default function Home() {
   const theme = useTheme();
-  const { profile, txs, repo, refresh, refreshing, loadError, today, status } = useApp();
+  const { profile, txs, refresh, refreshing, loadError, loadErrorKind, signOut, today, status } = useApp();
   const { balance, runway, drafts, average } = useMoney();
   const auto = useAutoScan();
   const ach = useAchievements();
@@ -427,7 +433,12 @@ export default function Home() {
     switch (item) {
       case 'error':
         return (
-          <AttentionRow icon="cloud-offline-outline" title="โหลดข้อมูลล่าสุดไม่สำเร็จ" sub={loadError ?? undefined} action="ลองอีกครั้ง" onPress={refresh} emphasis />
+          // An expired session cannot be fixed by trying again: offer to sign in again instead.
+          loadErrorKind === 'expired' ? (
+            <AttentionRow icon="log-in-outline" title="ต้องเข้าสู่ระบบใหม่" sub={loadError ?? undefined} action="เข้าสู่ระบบใหม่" onPress={() => signOut()} emphasis />
+          ) : (
+            <AttentionRow icon="cloud-offline-outline" title="โหลดข้อมูลล่าสุดไม่สำเร็จ" sub={loadError ?? undefined} action="ลองอีกครั้ง" onPress={refresh} emphasis />
+          )
         );
       case 'autoscan':
         return <AutoScanBanner />;
@@ -491,7 +502,7 @@ export default function Home() {
           <AttentionRow
             art={<GhostArt size={30} />}
             title="ฮาโลวีนมาแล้ว!"
-            sub="แตะเพื่อเปิดธีมฮาโลวีน จับผีรับลูกอม แลกชุดผี (ถึง 2 พ.ย.)"
+            sub={`แตะเพื่อเปิดธีมฮาโลวีน จับผีรับลูกอม แลกชุดผี (ถึง ${formatThaiDay(HALLOWEEN.to, { year: false })})`}
             action="เปิดธีมฮาโลวีน"
             onPress={() => {
               setColorTheme('halloween');
@@ -542,13 +553,8 @@ export default function Home() {
             <T v="small" numberOfLines={1}>
               {thaiWeekday(today)} {formatThaiDay(today, { year: false })}
             </T>
-            {repo?.mode === 'demo' ? (
-              <View style={{ paddingHorizontal: 8, borderRadius: radius.pill, backgroundColor: theme.surfaceAlt }}>
-                <T v="micro" color={theme.ink}>
-                  ทดลอง
-                </T>
-              </View>
-            ) : null}
+            {/* Demo mode: the badge is also the way to a real account. */}
+            <DemoUpgrade variant="badge" />
           </Row>
           <T v="h3" numberOfLines={1}>
             สวัสดี {profile?.displayName || ''}
@@ -577,17 +583,7 @@ export default function Home() {
       {/* 3. Latest transactions */}
       <Reveal index={3}>
         <View style={{ gap: space.sm }}>
-          <Row justify="space-between">
-            <T v="h3" accessibilityRole="header">
-              รายการล่าสุด
-            </T>
-            <Pressable onPress={() => router.navigate('/transactions')} hitSlop={10} accessibilityRole="button" accessibilityLabel="ดูทั้งหมด" style={{ flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44 }}>
-              <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi }}>
-                ดูทั้งหมด
-              </T>
-              <Ionicons name="chevron-forward" size={16} color={theme.ink} />
-            </Pressable>
-          </Row>
+          <SectionHead title="รายการล่าสุด" action="ดูทั้งหมด" onAction={() => router.navigate('/transactions')} />
           <View style={{ borderRadius: radius.lg, backgroundColor: theme.surface, paddingHorizontal: space.lg, paddingVertical: space.xs }}>
             {recent.length === 0 ? (
               <EmptyState
@@ -601,7 +597,7 @@ export default function Home() {
             ) : (
               recent.map((t, i) => (
                 <View key={t.id}>
-                  {i > 0 ? <Divider /> : null}
+                  {i > 0 ? <Divider style={{ marginLeft: TX_DIVIDER_INSET }} /> : null}
                   <TxRow tx={t} dayLabel={bkkDayKey(t.occurredAt) === today ? null : relativeDayLabel(bkkDayKey(t.occurredAt))} />
                 </View>
               ))

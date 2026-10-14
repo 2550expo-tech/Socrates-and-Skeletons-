@@ -53,7 +53,7 @@ function Line({ label, value, strong }: { label: string; value: string; strong?:
 export default function RunwayScreen() {
   const theme = useTheme();
   const { balance, runway, average, reserved, floor } = useMoney();
-  const { today, txs, goals } = useApp();
+  const { today, txs, goals, goalsError, refresh, refreshing } = useApp();
   const [reduce, setReduce] = useState(0);
   const [price, setPrice] = useState('');
   const [showMath, setShowMath] = useState(false);
@@ -70,7 +70,7 @@ export default function RunwayScreen() {
   const counting = runway.status !== 'no_spending' && runway.status !== 'below_floor';
   const check = monthEndCheck(runway);
   const status = monthEndStatus(check);
-  const statusColor = status.tone === 'good' ? theme.heroIncome : status.tone === 'bad' ? '#FFB4A8' : theme.heroInkSoft;
+  const statusColor = status.tone === 'good' ? theme.heroIncome : status.tone === 'bad' ? theme.heroCritical : theme.heroInkSoft;
 
   return (
     <Screen header={<StackHeader title="เงินพอถึงวันไหน" />} contentStyle={{ paddingTop: space.sm }}>
@@ -104,10 +104,10 @@ export default function RunwayScreen() {
                     เงินพอใช้อีก
                   </T>
                   <Row gap={6} align="flex-end">
-                    <T v="display" color={theme.heroAccent} style={{ fontVariant: ['tabular-nums'] }}>
+                    <T v="hero" color={theme.heroAccent} style={{ fontVariant: ['tabular-nums'] }}>
                       {runway.capped ? '365+' : daysShown}
                     </T>
-                    <T v="h3" color={theme.heroInk} style={{ marginBottom: 10 }}>
+                    <T v="h3" color={theme.heroInk} style={{ marginBottom: 9 }}>
                       วัน
                     </T>
                   </Row>
@@ -136,6 +136,19 @@ export default function RunwayScreen() {
           ) : null}
         </LinearGradient>
       </View>
+
+      {/* The jars could not be loaded: the money set aside in them may not be taken off yet. */}
+      {goalsError ? (
+        <Card tone="accent" style={{ paddingVertical: space.md, gap: space.sm }}>
+          <Row gap={space.sm} align="flex-start">
+            <Ionicons name="alert-circle-outline" size={20} color={theme.watch} />
+            <T v="small" color={theme.ink} style={{ flex: 1 }}>
+              โหลดกระปุกออมไม่สำเร็จ เงินที่กันไว้ในกระปุกอาจยังไม่ถูกหัก จำนวนวันด้านบนจึงอาจมากกว่าจริง
+            </T>
+          </Row>
+          <Button label="ลองอีกครั้ง" kind="soft" small icon="refresh" loading={refreshing} onPress={() => refresh()} style={{ alignSelf: 'flex-start' }} />
+        </Card>
+      ) : null}
 
       {/* What would be left in 7, 14 and 30 days at this pace. */}
       {counting && runway.averageSatang > 0 ? (
@@ -281,7 +294,7 @@ export default function RunwayScreen() {
           {openGoal ? (
             <Jar progress={goalProgress(openGoal)} size={44} />
           ) : (
-            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: theme.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 44, height: 44, borderRadius: radius.tile, backgroundColor: theme.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="flower-outline" size={22} color={theme.accentInk} />
             </View>
           )}
@@ -289,7 +302,7 @@ export default function RunwayScreen() {
             <T v="h3">{openGoal ? `${openGoal.emoji} ${openGoal.title}` : 'กระปุกออม'}</T>
             <T v="small">{openGoal ? goalLine(openGoal, today) : 'อยากได้อะไร ตั้งเป้าแล้วหยอดทีละนิด เงินในกระปุกไม่ถูกนับเป็นเงินใช้ได้'}</T>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={theme.inkFaint} />
+          <Ionicons name="chevron-forward" size={20} color={theme.inkSoft} />
         </Row>
       </Card>
     </Screen>

@@ -9,7 +9,8 @@
  */
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoid } from '../ui/KeyboardAvoid';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../data/AppProvider';
 import { authRedirectUrl } from '../data/authLinks';
@@ -32,8 +33,9 @@ import { Button, Card, Ionicons, Row, Segmented, T } from '../ui/components';
 import { Reveal } from '../ui/effects';
 import { useToast } from '../ui/feedback';
 import { StepDots } from '../ui/StepDots';
-import { Field, PasswordField } from '../ui/inputs';
-import { fonts, radius, space, useTheme } from '../ui/theme';
+import { Field, inputBox, PasswordField } from '../ui/inputs';
+import { takeWelcomeStart } from '../ui/DemoUpgrade';
+import { alpha, fonts, radius, space, useTheme } from '../ui/theme';
 
 type Mode = 'signin' | 'signup' | 'forgot';
 type Notice = { text: string; tone: 'error' | 'info'; action?: 'resend' | 'forgot' };
@@ -53,7 +55,8 @@ export default function Welcome() {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const { startDemo, showAuthNotice } = useApp();
-  const [mode, setMode] = useState<Mode>('signin');
+  // Opens on "สมัครสมาชิก" when the user came from the demo's "สมัครบัญชีจริง".
+  const [mode, setMode] = useState<Mode>(() => takeWelcomeStart());
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -207,11 +210,14 @@ export default function Welcome() {
       if (error) return setNotice({ text: authErrorMessage(error), tone: 'error' });
       setResendIn(RESEND_WAIT_S);
       setNotice({ text: `ส่งอีเมลใหม่ไปที่ ${address} แล้ว`, tone: 'info' });
+      // From the sign-in form ("ยังไม่ได้ยืนยันอีเมล"): open the same code screen as after sign-up,
+      // so the new 6-digit code can be typed in (not only the link in the email).
+      if (kind === 'confirm') setSent((cur) => cur ?? { kind: 'confirm', email: address, name: name.trim() || undefined });
     });
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoid style={{ backgroundColor: theme.bg }}>
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
         <View
           style={{
@@ -247,7 +253,9 @@ export default function Welcome() {
             </View>
           </Reveal>
           <Reveal index={3} from={12}>
-            <T v="body" color={theme.heroInkSoft} center>รู้ก่อนจ่าย เห็นว่าเงินจะอยู่ได้อีกกี่วัน</T>
+            <T v="body" color={theme.heroInkSoft} center>
+              แอปจดเงินของนักศึกษา อ่านสลิปให้เอง และบอกว่าเงินพอใช้ถึงวันไหน
+            </T>
           </Reveal>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: space.sm }}>
             {VALUE_POINTS.map((v, i) => (
@@ -260,13 +268,13 @@ export default function Welcome() {
                   paddingHorizontal: 10,
                   paddingVertical: 5,
                   borderRadius: radius.pill,
-                  backgroundColor: 'rgba(244,241,230,0.10)',
+                  backgroundColor: alpha(theme.heroInk, 0.1),
                   borderWidth: 1,
-                  borderColor: 'rgba(244,241,230,0.18)',
+                  borderColor: alpha(theme.heroInk, 0.18),
                 }}
               >
                 <Ionicons name={v.icon} size={14} color={theme.heroAccent} />
-                <T v="micro" color="#E8E1CC">
+                <T v="micro" color={theme.heroInk}>
                   {v.label}
                 </T>
               </View>
@@ -399,7 +407,7 @@ export default function Welcome() {
           </Reveal>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoid>
   );
 }
 
@@ -483,6 +491,7 @@ function SentCard({
 }) {
   const theme = useTheme();
   const [code, setCode] = useState('');
+  const [focused, setFocused] = useState(false);
   const confirm = sent.kind === 'confirm';
   const complete = isOtpComplete(code);
 
@@ -507,7 +516,7 @@ function SentCard({
           alignSelf: 'center',
         }}
       >
-        <Ionicons name={confirm ? 'mail-unread-outline' : 'key-outline'} size={28} color={theme.accent} />
+        <Ionicons name={confirm ? 'mail-unread-outline' : 'key-outline'} size={28} color={theme.accentInk} />
       </View>
       <T v="h3" center>
         {confirm ? 'ยืนยันอีเมล' : 'ตั้งรหัสผ่านใหม่'}
@@ -529,18 +538,13 @@ function SentCard({
         autoFocus
         maxLength={10}
         onSubmitEditing={() => complete && onVerify(code)}
-        style={{
-          borderWidth: 1.5,
-          borderColor: notice?.tone === 'error' ? theme.critical : complete ? theme.primary : theme.line,
-          borderRadius: radius.md,
-          backgroundColor: theme.surface,
-          paddingVertical: 14,
-          fontFamily: fonts.serifBold,
-          fontSize: 28,
-          letterSpacing: 10,
-          textAlign: 'center',
-          color: theme.ink,
-        }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        // The shared input look (visible edge, theme colour while typing), with big spaced digits.
+        style={[
+          inputBox(theme, { focused: focused || complete, error: notice?.tone === 'error' }),
+          { paddingVertical: 14, fontFamily: fonts.serifBold, fontSize: 28, lineHeight: 38, letterSpacing: 10, textAlign: 'center', color: theme.ink },
+        ]}
       />
       {notice ? <NoticeBox notice={notice} resendIn={resendIn} onResend={onResend} onForgot={onBack} /> : null}
       <Button label="ยืนยันรหัส" icon="shield-checkmark-outline" onPress={() => onVerify(code)} loading={busy} disabled={!complete} />

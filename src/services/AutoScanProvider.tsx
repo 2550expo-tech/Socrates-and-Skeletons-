@@ -31,6 +31,7 @@ import type { Transaction } from '../domain/types';
 import { useApp } from '../data/AppProvider';
 import { DEFAULT_SCAN_PREFS, loadScanPrefs, saveScanPrefs, type ScanPrefs } from '../data/prefs';
 import { processSlipImage } from './processSlip';
+import { useToast } from '../ui/feedback';
 import {
   findGalleryImages,
   galleryAvailable,
@@ -92,6 +93,7 @@ export function useAutoScan() {
 
 export function AutoScanProvider({ children }: { children: ReactNode }) {
   const { status, repo, userId, txs, upsertLocal, updateTx, profile } = useApp();
+  const toast = useToast();
   // Only once the user is in the app (not during sign-up or money setup).
   const inApp = status === 'ready' && !!profile?.onboarded;
   const [state, setState] = useState<AutoScanState>(IDLE);
@@ -125,8 +127,13 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
   const available = galleryAvailable && repo?.mode === 'cloud';
 
   const run = useCallback(
-    async (p: ScanPrefs) => {
-      if (!repo || !userId || running.current || scanLock.manual) return;
+    /** `manual`: the user asked ("ดึงสลิปวันนี้"), so the result is always said, even "nothing new". */
+    async (p: ScanPrefs, manual = false) => {
+      if (!repo || !userId) return;
+      if (running.current || scanLock.manual) {
+        if (manual) toast({ message: 'กำลังอ่านสลิปอยู่ รอสักครู่นะ' });
+        return;
+      }
       running.current = true;
       const gen = runGen.current;
       const current = () => gen === runGen.current;
@@ -243,14 +250,17 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
         // Keep what was recorded before stopping, so the banner can still say so.
         if (stoppedBy) setState({ ...IDLE, phase: 'error', message: stoppedBy, total: batch.length, processed, confirmed, drafts });
         else if (confirmed.length + drafts > 0) setState({ ...IDLE, phase: 'done', total: batch.length, processed, confirmed, drafts });
-        else setState(IDLE); // nothing new: stay quiet
+        else {
+          setState(IDLE); // nothing new: the automatic run stays quiet
+          if (manual) toast({ message: 'ไม่พบสลิปใหม่ของวันนี้ในแกลเลอรี' });
+        }
       } catch {
         if (current()) setState({ ...IDLE, phase: 'error', message: 'ตรวจแกลเลอรีอัตโนมัติไม่สำเร็จ ลองใหม่ได้ที่ปุ่ม “ดึงสลิปวันนี้” บนหน้าหลัก' });
       } finally {
         running.current = false;
       }
     },
-    [repo, userId],
+    [repo, userId, toast],
   );
 
   const maybeRun = useCallback(async () => {
@@ -304,10 +314,10 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
           setState({ ...IDLE, phase: 'needs_permission', message: 'ยังไม่ได้รับสิทธิ์เข้าถึงรูปภาพ เปิดได้ในการตั้งค่าของมือถือ' });
           return;
         }
-        await run(await loadScanPrefs(userId));
+        await run(await loadScanPrefs(userId), true);
       },
       async runNow() {
-        await run(await loadScanPrefs(userId));
+        await run(await loadScanPrefs(userId), true);
       },
       async undoLast() {
         const ids = state.confirmed.map((t) => t.id);

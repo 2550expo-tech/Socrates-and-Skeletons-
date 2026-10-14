@@ -650,7 +650,7 @@ try {
     state.coach = { status: 503, body: { error: { code: 'not_configured', message: 'x' } } };
     await page.fill('#coach-input', 'หมวดไหนควรลดก่อน');
     await button(page, 'ส่งคำถาม').click();
-    check('Coach: a missing key says exactly what to set', await visible(page, 'GEMINI_API_KEY'));
+    check('Coach: an AI that is not set up says so in plain Thai (no server details), with a way to ask again', (await visible(page, 'โค้ช AI ยังไม่พร้อมใช้งานตอนนี้')) && (await page.getByText('GEMINI_API_KEY').count()) === 0 && (await shown(button(page, 'ถามอีกครั้ง'))));
     state.coach = { status: 503, body: { error: { code: 'busy', message: 'x' } } };
     await page.fill('#coach-input', 'อีกข้อ');
     await button(page, 'ส่งคำถาม').click();

@@ -8,7 +8,7 @@
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../data/AppProvider';
 import { missionForSkin } from '../domain/missions';
@@ -27,6 +27,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { formatThaiDay } from '../domain/dates';
 import { HALLOWEEN } from '../domain/halloween';
 import { StackHeader } from '../ui/StackHeader';
+import { SectionHead } from '../ui/SectionHead';
 
 export default function Skins() {
   const theme = useTheme();
@@ -226,10 +227,7 @@ export default function Skins() {
 function Section({ title, right, hint, children }: { title: string; right?: string; hint?: string; children: React.ReactNode }) {
   return (
     <View style={{ gap: space.sm }}>
-      <Row justify="space-between">
-        <T v="h3">{title}</T>
-        {right ? <T v="small">{right}</T> : null}
-      </Row>
+      <SectionHead title={title} right={right ? <T v="small">{right}</T> : undefined} />
       {hint ? <T v="micro">{hint}</T> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>{children}</View>
     </View>
@@ -365,8 +363,9 @@ function SkinCard({
         aria-selected={picked}
         style={({ pressed }) => ({
           borderRadius: radius.lg,
-          borderWidth: picked ? 2 : StyleSheet.hairlineWidth,
-          borderColor: picked ? theme.accent : theme.line,
+          // Selected like every other choice in the app (primary); no outline otherwise, like Card.
+          borderWidth: 2,
+          borderColor: picked ? theme.primary : 'transparent',
           backgroundColor: theme.surface,
           paddingTop: 2,
           paddingBottom: space.sm,
@@ -377,7 +376,8 @@ function SkinCard({
           overflow: 'hidden',
         })}
       >
-        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 92, backgroundColor: skin.tint, opacity: theme.dark ? 0.22 : 0.16 }} />
+        {/* The tint runs under the 2pt selection edge too, so an unselected card shows no frame. */}
+        <View style={{ position: 'absolute', left: -2, right: -2, top: -2, height: 94, backgroundColor: skin.tint, opacity: theme.dark ? 0.22 : 0.16 }} />
         <View style={{ opacity: ended ? 0.55 : 1 }}>
           <KlaPicture skin={skin.id} mood={locked ? 'calm' : 'happy'} width={76} onDark={theme.dark} extras={false} />
         </View>

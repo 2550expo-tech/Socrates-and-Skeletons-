@@ -47,7 +47,8 @@ function DialogShell({ children, label }: { children: ReactNode; label: string }
     <View accessibilityViewIsModal accessibilityLabel={label} style={[StyleSheet.absoluteFill, { zIndex: 1000 }]}>
       <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: theme.overlay, opacity: fade }]} />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // Full screen from the top, so no offset is needed; Android draws edge to edge and needs it too.
+        behavior={Platform.OS === 'web' ? undefined : 'padding'}
         style={{ flex: 1, justifyContent: 'center', padding: space.xl }}
       >
         <Animated.View
@@ -244,7 +245,7 @@ function NewPasswordDialog({ onClose }: { onClose: () => void }) {
   return (
     <DialogShell label="ตั้งรหัสผ่านใหม่">
       <View style={{ alignItems: 'center' }}>
-        <Ionicons name="key-outline" size={36} color={theme.accent} />
+        <Ionicons name="key-outline" size={36} color={theme.accentInk} />
       </View>
       <T v="h2" center>
         ตั้งรหัสผ่านใหม่

@@ -11,7 +11,7 @@ import { categoryLook } from './category';
 import { Ionicons, Row, T } from './components';
 import { GrowBar } from './effects';
 import { useNative, useReduceMotion } from './motion';
-import { alpha, fonts, space, useTheme } from './theme';
+import { alpha, fonts, radius, space, type, useTheme } from './theme';
 
 /** One bar of DayBars: it rises out of the baseline (its rounded top stays round). */
 function RisingBar({ x, top, width, height, color, opacity, delay }: { x: number; top: number; width: number; height: number; color: string; opacity: number; delay: number }) {
@@ -57,8 +57,9 @@ export function TrendBars({ buckets, averageSatang, height = 140, label }: { buc
   const second = sorted[1] ?? 0;
   const cap = second > 0 && sorted[0] > second * 2.5 ? Math.max(second * 1.6, averageSatang ?? 0) : null;
   const max = Math.max(1, cap ?? sorted[0] ?? 0, averageSatang ?? 0);
-  const top = 18;
-  const bottom = 22;
+  // Room for the 12pt labels above (the peak amount) and below (days): Thai needs 12pt at least.
+  const top = 20;
+  const bottom = 24;
   const plotH = height - top - bottom;
   // Many bars (30 days): narrow gaps so each bar keeps some width.
   const gap = buckets.length > 14 ? 3 : 8;
@@ -96,9 +97,9 @@ export function TrendBars({ buckets, averageSatang, height = 140, label }: { buc
             d.label ? (
               <SvgText
                 key={`l${d.key}`}
-                x={Math.min(width - 12, Math.max(12, i * (barW + gap) + barW / 2))}
+                x={Math.min(width - 14, Math.max(14, i * (barW + gap) + barW / 2))}
                 y={height - 6}
-                fontSize={11}
+                fontSize={type.micro.fontSize}
                 fontFamily={d.current ? fonts.sansSemi : fonts.sansMedium}
                 fill={d.current ? theme.ink : theme.inkSoft}
                 textAnchor="middle"
@@ -109,9 +110,9 @@ export function TrendBars({ buckets, averageSatang, height = 140, label }: { buc
           )}
           {peak && peak.expenseSatang > 0 ? (
             <SvgText
-              x={Math.min(width - 18, Math.max(18, peakIndex * (barW + gap) + barW / 2))}
-              y={Math.max(11, y(peak.expenseSatang) - 5)}
-              fontSize={10}
+              x={Math.min(width - 24, Math.max(24, peakIndex * (barW + gap) + barW / 2))}
+              y={Math.max(13, y(peak.expenseSatang) - 5)}
+              fontSize={type.micro.fontSize}
               fontFamily={fonts.sansSemi}
               fill={theme.inkSoft}
               textAnchor="middle"
@@ -152,7 +153,7 @@ function CategoryIcon({ k, size = 28 }: { k: string; size?: number }) {
   const theme = useTheme();
   const look = categoryLook(k, theme);
   return (
-    <View style={{ width: size, height: size, borderRadius: size * 0.32, backgroundColor: look.tile, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ width: size, height: size, borderRadius: size >= 36 ? radius.tile : radius.sm, backgroundColor: look.tile, alignItems: 'center', justifyContent: 'center' }}>
       <Ionicons name={look.icon} size={size * 0.58} color={look.ink} />
     </View>
   );
@@ -265,7 +266,7 @@ export function CategoryDonut({ items, size = 190 }: { items: CategoryTotal[]; s
             {sl.icon ? (
               <CategoryIcon k={sl.key} />
             ) : (
-              <View style={{ width: 28, height: 28, borderRadius: 9, backgroundColor: alpha(theme.inkFaint, 0.22), alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: 28, height: 28, borderRadius: radius.sm, backgroundColor: alpha(theme.inkFaint, 0.22), alignItems: 'center', justifyContent: 'center' }}>
                 <Ionicons name="ellipsis-horizontal" size={16} color={theme.inkSoft} />
               </View>
             )}

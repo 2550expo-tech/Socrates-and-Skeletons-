@@ -53,7 +53,7 @@ export function RunwayRail({ check, label }: { check: MonthEndCheck; label: stri
   const mid = H / 2;
   const ink = theme.heroInk;
   const good = theme.heroIncome;
-  const bad = '#FF9A8F';
+  const bad = theme.heroCritical;
   const tickX = x(monthEnd);
   const endX = x(runDays);
 

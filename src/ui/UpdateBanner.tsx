@@ -73,7 +73,7 @@ function UpdateBannerInner() {
       >
         <Buddy mood="cheer" size={40} still onDark />
         <View style={{ flex: 1 }}>
-          <T v="small" color="#F4F1E6">{BUDDY_NAME}มีเวอร์ชันใหม่มาแล้ว</T>
+          <T v="small" color={theme.heroInk}>{BUDDY_NAME}มีเวอร์ชันใหม่มาแล้ว</T>
           <T v="micro" color={theme.heroAccent}>แตะเพื่อเปิดใหม่ (ใช้เวลา 2–3 วินาที)</T>
         </View>
         <IconButton icon="close" label="ไว้ทีหลัง" color={theme.heroInkSoft} onPress={() => setHidden(true)} />

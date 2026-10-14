@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GrowBar, Reveal, usePressSpring } from './effects';
+import { KeyboardAvoid } from './KeyboardAvoid';
 import { useCountUp, useNative, useReduceMotion } from './motion';
 import { alpha, fonts, radius, space, type, useTheme } from './theme';
 
@@ -33,9 +34,10 @@ export type IconName = ComponentProps<typeof Ionicons>['name'];
 // Text
 // ---------------------------------------------------------------------------
 
-type Variant = 'display' | 'h1' | 'h2' | 'h3' | 'body' | 'small' | 'micro' | 'label';
+type Variant = 'hero' | 'display' | 'h1' | 'h2' | 'h3' | 'body' | 'small' | 'micro' | 'label';
 
 const VARIANT_FONT: Record<Variant, string> = {
+  hero: fonts.serif,
   display: fonts.serif,
   // Page titles in the sans face: the serif is kept for money.
   h1: fonts.sansBold,
@@ -170,6 +172,8 @@ export function Screen({
   return (
     <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: theme.bg }}>
       {header}
+      {/* Android: room for the keyboard (iOS scrolls the field into view with automaticallyAdjustKeyboardInsets). */}
+      <KeyboardAvoid ios={false}>
       {scroll && scrollY ? (
         <Animated.ScrollView
           contentContainerStyle={[pad, { paddingBottom: 120, gap: space.lg }, contentStyle]}
@@ -195,6 +199,7 @@ export function Screen({
       ) : (
         <View style={[{ flex: 1 }, pad, contentStyle]}>{children}</View>
       )}
+      </KeyboardAvoid>
     </SafeAreaView>
   );
 }
@@ -251,22 +256,6 @@ export function Card({
   );
 }
 
-export function SectionTitle({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
-  const theme = useTheme();
-  return (
-    <Row justify="space-between" style={{ marginTop: space.sm }}>
-      <T v="h3">{title}</T>
-      {action && onAction ? (
-        <Pressable onPress={onAction} hitSlop={10} accessibilityRole="button">
-          <T v="small" color={theme.primary} style={{ fontFamily: fonts.sansSemi }}>
-            {action}
-          </T>
-        </Pressable>
-      ) : null}
-    </Row>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Controls
 // ---------------------------------------------------------------------------
@@ -302,7 +291,7 @@ export function Button({
     ghost: { bg: 'transparent', fg: theme.ink, border: theme.lineStrong },
     danger: { bg: 'transparent', fg: theme.critical, border: theme.critical },
     soft: { bg: theme.surfaceAlt, fg: theme.ink, border: theme.surfaceAlt },
-    onDark: { bg: 'rgba(244,241,230,0.10)', fg: '#F4F1E6', border: 'rgba(244,241,230,0.45)' },
+    onDark: { bg: alpha(theme.heroInk, 0.1), fg: theme.heroInk, border: alpha(theme.heroInk, 0.45) },
   }[kind];
   const off = disabled || loading;
   return (
@@ -355,29 +344,35 @@ export function IconButton({
   onPress,
   label,
   color,
+  disabled,
 }: {
   icon: IconName;
   onPress: () => void;
   label: string;
   color?: string;
+  /** Shown faint, not pressable, and announced as unavailable. */
+  disabled?: boolean;
 }) {
   const theme = useTheme();
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       hitSlop={8}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      aria-disabled={!!disabled}
       style={({ pressed }) => ({
         width: 42,
         height: 42,
         borderRadius: 21,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: pressed ? theme.surfaceAlt : 'transparent',
+        backgroundColor: pressed && !disabled ? theme.surfaceAlt : 'transparent',
       })}
     >
-      <Ionicons name={icon} size={22} color={color ?? theme.ink} />
+      <Ionicons name={icon} size={22} color={disabled ? theme.lineStrong : (color ?? theme.ink)} />
     </Pressable>
   );
 }
@@ -551,7 +546,7 @@ export function Badge({
     gold: { bg: theme.accentSoft, fg: theme.accentInk },
   }[tone];
   const dark = {
-    neutral: { bg: 'rgba(244,241,230,0.14)', fg: '#F4F1E6' },
+    neutral: { bg: alpha(theme.heroInk, 0.14), fg: theme.heroInk },
     good: { bg: 'rgba(92,192,142,0.22)', fg: '#B8F0CF' },
     watch: { bg: 'rgba(224,165,72,0.25)', fg: '#FFD89A' },
     critical: { bg: 'rgba(224,122,99,0.28)', fg: '#FFC2B3' },

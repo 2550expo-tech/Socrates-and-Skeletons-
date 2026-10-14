@@ -47,7 +47,7 @@ export function SlipCopy({ hash }: { hash: string | null | undefined }) {
         accessibilityRole="button"
         accessibilityLabel="ดูรูปสลิปเต็มจอ"
         onPress={() => setOpen(true)}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.lg, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.line }}
+        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.lg, backgroundColor: pressed ? theme.surfaceAlt : theme.surface })}
       >
         <Image source={{ uri }} accessibilityLabel="รูปสลิป" resizeMode="cover" style={{ width: 64, height: 96, borderRadius: 8, backgroundColor: theme.surfaceAlt }} />
         <View style={{ flex: 1, gap: 2 }}>
@@ -57,7 +57,7 @@ export function SlipCopy({ hash }: { hash: string | null | undefined }) {
             แตะเพื่อดูเต็มจอ
           </T>
         </View>
-        <Ionicons name="expand-outline" size={20} color={theme.inkFaint} />
+        <Ionicons name="expand-outline" size={20} color={theme.inkSoft} />
       </Pressable>
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable

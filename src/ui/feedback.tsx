@@ -7,7 +7,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { AccessibilityInfo, Animated, Modal, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, T } from './components';
-import { buildTheme, fonts, radius, readableOn, space, useTheme } from './theme';
+import { buildTheme, fonts, radius, readableOn, space, type, useTheme } from './theme';
 
 interface ToastOptions {
   message: string;
@@ -78,7 +78,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               gap: 12,
             }}
           >
-            <Text style={{ flex: 1, fontFamily: fonts.sansMedium, fontSize: 14, color: toast.tone === 'error' ? readableOn(theme.critical, '#FFFFFF', theme.bg) : theme.bg }}>
+            <Text style={{ ...type.small, flex: 1, fontFamily: fonts.sansMedium, color: toast.tone === 'error' ? readableOn(theme.critical, '#FFFFFF', theme.bg) : theme.bg }}>
               {toast.message}
             </Text>
             {toast.action ? (
@@ -90,7 +90,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 hitSlop={10}
                 accessibilityRole="button"
               >
-                <Text style={{ fontFamily: fonts.sansBold, fontSize: 14, color: actionColor }}>{toast.action.label}</Text>
+                <Text style={{ ...type.small, fontFamily: fonts.sansBold, color: actionColor }}>{toast.action.label}</Text>
               </Pressable>
             ) : null}
           </View>

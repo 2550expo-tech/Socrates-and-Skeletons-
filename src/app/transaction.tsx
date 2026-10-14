@@ -5,9 +5,10 @@
  */
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useLocalSearchParams } from 'expo-router';
-import { goBack, useLeaveWhenDone } from '../ui/nav';
+import { goBack, useConfirmLeave, useLeaveWhenDone } from '../ui/nav';
 import { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Platform, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoid } from '../ui/KeyboardAvoid';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../data/AppProvider';
 import { categoriesFor, defaultCategory, suggestCategory } from '../domain/categories';
@@ -15,10 +16,11 @@ import { bkkDayKey, bkkTime, bkkToIso, formatThaiDay, parseSlipDate, parseSlipTi
 import { formatBaht, parseBahtToSatang, satangToInput } from '../domain/money';
 import { ALT_PREFIX, amountChoices, FLAG_LABEL, type ReviewFlag } from '../domain/slip';
 import type { TxKind } from '../domain/types';
-import { Button, Card, Chip, IconButton, Ionicons, Row, Segmented, T } from '../ui/components';
+import { Button, Card, Chip, EmptyState, IconButton, Ionicons, Row, Segmented, T, type IconName } from '../ui/components';
+import { Buddy } from '../ui/Buddy';
 import { ConfirmSheet, useToast } from '../ui/feedback';
-import { AmountField, Field } from '../ui/inputs';
-import { fonts, radius, space, useTheme } from '../ui/theme';
+import { AmountField, Field, inputBox } from '../ui/inputs';
+import { fonts, space, useTheme } from '../ui/theme';
 import { SlipCopy } from '../ui/SlipCopy';
 import { categoryLook } from '../ui/category';
 import { StackHeader } from '../ui/StackHeader';
@@ -45,12 +47,13 @@ export default function TransactionForm() {
   const [note, setNote] = useState(existing?.note ?? '');
   const [busy, setBusy] = useState(false);
   const [askDelete, setAskDelete] = useState(false);
-  const [askDiscard, setAskDiscard] = useState(false);
   // What the form started with, to tell whether closing would lose anything typed.
   const [start] = useState(() => ({ kind: startKind, amount, title, category, day, time, note }));
   const dirty =
     kind !== start.kind || amount !== start.amount || title !== start.title || category !== start.category || day !== start.day || time !== start.time || note !== start.note;
-  const close = () => (dirty && !busy ? setAskDiscard(true) : goBack());
+  // Asks before losing what was typed, also on Android's back button, the iOS swipe-down and the browser's back.
+  const leaveGuard = useConfirmLeave(dirty && !busy, leaveWhenDone);
+  const close = () => leaveGuard.requestLeave();
   const [amountError, setAmountError] = useState<string | null>(null);
   // Web only: the browser build has no native date picker, so dates are typed.
   const [dayText, setDayText] = useState(() => { const [y, m, d] = day.split('-'); return `${d}/${m}/${Number(y) + 543}`; });
@@ -129,7 +132,7 @@ export default function TransactionForm() {
         });
         toast({ message: kind === 'income' ? 'เพิ่มเงินเข้าแล้ว' : 'บันทึกรายการแล้ว' });
       }
-      leaveWhenDone();
+      leaveGuard.release();
     } catch (e) {
       toast({ message: e instanceof Error && e.name === 'DuplicateSlipError' ? 'มีรายการจากสลิปนี้อยู่แล้ว' : 'บันทึกไม่สำเร็จ ลองอีกครั้ง', tone: 'error' });
     } finally {
@@ -143,7 +146,7 @@ export default function TransactionForm() {
     setBusy(true);
     try {
       const removed = await removeTx(existing.id);
-      leaveWhenDone();
+      leaveGuard.release();
       toast({
         message: 'ลบรายการแล้ว',
         action: removed
@@ -163,31 +166,42 @@ export default function TransactionForm() {
   }
 
   const flagged = (f: ReviewFlag) => isDraft && flags.includes(f);
-  const pill = (label: string, onPress: () => void, warn: boolean, a11y: string) => (
+  // Android date and time: buttons that open the system pickers, drawn like the other fields.
+  const pill = (icon: IconName, label: string, onPress: () => void, warn: boolean, a11y: string) => (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={a11y}
-      style={{
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        borderWidth: 1.5,
-        borderColor: warn ? theme.watch : theme.line,
-        borderRadius: radius.md,
-        paddingVertical: 12,
-        paddingHorizontal: 14,
-        backgroundColor: theme.surface,
-      }}
+      accessibilityLabel={`${a11y} ${label}`}
+      style={({ pressed }) => [
+        inputBox(theme),
+        { flex: 1, gap: 8, minHeight: 48, backgroundColor: pressed ? theme.surfaceAlt : theme.surface },
+        warn && { borderColor: theme.watch },
+      ]}
     >
-      <T v="body">{label}</T>
+      <Ionicons name={icon} size={18} color={warn ? theme.watch : theme.inkSoft} />
+      <T v="body" color={theme.ink} style={{ flex: 1 }} numberOfLines={1}>
+        {label}
+      </T>
     </Pressable>
   );
 
+  // Opened for an item that is not here (deleted on another phone, older than the loaded year,
+  // or a stale link): say so, never show an empty form that would save a new item instead.
+  if (id && !existing && !busy) {
+    return (
+      <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
+        <StackHeader title="รายการ" close />
+        <View style={{ flex: 1 }}>
+          <EmptyState icon="search" art={<Buddy mood="thinking" size={84} />} title="ไม่พบรายการนี้" body="อาจถูกลบไปแล้ว หรือเก่ากว่าข้อมูลที่โหลดไว้" action="กลับ" onAction={() => goBack()} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoid>
         <StackHeader
           title={!existing ? (kind === 'income' ? 'เพิ่มเงินเข้า' : 'จดรายการ') : isDraft ? 'ตรวจสลิป' : 'แก้ไขรายการ'}
           close
@@ -325,8 +339,8 @@ export default function TransactionForm() {
               </Row>
             ) : Platform.OS === 'android' ? (
               <Row gap={space.sm}>
-                {pill(`📅 ${formatThaiDay(day)}`, () => openAndroidPicker('date'), flagged('date'), 'เลือกวันที่')}
-                {pill(`🕒 ${time}`, () => openAndroidPicker('time'), false, 'เลือกเวลา')}
+                {pill('calendar-outline', formatThaiDay(day), () => openAndroidPicker('date'), flagged('date'), 'เลือกวันที่')}
+                {pill('time-outline', time, () => openAndroidPicker('time'), false, 'เลือกเวลา')}
               </Row>
             ) : (
               <Row gap={space.sm}>
@@ -357,28 +371,27 @@ export default function TransactionForm() {
             <Button label={existing ? 'บันทึกการแก้ไข' : 'บันทึกรายการ'} icon="checkmark" onPress={() => save(true)} loading={busy} />
           )}
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoid>
 
       <ConfirmSheet
         visible={askDelete}
         title="ลบรายการนี้?"
-        body={isDraft ? 'แบบร่างจากสลิปนี้จะถูกลบ ถ้าสแกนรูปเดิมอีกครั้งจะอ่านใหม่ได้' : 'ยอดคงเหลือและ Money Runway จะคำนวณใหม่ทันที กดเลิกทำได้ภายใน 10 วินาที'}
+        body={isDraft ? 'แบบร่างจากสลิปนี้จะถูกลบ ถ้าสแกนรูปเดิมอีกครั้งจะอ่านใหม่ได้' : 'ยอดคงเหลือและวันที่เงินพอใช้จะคำนวณใหม่ทันที กดเลิกทำได้ภายใน 10 วินาที'}
         confirmLabel="ลบรายการ"
         destructive
         onConfirm={doDelete}
         onCancel={() => setAskDelete(false)}
       />
       <ConfirmSheet
-        visible={askDiscard}
+        visible={leaveGuard.asking}
         title="ทิ้งสิ่งที่แก้ไว้?"
         body={existing ? 'การแก้ไขนี้ยังไม่ได้บันทึก ถ้าปิดตอนนี้รายการจะเหมือนเดิม' : 'รายการนี้ยังไม่ได้บันทึก ถ้าปิดตอนนี้จะไม่ถูกจดไว้'}
         confirmLabel="ทิ้งและปิด"
         destructive
         onConfirm={() => {
-          setAskDiscard(false);
-          goBack();
+          leaveGuard.leave();
         }}
-        onCancel={() => setAskDiscard(false)}
+        onCancel={leaveGuard.stay}
       />
     </SafeAreaView>
   );

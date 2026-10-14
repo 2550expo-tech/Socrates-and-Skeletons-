@@ -4,7 +4,8 @@
  */
 import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoid } from '../ui/KeyboardAvoid';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../data/AppProvider';
 import { formatThaiDay } from '../domain/dates';
@@ -14,7 +15,7 @@ import { Button, Chip, IconButton, Row, T } from '../ui/components';
 import { ConfirmSheet, useToast } from '../ui/feedback';
 import { AmountField, Field } from '../ui/inputs';
 import { useLeaveWhenDone } from '../ui/nav';
-import { fonts, radius, space, useTheme } from '../ui/theme';
+import { alpha, fonts, radius, space, useTheme } from '../ui/theme';
 import { StackHeader } from '../ui/StackHeader';
 
 export default function GoalForm() {
@@ -58,7 +59,7 @@ export default function GoalForm() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoid>
         <StackHeader
           title={existing ? 'แก้กระปุกออม' : 'ตั้งกระปุกออมใหม่'}
           close
@@ -77,16 +78,17 @@ export default function GoalForm() {
                   accessibilityRole="button"
                   accessibilityLabel={`ไอคอน ${e}`}
                   aria-selected={emoji === e}
-                  style={{
+                  style={({ pressed }) => ({
                     width: 48,
                     height: 48,
                     borderRadius: radius.md,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: emoji === e ? theme.accentSoft : theme.surface,
-                    borderWidth: emoji === e ? 2 : 1,
-                    borderColor: emoji === e ? theme.accent : theme.line,
-                  }}
+                    // Selected like Chip: primary edge on a primary tint.
+                    backgroundColor: emoji === e ? alpha(theme.primary, theme.dark ? 0.22 : 0.1) : pressed ? theme.surfaceAlt : theme.surface,
+                    borderWidth: 2,
+                    borderColor: emoji === e ? theme.primary : 'transparent',
+                  })}
                 >
                   <T v="h2">{e}</T>
                 </Pressable>
@@ -115,7 +117,7 @@ export default function GoalForm() {
           <T v="micro">เงินที่หยอดกระปุกยังอยู่ในบัญชีของคุณ แต่ MindPay จะกันไว้ ไม่นับเป็นเงินที่ใช้ได้ในหน้า “เงินพอถึง”</T>
           <Button label={existing ? 'บันทึก' : 'ตั้งกระปุก'} kind="gold" icon="checkmark" shine onPress={save} loading={busy} />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAvoid>
       <ConfirmSheet
         visible={askDelete}
         title="ลบกระปุกนี้?"

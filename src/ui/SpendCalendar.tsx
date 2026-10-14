@@ -45,9 +45,9 @@ export function SpendCalendar({
   return (
     <Card style={{ gap: space.sm, paddingVertical: space.md }}>
       <Row justify="space-between">
-        <IconButton icon="chevron-back" label="เดือนก่อน" onPress={() => onPrev?.()} color={onPrev ? theme.ink : theme.line} />
+        <IconButton icon="chevron-back" label="เดือนก่อน" onPress={() => onPrev?.()} disabled={!onPrev} />
         <T v="h3">{cal.label}</T>
-        <IconButton icon="chevron-forward" label="เดือนถัดไป" onPress={() => onNext?.()} color={onNext ? theme.ink : theme.line} />
+        <IconButton icon="chevron-forward" label="เดือนถัดไป" onPress={() => onNext?.()} disabled={!onNext} />
       </Row>
       <View style={{ flexDirection: 'row' }}>
         {WEEKDAYS.map((w) => (

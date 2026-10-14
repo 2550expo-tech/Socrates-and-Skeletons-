@@ -12,9 +12,10 @@ import { Buddy } from '../ui/Buddy';
 import { Button, Card, Divider, EmptyState, IconButton, T } from '../ui/components';
 import { Reveal } from '../ui/effects';
 import { useToast } from '../ui/feedback';
-import { TxRow } from '../ui/TxRow';
+import { TX_DIVIDER_INSET, TxRow } from '../ui/TxRow';
 import { space, useTheme } from '../ui/theme';
 import { StackHeader } from '../ui/StackHeader';
+import { SectionHead } from '../ui/SectionHead';
 
 export default function Drafts() {
   const theme = useTheme();
@@ -56,12 +57,12 @@ export default function Drafts() {
 
         {ready.length > 0 ? (
           <View style={{ gap: space.sm }}>
-            <T v="h3">พร้อมยืนยัน ({ready.length})</T>
+            <SectionHead title={`พร้อมยืนยัน (${ready.length})`} />
             <T v="small">อ่านได้ครบทุกช่องด้วยความมั่นใจ 80% ขึ้นไป รวมแล้ว {formatBaht(readyTotal, { sign: true })}</T>
             <Card style={{ paddingVertical: space.xs, gap: 0 }}>
               {ready.map((t, i) => (
                 <Reveal key={t.id} index={i} from={10}>
-                  {i > 0 ? <Divider /> : null}
+                  {i > 0 ? <Divider style={{ marginLeft: TX_DIVIDER_INSET }} /> : null}
                   <TxRow tx={t} />
                 </Reveal>
               ))}
@@ -72,12 +73,12 @@ export default function Drafts() {
 
         {review.length > 0 ? (
           <View style={{ gap: space.sm }}>
-            <T v="h3">ต้องตรวจก่อน ({review.length})</T>
+            <SectionHead title={`ต้องตรวจก่อน (${review.length})`} />
             <T v="small">มีบางช่องที่อ่านไม่ชัด แตะเพื่อแก้แล้วยืนยันทีละรายการ</T>
             <Card style={{ paddingVertical: space.xs, gap: 0 }}>
               {review.map((t, i) => (
                 <Reveal key={t.id} index={i} from={10}>
-                  {i > 0 ? <Divider /> : null}
+                  {i > 0 ? <Divider style={{ marginLeft: TX_DIVIDER_INSET }} /> : null}
                   <TxRow tx={t} />
                 </Reveal>
               ))}

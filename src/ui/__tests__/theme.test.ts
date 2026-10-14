@@ -50,6 +50,12 @@ describe('TC-78 colour themes stay readable', () => {
           ['critical on bg', t.critical, t.bg],
           ['heroInkSoft on hero', t.heroInkSoft, t.hero],
           ['heroInk on heroTop', t.heroInk, t.heroTop],
+          // Text also sits at the top of the hero gradient, where it is lightest (pre-ship D4-1).
+          ['heroInkSoft on heroTop', t.heroInkSoft, t.heroTop],
+          ['heroIncome on heroTop', t.heroIncome, t.heroTop],
+          ['heroIncome on hero', t.heroIncome, t.hero],
+          ['heroCritical on heroTop', t.heroCritical, t.heroTop],
+          ['heroCritical on hero', t.heroCritical, t.hero],
         ];
         const low = pairs.filter(([, a, b]) => contrast(a, b) < 4.5).map(([n, a, b]) => `${n} ${contrast(a, b).toFixed(2)}`);
         expect(low).toEqual([]);
@@ -77,6 +83,9 @@ describe('TC-95 MindPay ใหม่: control edges and category icons stand out
         }
         // Placeholders now use inkSoft: readable as text on inputs.
         expect(contrast(t.inkSoft, t.surface)).toBeGreaterThanOrEqual(4.5);
+        // The lit streak flame stands out from the page and from the hero (pre-ship D1-2).
+        expect(contrast(t.streak, t.bg), `${spec.key} ${dark} streak`).toBeGreaterThanOrEqual(3);
+        expect(contrast(t.heroStreak, t.heroTop), `${spec.key} ${dark} heroStreak`).toBeGreaterThanOrEqual(3);
       }
     }
   });

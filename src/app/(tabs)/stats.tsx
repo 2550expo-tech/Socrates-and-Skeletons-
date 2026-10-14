@@ -20,7 +20,7 @@ import { CategoryBars, CategoryDonut, TrendBars } from '../../ui/charts';
 import { Card, Divider, EmptyState, Ionicons, Money, Row, Screen, Segmented, T } from '../../ui/components';
 import { TitleDecor } from '../../ui/halloween';
 import { SectionHead } from '../../ui/SectionHead';
-import { fonts, space, useTheme } from '../../ui/theme';
+import { space, useTheme } from '../../ui/theme';
 
 const TREND_TITLE: Record<RangeKey, string> = {
   today: 'รายจ่าย 7 วันล่าสุด',
@@ -68,15 +68,11 @@ export default function Stats() {
         <Row gap={space.lg} style={{ flexWrap: 'wrap' }}>
           <T v="small">
             เงินเข้า{' '}
-            <T v="small" color={theme.income} style={{ fontFamily: fonts.sansSemi }}>
-              {formatBaht(summary.incomeSatang, { decimals: false })}
-            </T>
+            <Money satang={summary.incomeSatang} size="small" decimals={false} color={theme.income} />
           </T>
           <T v="small">
             สุทธิ{' '}
-            <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi }}>
-              {formatBaht(summary.netSatang, { sign: true, decimals: false })}
-            </T>
+            <Money satang={summary.netSatang} size="small" sign decimals={false} />
           </T>
         </Row>
         <Divider style={{ marginVertical: space.xs }} />
@@ -90,9 +86,7 @@ export default function Stats() {
           <View style={{ width: 1, backgroundColor: theme.line, marginHorizontal: space.md }} />
           <View style={{ flex: 1, gap: 2 }}>
             <T v="small">{range === 'today' ? 'เฉลี่ยต่อวัน (วันนี้)' : `เฉลี่ยต่อวัน (${RANGE_DAYS[range]} วัน)`}</T>
-            <T v="h2" style={{ fontVariant: ['tabular-nums'] }}>
-              {formatBaht(perDay, { decimals: false })}
-            </T>
+            <Money satang={perDay} size="h2" decimals={false} />
           </View>
         </Row>
       </Card>
@@ -128,7 +122,7 @@ export default function Stats() {
           {trend.unit === 'month'
             ? `${trend.partialFrom ? `เดือนแรกนับตั้งแต่ ${formatThaiDay(trend.partialFrom)} · ` : ''}เดือนนี้นับถึงวันนี้`
             : trend.buckets.length === 7
-              ? 'เส้นประ = ค่าเฉลี่ยต่อวันที่ใช้คำนวณ Money Runway'
+              ? 'เส้นประ = ค่าเฉลี่ยต่อวันที่ใช้คำนวณว่าเงินพอใช้กี่วัน'
               : 'เส้นประ = ค่าเฉลี่ยต่อวันของ 30 วันนี้'}
         </T>
       </Card>

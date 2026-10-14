@@ -8,8 +8,10 @@
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Animated, Easing, Linking, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoid } from '../ui/KeyboardAvoid';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StackHeader } from '../ui/StackHeader';
 import { useApp } from '../data/AppProvider';
 import { VOICE_NOTE } from '../domain/achievements';
 import { BUDDY_NAME } from '../domain/buddy';
@@ -26,9 +28,8 @@ import { inputBox, inputText } from '../ui/inputs';
 import { PulseRing, Reveal, usePressSpring } from '../ui/effects';
 import { useToast } from '../ui/feedback';
 import { useNative, useReduceMotion } from '../ui/motion';
-import { goBack, useLeaveWhenDone } from '../ui/nav';
+import { useLeaveWhenDone } from '../ui/nav';
 import { fonts, radius, space, useTheme } from '../ui/theme';
-import { HeaderDecor } from '../ui/halloween';
 
 const EXAMPLES = ['ข้าว 50 บาท', 'ค่ารถ 25 กาแฟ 65', 'ได้เงินจากแม่ 500', 'เมื่อวาน หมูกระทะ 299'];
 
@@ -179,12 +180,8 @@ export default function VoiceEntry() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: theme.bg }}>
-      <Row justify="space-between" style={{ paddingHorizontal: space.sm, paddingTop: space.sm }}>
-        <IconButton icon="close" label="ปิด" onPress={() => goBack()} />
-        <T v="h3">พูดจดรายการ</T>
-        <HeaderDecor />
-      </Row>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <StackHeader title="พูดจดรายการ" close />
+      <KeyboardAvoid>
         <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: space.xxxl }} keyboardShouldPersistTaps="handled">
           {/* The mic */}
           <Reveal zoom>
@@ -294,11 +291,12 @@ export default function VoiceEntry() {
                   <Reveal key={key} index={i} from={10} zoom>
                     <Card style={{ paddingVertical: space.md }}>
                       <Row gap={space.md}>
-                        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: categoryLook(cat.key, theme).tile, alignItems: 'center', justifyContent: 'center' }}>
+                        <View style={{ width: 40, height: 40, borderRadius: radius.tile, backgroundColor: categoryLook(cat.key, theme).tile, alignItems: 'center', justifyContent: 'center' }}>
                           <Ionicons name={categoryLook(cat.key, theme).icon} size={20} color={categoryLook(cat.key, theme).ink} />
                         </View>
                         <View style={{ flex: 1, gap: 2 }}>
-                          <T v="body" numberOfLines={1} style={{ fontFamily: fonts.sansSemi }}>
+                          {/* Two lines: this is where the user checks what will be saved. */}
+                          <T v="body" numberOfLines={2} style={{ fontFamily: fonts.sansSemi }}>
                             {item.title}
                           </T>
                           <T v="micro">
@@ -340,7 +338,7 @@ export default function VoiceEntry() {
             เสียงถูกแปลงเป็นข้อความโดยระบบของมือถือหรือเบราว์เซอร์ MindPay เก็บเฉพาะรายการที่คุณกดบันทึก
           </T>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAvoid>
     </SafeAreaView>
   );
 }

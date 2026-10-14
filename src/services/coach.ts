@@ -12,7 +12,8 @@ export async function askCoach(params: { context: unknown; question: string }): 
       const body = await (error.context as Response).json().catch(() => null);
       if (body?.error?.code === 'quota') throw new CoachError('วันนี้คุยกับน้องกล้าครบโควตาแล้ว พรุ่งนี้มาคุยกันใหม่นะ');
       if (body?.error?.code === 'not_configured') {
-        throw new CoachError('โค้ช AI ยังไม่พร้อม: ผู้ดูแลต้องใส่ GEMINI_API_KEY ใน Supabase → Edge Functions → Secrets (หรือ key ที่ใส่ไว้ใช้ไม่ได้) ระหว่างนี้ดูคำแนะนำด้านบนได้เลย');
+        // The setup detail (which secret is missing) is for the team, in the function's logs, not for students.
+        throw new CoachError('โค้ช AI ยังไม่พร้อมใช้งานตอนนี้ ลองใหม่ภายหลัง ระหว่างนี้แตะการ์ด "สิ่งที่ควรรู้ตอนนี้" ให้น้องกล้าเล่าได้');
       }
       if (body?.error?.code === 'busy') throw new CoachError('ตอนนี้มีคนคุยกับน้องกล้าเยอะ รอสักครู่แล้วถามใหม่นะ');
       if (body?.error?.code === 'unauthorized') throw new CoachError('เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง');

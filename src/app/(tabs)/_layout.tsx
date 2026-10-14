@@ -50,7 +50,7 @@ function useSpentToday(): number {
 
 /** Android: keep the home-screen widget showing the same numbers as the app. */
 function useQuickWidgetSync() {
-  const { today, status } = useApp();
+  const { today, status, profile } = useApp();
   const { balance, runway } = useMoney();
   const theme = useTheme();
   const spent = useSpentToday();
@@ -58,7 +58,8 @@ function useQuickWidgetSync() {
   const below = runway.status === 'below_floor';
   const { heroTop, heroDeep, heroAccent, heroInk, heroInkSoft } = theme;
   useEffect(() => {
-    if (!widgetAvailable || status !== 'ready') return;
+    // Only real numbers reach the widget: never the empty state of a load that failed.
+    if (!widgetAvailable || status !== 'ready' || !profile) return;
     // A moment's wait so a burst of changes (a scan saving several slips) redraws once.
     const t = setTimeout(() => {
       saveWidgetSnapshot({
@@ -74,7 +75,7 @@ function useQuickWidgetSync() {
       }).catch(() => {});
     }, 600);
     return () => clearTimeout(t);
-  }, [status, today, spent, balance, depletionDay, capped, below, heroTop, heroDeep, heroAccent, heroInk, heroInkSoft]);
+  }, [status, profile, today, spent, balance, depletionDay, capped, below, heroTop, heroDeep, heroAccent, heroInk, heroInkSoft]);
 }
 
 /** The tab icon pops when its tab becomes the chosen one. */
@@ -191,7 +192,7 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
             height: 50,
             padding: 4,
             paddingRight: 12,
-            gap: 8,
+            gap: 10,
             borderRadius: 25,
             backgroundColor: theme.surfaceAlt,
           }}
@@ -204,7 +205,8 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
                 accessibilityLabel="เพิ่มรายการ"
                 onPressIn={press.onPressIn}
                 onPressOut={press.onPressOut}
-                hitSlop={6}
+                // No overlap with "วันนี้ใช้ไป" beside it: a tap just right of (+) must still be (+).
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 2 }}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
                   router.push('/add');
@@ -218,10 +220,11 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`วันนี้ใช้ไป ${shortBaht(spentToday)} ดูรายการวันนี้`}
-            hitSlop={8}
+            hitSlop={{ top: 8, bottom: 8, left: 2, right: 8 }}
             onPress={() => {
               Haptics.selectionAsync().catch(() => {});
-              router.navigate('/transactions');
+              // A fresh list (no leftover filter or search), today's items at the top.
+              router.navigate({ pathname: '/transactions', params: { fresh: String(Date.now()) } });
             }}
             style={{ minWidth: 48, minHeight: 42, justifyContent: 'center' }}
           >

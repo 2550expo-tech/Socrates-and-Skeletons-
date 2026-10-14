@@ -1,8 +1,9 @@
 /**
  * A slider drawn in JS (no native module, so installed apps get it over the
- * air): drag the gold thumb or tap the track; it snaps to `step` and gives a
+ * air): drag the thumb or tap the track; it snaps to `step` and gives a
  * light tick on the phone at each step. Screen readers can adjust it too, and
- * on the web the arrow keys move it.
+ * on the web the arrow keys move it (with a ring on the thumb while it has focus).
+ * Track, fill and thumb use colours that stand out from the card (3:1, WCAG 1.4.11).
  */
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
@@ -38,6 +39,7 @@ export function Slider({
   const [width, setWidth] = useState(0);
   const [pos] = useState(() => new Animated.Value(0));
   const [grab] = useState(() => new Animated.Value(0));
+  const [focused, setFocused] = useState(false);
   // Where the track starts on the screen (found when the finger goes down), and the last value sent.
   const originX = useRef(0);
   const sent = useRef(value);
@@ -93,6 +95,8 @@ export function Slider({
         {...(Platform.OS === 'web'
           ? {
               focusable: true,
+              onFocus: () => setFocused(true),
+              onBlur: () => setFocused(false),
               onKeyDown: (e: { key?: string; nativeEvent?: { key?: string }; preventDefault?: () => void }) => {
                 const key = e.key ?? e.nativeEvent?.key;
                 const next =
@@ -112,10 +116,10 @@ export function Slider({
               },
             }
           : {})}
-        style={{ height: THUMB + 12, justifyContent: 'center' }}
+        style={{ height: THUMB + 12, justifyContent: 'center', outlineWidth: 0 }}
       >
         {/* track and the filled part up to the thumb */}
-        <View pointerEvents="none" style={{ height: 8, borderRadius: 4, backgroundColor: theme.surfaceAlt, marginHorizontal: THUMB / 2 }} />
+        <View pointerEvents="none" style={{ height: 8, borderRadius: 4, backgroundColor: theme.lineStrong, marginHorizontal: THUMB / 2 }} />
         <Animated.View
           pointerEvents="none"
           style={{
@@ -124,7 +128,7 @@ export function Slider({
             height: 8,
             width: travel,
             borderRadius: 4,
-            backgroundColor: theme.accent,
+            backgroundColor: theme.primary,
             transformOrigin: 'left',
             transform: [{ scaleX: travel ? pos.interpolate({ inputRange: [0, travel], outputRange: [0.0001, 1], extrapolate: 'clamp' }) : 0.0001 }],
           }}
@@ -137,9 +141,9 @@ export function Slider({
             width: THUMB,
             height: THUMB,
             borderRadius: THUMB / 2,
-            backgroundColor: theme.heroAccent,
+            backgroundColor: theme.primary,
             borderWidth: 3,
-            borderColor: theme.surface,
+            borderColor: focused ? theme.ink : theme.surface,
             shadowColor: '#000',
             shadowOpacity: 0.25,
             shadowRadius: 6,
