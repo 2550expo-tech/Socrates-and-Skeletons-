@@ -56,8 +56,16 @@ const visible = (page, text, timeout = 6000) => page.getByText(text, { exact: fa
 const gone = (page, text, timeout = 6000) => page.getByText(text, { exact: false }).first().waitFor({ state: 'hidden', timeout }).then(() => true, () => false);
 const introGone = (page) => page.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
 const button = (page, name) => page.getByRole('button', { name, exact: false }).first();
+/** How many slip photos have been sent to the AI so far. */
+const slipsSent = () => state.calls.filter((c) => c.startsWith('POST /functions/v1/parse-slip')).length;
+/** PDPA consent card on the scan screen (web): nothing can be read before a yes. */
+async function consentOnScan(page) {
+  await visible(page, 'ขออนุญาตก่อนให้', 8000);
+  await button(page, 'ยินยอม ให้อ่านรูปที่ฉันเลือก').click();
+  await visible(page, 'เลือกรูปสลิป แล้ว', 8000);
+}
 /** Waits (up to `timeout`) until the element is visible. */
-const shown = (locator, timeout = 6000) => locator.waitFor({ state: 'visible', timeout }).then(() => true, () => false);
+const shown =(locator, timeout = 6000) => locator.waitFor({ state: 'visible', timeout }).then(() => true, () => false);
 /** Choose a period (วันนี้ / 7 วัน / ...) on the segmented control; clicks again if a layout shift ate the first click. */
 async function pickPeriod(page, label) {
   const tab = page.getByRole('tab', { name: label, exact: true }).first();
@@ -333,6 +341,17 @@ try {
     await visible(page, 'ยอดคงเหลือ', 8000);
     await page.goto(`${APP}scan`);
     await introGone(page);
+    // PDPA: consent first. No photo can be picked or sent before the user says yes.
+    const asked = await visible(page, 'ขออนุญาตก่อนให้', 8000);
+    const pickerHidden = (await page.getByRole('button', { name: 'เลือกรูปสลิป', exact: true }).count()) === 0;
+    check('Consent first: the scan screen asks before any photo can be picked', asked && pickerHidden);
+    check(
+      'The consent card says what is sent, to whom, about the other person, and how to say no',
+      (await visible(page, 'Gemini')) && (await visible(page, 'คนที่โอนกับคุณ')) && (await button(page, 'ไม่ยินยอม').isVisible()),
+    );
+    await page.waitForTimeout(1500);
+    await shot(page, '13b-scan-consent');
+    await button(page, 'ยินยอม ให้อ่านรูปที่ฉันเลือก').click();
     check('Web scan: one button to choose photos, no range to pick first', (await visible(page, 'เลือกรูปสลิป แล้ว')) && !(await page.getByText('ย้อนหลังกี่วัน').count()));
     await shot(page, '14-scan-start');
     const chooser = page.waitForEvent('filechooser');
@@ -651,6 +670,7 @@ try {
     await visible(page, 'ยอดคงเหลือ', 8000);
     await page.goto(`${APP}scan`);
     await introGone(page);
+    await consentOnScan(page);
     const chooser = page.waitForEvent('filechooser');
     await button(page, 'เลือกรูปสลิป').click();
     state.slipOffline = 2; // the connection drops: the retry after 3 s fails too
@@ -695,6 +715,7 @@ try {
     await visible(page, 'ยอดคงเหลือ', 8000);
     await page.goto(`${APP}scan`);
     await introGone(page);
+    await consentOnScan(page);
     const chooser = page.waitForEvent('filechooser');
     await button(page, 'เลือกรูปสลิป').click();
     await (await chooser).setFiles([join(FIXTURES, 'slip-qr.jpg')]);
@@ -742,7 +763,14 @@ try {
     const aiBefore = state.calls.filter((c) => c.startsWith('POST /functions/v1/parse-slip')).length;
     await button(page, 'เริ่มใช้ MindPay').click();
     await visible(page, 'ยอดคงเหลือ', 8000);
-    // No photo is picked: the scan starts by itself once the user is in the app.
+    // PDPA: before the first automatic scan the home screen asks; nothing is sent until the user says yes.
+    const askedHome = await visible(page, 'ขออนุญาตก่อนให้', 10000);
+    await page.waitForTimeout(1500);
+    const sentBeforeYes = slipsSent() - aiBefore;
+    await shot(page, '19b-auto-scan-consent');
+    check('Android flow: the home screen asks for consent first, and sends nothing before a yes', askedHome && sentBeforeYes === 0, `${sentBeforeYes} sent before consent`);
+    await button(page, 'ยินยอม และหาสลิปเองตอนเปิดแอป').click();
+    // No photo is picked: after the yes the scan starts by itself.
     const scanned = await visible(page, 'จดให้แล้ว 3 รายการ', 25000);
     await page.waitForTimeout(1200);
     await shot(page, '20-auto-scan-done');
@@ -760,6 +788,55 @@ try {
       olderFound && state.txRows.some((r) => r.title === 'ร้านเมื่อวาน'),
       olderFound ? '' : (await page.locator('body').innerText()).split('\n').filter((l) => /รูป|สลิป/.test(l)).slice(0, 6).join(' | '),
     );
+
+    // Withdrawing consent in Settings: works at once, and nothing more is sent.
+    await page.goto(`${APP}settings`);
+    await introGone(page);
+    check('Settings shows the consent and when it was given', (await visible(page, 'ยินยอมแล้ว', 8000)) && (await visible(page, 'ตอบเมื่อ')));
+    await button(page, 'ถอนความยินยอม').click();
+    check('Withdrawing consent works at once', (await visible(page, 'ถอนความยินยอมแล้ว')) && (await visible(page, 'ไม่ยินยอม')));
+    await shot(page, '20b-consent-withdrawn');
+    const sentBefore = slipsSent();
+    await page.goto(`${APP}scan`);
+    await introGone(page);
+    const askedAgain = await visible(page, 'ตอนนี้ยังไม่ได้ให้อ่านสลิป', 8000);
+    await page.waitForTimeout(1500);
+    check('After withdrawing: the scan screen does not read the gallery and offers to change the answer', askedAgain && slipsSent() === sentBefore, `${slipsSent() - sentBefore} sent`);
+    check('After withdrawing: the slips already recorded stay in the account', state.txRows.some((r) => r.title === 'ร้านข้าวมันไก่'));
+    await ctx.close();
+    state.confirmEmail = true;
+  }
+
+  // 17b. Saying no on the home screen: nothing is sent, the card does not come back, the rest of the app works
+  {
+    state.confirmEmail = false;
+    const { ctx, page } = await freshPage('decline');
+    await installTestGallery(page, [{ name: 'slip-qr-2.jpg', minutesAgo: 10 }]);
+    await page.goto(APP);
+    await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
+    await introGone(page);
+    await page.getByText('สมัครสมาชิก', { exact: true }).click();
+    await page.fill('#name', 'ไม่ยินยอม');
+    await page.fill('#email', 'decline@example.com');
+    await page.fill('#password', 'secret123');
+    await button(page, 'สร้างบัญชี').click();
+    await visible(page, 'สมัครบัญชีสำเร็จ');
+    await button(page, 'ไปตั้งค่าเงิน').click();
+    await page.fill('#ob-balance', '2000');
+    const before = slipsSent();
+    await button(page, 'เริ่มใช้ MindPay').click();
+    await visible(page, 'ขออนุญาตก่อนให้', 10000);
+    await button(page, 'ไม่ยินยอม').click();
+    const cardGone = await gone(page, 'ขออนุญาตก่อนให้');
+    await page.waitForTimeout(2500);
+    check('Saying no: the card goes away and no slip photo is sent', cardGone && slipsSent() === before, `${slipsSent() - before} sent`);
+    await page.goto(APP);
+    await introGone(page);
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    await page.waitForTimeout(3000);
+    const askedAgain = await page.getByText('ขออนุญาตก่อนให้').count();
+    check('Saying no: opening the app again does not ask again or send anything', askedAgain === 0 && slipsSent() === before, `asked=${askedAgain} sent=${slipsSent() - before}`);
+    check('Saying no: the balance and the rest of the app work as usual', await visible(page, '฿2,000'));
     await ctx.close();
     state.confirmEmail = true;
   }
@@ -790,6 +867,7 @@ try {
     await visible(page, 'ยอดคงเหลือ', 8000);
     await page.goto(`${APP}scan`);
     await introGone(page);
+    await consentOnScan(page);
     const chooser = page.waitForEvent('filechooser');
     await button(page, 'เลือกรูปสลิป').click();
     await (await chooser).setFiles([join(FIXTURES, 'photo-3.jpg')]);

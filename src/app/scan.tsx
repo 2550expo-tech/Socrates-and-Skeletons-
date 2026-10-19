@@ -33,6 +33,7 @@ import { ScannerStage } from '../ui/ScannerStage';
 import { TxRow } from '../ui/TxRow';
 import { radius, space, useTheme } from '../ui/theme';
 import { WaitNotice } from '../ui/WaitNotice';
+import { SlipConsent } from '../ui/SlipConsent';
 import { HeaderDecor } from '../ui/halloween';
 
 export default function Scan() {
@@ -50,15 +51,18 @@ export default function Scan() {
   const done = state.phase === 'done';
   const demo = repo?.mode === 'demo';
   const started = useRef(false);
+  // PDPA: nothing is read until this account has said yes (domain/consent.ts).
+  const consented = auto.consent === 'granted';
+  const askConsent = !demo && !!repo && (auto.consent === 'ask' || auto.consent === 'declined');
 
-  // Phone app: start searching as soon as the screen opens (after the first frame).
+  // Phone app: start searching as soon as the screen opens (after the first frame), once consent is given.
   useEffect(() => {
-    if (started.current || demo || !galleryAvailable || !repo || autoBusy) return;
+    if (started.current || demo || !galleryAvailable || !repo || autoBusy || !consented) return;
     started.current = true;
     const t = setTimeout(() => s.loadFromGallery('1m'), 250);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [demo, repo, autoBusy]);
+  }, [demo, repo, autoBusy, consented]);
 
   const recorded = useMemo(() => {
     const ids = new Set(s.runTxIds);
@@ -102,8 +106,23 @@ export default function Scan() {
           <BuddySays mood="calm">โหมดทดลองยังอ่านสลิปไม่ได้นะ เพราะต้องใช้เซิร์ฟเวอร์ เข้าสู่ระบบด้วยบัญชีจริง แล้ว{BUDDY_NAME}จะอ่านให้เลย</BuddySays>
         ) : null}
 
+        {askConsent ? (
+          <SlipConsent
+            autoOption={galleryAvailable}
+            declined={auto.consent === 'declined'}
+            onAnswer={async (granted, autoScan) => {
+              // From this screen a yes reads now (the effect above starts it); it does not start a second, automatic run.
+              await auto.setConsent(granted, galleryAvailable ? { autoScan } : {});
+              if (!granted) {
+                toast({ message: 'ไม่ส่งรูปสลิปออกจากเครื่อง จดเองหรือพูดจดได้ตามปกติ' });
+                goBack();
+              }
+            }}
+          />
+        ) : null}
+
         {/* Web: one tap to choose photos, then everything else is automatic */}
-        {!galleryAvailable && idle && !demo ? (
+        {!galleryAvailable && idle && !demo && consented ? (
           <Card style={{ gap: space.md, alignItems: 'center' }}>
             <Buddy mood="happy" size={92} />
             <T v="h2" center>เลือกรูปสลิป แล้ว{BUDDY_NAME}จัดการที่เหลือให้</T>
@@ -249,7 +268,7 @@ export default function Scan() {
           <Row gap={6}>
             <Ionicons name="shield-checkmark-outline" size={16} color={theme.inkSoft} />
             <T v="micro" style={{ flex: 1 }}>
-              รูปสลิปส่งให้ AI (Google Gemini) อ่านครั้งเดียว ไม่ถูกเก็บบนเซิร์ฟเวอร์ MindPay (รายละเอียดในตั้งค่า) · สลิปที่อ่านชัดทุกช่องรวมในยอดทันที ส่วนที่ไม่ชัดรอให้ตรวจ (ปิดได้ในตั้งค่า)
+              รูปสลิปส่งให้ AI (Google Gemini) อ่านเฉพาะเมื่อคุณยินยอม และไม่ถูกเก็บบนเซิร์ฟเวอร์ MindPay (ถอนความยินยอมได้ในตั้งค่า) · สลิปที่อ่านชัดทุกช่องรวมในยอดทันที ส่วนที่ไม่ชัดรอให้ตรวจ (ปิดได้ในตั้งค่า)
             </T>
           </Row>
         </View>

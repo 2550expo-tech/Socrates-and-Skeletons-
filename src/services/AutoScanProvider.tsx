@@ -21,10 +21,15 @@
  *   hold up the photos behind it.
  * - Each account keeps its own last-run time, and a run stops (saving nothing more)
  *   when the account changes. It also waits while the scan screen is reading photos.
+ * - Consent first (PDPA, domain/consent.ts): until this account says yes, nothing is
+ *   scanned and the photo permission is not even asked for; the home screen shows the
+ *   consent card instead. A "no" keeps it quiet. Withdrawing consent stops a run at the
+ *   next photo (processSlipImage checks consent for every photo).
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 import { autoScanSince, MAX_AUTO_ATTEMPTS, MAX_IMAGES_PER_RUN, nextAutoScanMark, shouldAutoScan } from '../domain/autoScan';
+import { answerConsent, consentState, type ConsentState } from '../domain/consent';
 import { rangeDays } from '../domain/dates';
 import { buildDuplicateIndex } from '../domain/slip';
 import type { Transaction } from '../domain/types';
@@ -54,7 +59,7 @@ const READER_DOWN = 'ระบบอ่านสลิปขัดข้อง�
 /** Runs one photo may stop (busy or timed-out reader) before the automatic scan leaves it for the scan screen. */
 const STALL_LIMIT = 3;
 
-export type AutoScanPhase = 'idle' | 'needs_permission' | 'scanning' | 'done' | 'error';
+export type AutoScanPhase = 'idle' | 'needs_consent' | 'needs_permission' | 'scanning' | 'done' | 'error';
 
 export interface AutoScanState {
   phase: AutoScanPhase;
@@ -73,7 +78,11 @@ interface AutoScanContextValue {
   state: AutoScanState;
   prefs: ScanPrefs;
   available: boolean;
-  setPrefs(patch: Partial<Omit<ScanPrefs, 'lastAutoScanAt'>>): Promise<void>;
+  /** This account's answer about sending slip photos to the AI; null while it is being loaded. */
+  consent: ConsentState | null;
+  /** Record the answer. A yes with autoScan on the phone starts the first scan right away. */
+  setConsent(granted: boolean, opts?: { autoScan?: boolean }): Promise<void>;
+  setPrefs(patch: Partial<Omit<ScanPrefs, 'lastAutoScanAt' | 'aiConsent'>>): Promise<void>;
   grantAndRun(): Promise<void>;
   runNow(): Promise<void>;
   /** Move this run's auto-counted slips back to "รอยืนยัน". */
@@ -96,6 +105,8 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
   const inApp = status === 'ready' && !!profile?.onboarded;
   const [state, setState] = useState<AutoScanState>(IDLE);
   const [prefs, setPrefsState] = useState<ScanPrefs>(DEFAULT_SCAN_PREFS);
+  /** Whose prefs are loaded (so a card is never shown from another account's or the default answer). */
+  const [prefsFor, setPrefsFor] = useState<string | null | undefined>(undefined);
   const running = useRef(false);
   const txsRef = useRef(txs);
   // The app's actions change on every data change; read them through refs so a new
@@ -118,9 +129,13 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     runGen.current += 1;
     loadScanPrefs(userId)
-      .then(setPrefsState)
+      .then((p) => {
+        setPrefsState(p);
+        setPrefsFor(userId);
+      })
       .catch(() => {});
   }, [userId]);
+  const consent: ConsentState | null = prefsFor === userId && userId ? consentState(prefs.aiConsent) : null;
 
   const available = galleryAvailable && repo?.mode === 'cloud';
 
@@ -190,7 +205,7 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
               delete failures[img.assetId];
             } catch (e) {
               const code = e instanceof SlipReaderError ? e.code : null;
-              if (code === 'cancelled') {
+              if (code === 'cancelled' || code === 'no_consent') {
                 quiet = true;
                 break;
               }
@@ -258,6 +273,12 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
     let p = await loadScanPrefs(userId);
     setPrefsState(p);
     if (!shouldAutoScan({ enabled: p.autoScan, lastAutoScanAt: p.lastAutoScanAt, nowMs: Date.now(), alreadyRunning: running.current })) return;
+    // Consent before anything else, even before the phone's photo permission dialog.
+    const c = consentState(p.aiConsent);
+    if (c !== 'granted') {
+      if (c === 'ask') setState({ ...IDLE, phase: 'needs_consent' });
+      return;
+    }
     let access = await getGalleryAccess().catch(() => 'denied' as const);
     if (access === 'denied' && !p.askedGalleryOnce) {
       // First time the app opens: ask for the photos right away (the phone shows its own
@@ -295,6 +316,18 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
       state,
       prefs,
       available,
+      consent,
+      async setConsent(granted, opts = {}) {
+        if (!userId) return;
+        const patch: Partial<ScanPrefs> = { aiConsent: answerConsent(granted, Date.now()) };
+        if (opts.autoScan !== undefined) patch.autoScan = opts.autoScan;
+        const next = await saveScanPrefs(patch, userId);
+        setPrefsState(next);
+        setPrefsFor(userId);
+        setState(IDLE);
+        // A yes to "scan by itself": the first scan (and the phone's photo prompt) follows right away.
+        if (granted && next.autoScan && available && inApp) await maybeRun();
+      },
       async setPrefs(patch) {
         setPrefsState(await saveScanPrefs(patch, userId));
       },
@@ -318,7 +351,7 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
         setState(IDLE);
       },
     }),
-    [state, prefs, available, run, userId],
+    [state, prefs, available, consent, run, maybeRun, inApp, userId],
   );
 
   return <AutoScanContext.Provider value={value}>{children}</AutoScanContext.Provider>;

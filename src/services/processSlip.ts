@@ -2,7 +2,7 @@
  * FR-4: process ONE image into a transaction. Shared by the manual scan screen
  * and the automatic scan that runs when the app opens.
  *
- *   QR check (phone, free) -> shrink + hash -> slip reader -> rules -> save
+ *   consent? -> QR check (phone, free) -> shrink + hash -> slip reader -> rules -> save
  */
 import { bkkToIso } from '../domain/dates';
 import {
@@ -17,6 +17,8 @@ import {
 import { EMPTY_NAME_STATS } from '../domain/slipNames';
 import type { ItemStatus } from '../domain/scanQueue';
 import type { Transaction } from '../domain/types';
+import { maySendSlips } from '../domain/consent';
+import { loadScanPrefs } from '../data/prefs';
 import { DuplicateSlipError, type Repo } from '../data/repo';
 import { learnPayer, loadNames } from './myNames';
 import { detectSlipQr, prepareImage, READER_MESSAGES, readSlip, SlipReaderError } from './slips';
@@ -49,6 +51,11 @@ export async function processSlipImage(opts: {
   /** The signed-in account: its own name on slips is learned to tell income from expense. */
   userId?: string | null;
 }): Promise<ProcessResult> {
+  // PDPA: no photo leaves the phone for the AI without this account's consent (domain/consent.ts).
+  // Checked here, the one path both the scan screen and the automatic scan go through.
+  const { aiConsent } = await loadScanPrefs(opts.userId);
+  if (!opts.userId || !maySendSlips(aiConsent)) throw new SlipReaderError('no_consent', READER_MESSAGES.no_consent);
+
   const size = { width: opts.width, height: opts.height };
   const { qr, scannerWorks, otherQr } = await detectSlipQr(opts.uri, size);
   // E-wallet slips (TrueMoney, ShopeePay...) carry their own kind of QR: a screen-sized

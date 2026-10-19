@@ -172,6 +172,7 @@ export class SlipReaderError extends Error {
       | 'reader_error'
       | 'server'
       | 'cancelled'
+      | 'no_consent'
       | 'qr_unavailable',
     message: string,
   ) {
@@ -186,6 +187,7 @@ export const READER_MESSAGES: Record<SlipReaderError['code'], string> = {
   too_large: 'รูปใหญ่เกินไป',
   server: 'ระบบอ่านสลิปขัดข้องชั่วคราว สลิปที่เหลือจะอ่านต่อให้ภายหลัง',
   cancelled: 'หยุดอ่านสลิปแล้ว',
+  no_consent: 'ยังไม่ได้ยินยอมให้ส่งรูปสลิปให้ AI อ่าน จึงไม่ได้ส่งรูปออกจากเครื่อง (เปลี่ยนได้ในตั้งค่า → ความเป็นส่วนตัว)',
   not_configured: 'ระบบอ่านสลิปยังไม่พร้อม: ผู้ดูแลต้องใส่ GEMINI_API_KEY ใน Supabase → Edge Functions → Secrets (หรือ key ที่ใส่ไว้ใช้ไม่ได้)',
   busy: 'ตอนนี้ AI อ่านสลิปมีคนใช้เยอะ ลองใหม่อีกสักครู่ สลิปที่เหลือจะอ่านต่อตอนเปิดแอปครั้งหน้า',
   network: 'เชื่อมต่ออินเทอร์เน็ตไม่ได้ ลองใหม่อีกครั้ง',
