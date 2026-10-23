@@ -14,13 +14,15 @@ import { supabase } from '../data/supabase';
 import { useAutoScan } from '../services/AutoScanProvider';
 import { forgetScanned } from '../services/slips';
 import { amountToInput, parseBahtToSatang } from '../domain/money';
-import { Button, Card, IconButton, Ionicons, Row, Segmented, T, Toggle } from '../ui/components';
+import { bkkDayKey, bkkTime, formatThaiDay } from '../domain/dates';
+import { Badge, Button, Card, IconButton, Ionicons, Row, Segmented, T, Toggle } from '../ui/components';
+import { ConsentPoints } from '../ui/SlipConsent';
 import { setKlaSound, useKlaSound } from '../ui/kla/useKlaTalk';
 import { ThemePicker } from '../ui/ThemePicker';
 import { setThemeMode, useThemeMode, type ThemeMode } from '../ui/themeMode';
 import { ConfirmSheet, useToast } from '../ui/feedback';
 import { Field } from '../ui/inputs';
-import { space, useTheme } from '../ui/theme';
+import { radius, space, useTheme } from '../ui/theme';
 import { HeaderDecor } from '../ui/halloween';
 
 export default function Settings() {
@@ -105,7 +107,7 @@ export default function Settings() {
             <Button label="บันทึก" onPress={save} loading={busy} />
           </Card>
 
-          {auto.available ? (
+          {auto.available && auto.consent === 'granted' ? (
             <Card>
               <T v="h3">อ่านสลิปอัตโนมัติ</T>
               <Row justify="space-between" gap={space.md}>
@@ -157,9 +159,40 @@ export default function Settings() {
 
           <Card>
             <T v="h3">ความเป็นส่วนตัว</T>
+            {repo?.mode === 'cloud' && auto.consent ? (
+              <View style={{ gap: space.sm, backgroundColor: theme.surfaceAlt, borderRadius: radius.lg, padding: space.md }}>
+                <Row justify="space-between" gap={space.sm}>
+                  <T v="body" style={{ flex: 1 }}>ส่งรูปสลิปให้ AI อ่าน</T>
+                  <Badge
+                    label={auto.consent === 'granted' ? 'ยินยอมแล้ว' : auto.consent === 'declined' ? 'ไม่ยินยอม' : 'ยังไม่ได้ตอบ'}
+                    tone={auto.consent === 'granted' ? 'good' : 'neutral'}
+                  />
+                </Row>
+                {auto.prefs.aiConsent ? (
+                  <T v="micro">ตอบเมื่อ {formatThaiDay(bkkDayKey(auto.prefs.aiConsent.at), { year: true })} {bkkTime(new Date(auto.prefs.aiConsent.at))} น.</T>
+                ) : null}
+                <ConsentPoints />
+                {auto.consent === 'granted' ? (
+                  <Button
+                    label="ถอนความยินยอม"
+                    kind="soft"
+                    small
+                    icon="close-circle-outline"
+                    onPress={() => auto.setConsent(false).then(() => toast({ message: 'ถอนความยินยอมแล้ว แอปจะไม่ส่งรูปสลิปออกจากเครื่อง' }))}
+                  />
+                ) : (
+                  <Button
+                    label="ยินยอมให้อ่านสลิป"
+                    kind="soft"
+                    small
+                    icon="checkmark-circle-outline"
+                    onPress={() => auto.setConsent(true).then(() => toast({ message: 'ยินยอมแล้ว อ่านสลิปได้ที่ปุ่มสแกนสลิป' }))}
+                  />
+                )}
+                <T v="micro">ถอนแล้วแอปหยุดส่งรูปทันที รายการที่บันทึกไว้แล้วยังอยู่ในบัญชีของคุณ ลบเองได้ในแท็บรายการ</T>
+              </View>
+            ) : null}
             <T v="small">
-              • รูปในแกลเลอรีถูกตรวจบนมือถือก่อน เฉพาะรูปที่มี QR ของสลิปจะถูกส่งให้ AI (Google Gemini) อ่าน และไม่ถูกเก็บบนเซิร์ฟเวอร์ MindPay{'\n'}
-              • ช่วงทดลองใช้ Gemini แบบฟรี ซึ่ง Google อาจเก็บข้อมูลที่ส่งไปเพื่อปรับปรุง AI ตามเงื่อนไขของ Google{'\n'}
               • น้องกล้า (โค้ช AI) เห็นเฉพาะยอดรวมตามหมวด ไม่เห็นรูปสลิป เลขบัญชี หรือชื่อคนที่คุณโอนให้{'\n'}
               • เสียงของน้องกล้าใช้เสียงอ่านภาษาไทยที่มากับมือถือหรือเบราว์เซอร์ของคุณ (ข้อความที่อ่านเป็นคำตอบของโค้ชเท่านั้น){'\n'}
               • ข้อมูลรายการของคุณมองเห็นได้เฉพาะบัญชีของคุณ (Row Level Security)

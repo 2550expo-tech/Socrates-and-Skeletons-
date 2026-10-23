@@ -10,6 +10,7 @@ import { useAutoScan } from '../services/AutoScanProvider';
 import { Buddy } from './Buddy';
 import { Button, Card, IconButton, Money, ProgressBar, Row, T } from './components';
 import { Reveal, ScanBeam, useCelebrate } from './effects';
+import { SlipConsent } from './SlipConsent';
 import { useToast } from './feedback';
 import { space, useTheme } from './theme';
 import { WaitNotice } from './WaitNotice';
@@ -17,7 +18,7 @@ import { WaitNotice } from './WaitNotice';
 export function AutoScanBanner() {
   const theme = useTheme();
   const toast = useToast();
-  const { state, available, grantAndRun, undoLast, dismiss } = useAutoScan();
+  const { state, available, grantAndRun, undoLast, dismiss, setConsent } = useAutoScan();
   const celebrate = useCelebrate();
   const counted = state.phase === 'done' ? state.confirmed.length : 0;
   useEffect(() => {
@@ -45,6 +46,10 @@ export function AutoScanBanner() {
       </Card>
       </Reveal>
     );
+  }
+
+  if (state.phase === 'needs_consent') {
+    return <SlipConsent autoOption onAnswer={(granted, autoScan) => setConsent(granted, { autoScan })} />;
   }
 
   if (state.phase === 'needs_permission') {

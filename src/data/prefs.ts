@@ -1,7 +1,9 @@
 /**
  * Per-device preferences for slip scanning. Kept on the phone (not in the
  * database) because they describe how THIS phone's gallery is handled.
+ * The scan window and the AI consent belong to each account on the phone.
  */
+import type { ConsentRecord } from '../domain/consent';
 import { Storage } from './storage';
 
 export interface ScanPrefs {
@@ -13,36 +15,48 @@ export interface ScanPrefs {
   lastAutoScanAt: number;
   /** The phone's photo permission was asked for once by itself (the first time the app opened). */
   askedGalleryOnce: boolean;
+  /** This account's answer to "may slip photos go to the AI?" (null = not asked yet). See domain/consent.ts. */
+  aiConsent: ConsentRecord | null;
 }
 
 const KEY = 'mindpay.scanPrefs.v1';
-export const DEFAULT_SCAN_PREFS: ScanPrefs = { autoScan: true, autoConfirm: true, lastAutoScanAt: 0, askedGalleryOnce: false };
+export const DEFAULT_SCAN_PREFS: ScanPrefs = { autoScan: true, autoConfirm: true, lastAutoScanAt: 0, askedGalleryOnce: false, aiConsent: null };
 
-/** Stored form: the switches belong to this phone, the scan window to each account on it. */
-type Stored = Omit<ScanPrefs, 'lastAutoScanAt'> & { lastAutoScanBy?: Record<string, number> };
+/** Stored form: the switches belong to this phone, the scan window and consent to each account on it. */
+type Stored = Omit<ScanPrefs, 'lastAutoScanAt' | 'aiConsent'> & {
+  lastAutoScanBy?: Record<string, number>;
+  aiConsentBy?: Record<string, ConsentRecord>;
+};
 
 async function loadStored(): Promise<Stored> {
   try {
     const raw = await Storage.getItem(KEY);
     const parsed = raw ? (JSON.parse(raw) as Partial<Stored>) : {};
     const { autoScan, autoConfirm, askedGalleryOnce } = { ...DEFAULT_SCAN_PREFS, ...parsed };
-    return { autoScan, autoConfirm, askedGalleryOnce, lastAutoScanBy: parsed.lastAutoScanBy ?? {} };
+    return { autoScan, autoConfirm, askedGalleryOnce, lastAutoScanBy: parsed.lastAutoScanBy ?? {}, aiConsentBy: parsed.aiConsentBy ?? {} };
   } catch {
-    return { ...DEFAULT_SCAN_PREFS, lastAutoScanBy: {} };
+    return { autoScan: true, autoConfirm: true, askedGalleryOnce: false, lastAutoScanBy: {}, aiConsentBy: {} };
   }
 }
 
-/** This phone's scan settings, with the scan window of `userId` (another account starts with its own). */
+/** This phone's scan settings, with the scan window and consent of `userId` (another account starts with its own). */
 export async function loadScanPrefs(userId?: string | null): Promise<ScanPrefs> {
   const s = await loadStored();
-  return { autoScan: s.autoScan, autoConfirm: s.autoConfirm, askedGalleryOnce: s.askedGalleryOnce, lastAutoScanAt: (userId && s.lastAutoScanBy?.[userId]) || 0 };
+  return {
+    autoScan: s.autoScan,
+    autoConfirm: s.autoConfirm,
+    askedGalleryOnce: s.askedGalleryOnce,
+    lastAutoScanAt: (userId && s.lastAutoScanBy?.[userId]) || 0,
+    aiConsent: (userId && s.aiConsentBy?.[userId]) || null,
+  };
 }
 
 export async function saveScanPrefs(patch: Partial<ScanPrefs>, userId?: string | null): Promise<ScanPrefs> {
   const s = await loadStored();
-  const { lastAutoScanAt, ...rest } = patch;
+  const { lastAutoScanAt, aiConsent, ...rest } = patch;
   const next: Stored = { ...s, ...rest };
   if (lastAutoScanAt !== undefined && userId) next.lastAutoScanBy = { ...s.lastAutoScanBy, [userId]: lastAutoScanAt };
+  if (aiConsent && userId) next.aiConsentBy = { ...s.aiConsentBy, [userId]: aiConsent };
   await Storage.setItem(KEY, JSON.stringify(next));
   return loadScanPrefs(userId);
 }
