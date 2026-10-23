@@ -1,0 +1,25 @@
+{
+  "name": "MindPay",
+  "short_name": "MindPay",
+  "description": "เพื่อนการเงินที่อ่านสลิปและบอกว่าเงินพอถึงวันไหน",
+  "lang": "th",
+  "start_url": "/Socrates-and-Skeletons-/",
+  "scope": "/Socrates-and-Skeletons-/",
+  "display": "standalone",
+  "background_color": "#0E3B2C",
+  "theme_color": "#0E3B2C",
+  "icons": [
+    {
+      "src": "/Socrates-and-Skeletons-/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/Socrates-and-Skeletons-/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
