@@ -31,7 +31,11 @@ describe('TC-92 consent before slip photos go to the AI', () => {
   it('tells the person what is sent, to whom, what is kept, about other people, and how to say no', () => {
     const text = SLIP_AI_CONSENT_POINTS.join(' ');
     expect(text).toMatch(/QR/);
+    // Every AI the server may be set up with is named (supabase/functions/_shared/common.ts).
     expect(text).toMatch(/Gemini/);
+    expect(text).toMatch(/Claude/);
+    // Photos the person picks skip the QR check, and the consent says so.
+    expect(text).toMatch(/เลือกเอง/);
     expect(text).toMatch(/คนที่โอน/);
     expect(text).toMatch(/เก็บเฉพาะ/);
     expect(text).toMatch(/ไม่ยินยอม/);

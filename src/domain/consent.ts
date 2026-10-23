@@ -38,14 +38,21 @@ export function answerConsent(granted: boolean, nowMs: number): ConsentRecord {
 
 /**
  * What the person is told before they answer (also shown in Settings). Keep it true to the
- * code: QR check on the phone (services/slips.ts), parse-slip Edge Function, Gemini, what
- * repo.insert keeps. Change the wording only together with SLIP_AI_CONSENT_VERSION.
+ * code:
+ * - the QR check on the phone applies when the app searches the gallery by itself
+ *   (AutoScanProvider, useSlipScanner `requireQr`); photos the person picks are all sent;
+ *   a screen-sized picture with any QR (e-wallet slips) is sent too (processSlip.ts);
+ * - parse-slip reads each slip twice with the AI the server is set up with: Anthropic Claude
+ *   or Google Gemini (supabase/functions/_shared/common.ts `aiProvider`, AI_PROVIDER);
+ * - what repo.insert keeps (processSlip.ts): amount, date/time, name, bank (in the note),
+ *   reference number and a fingerprint (hash) of the picture for duplicates.
+ * Change the wording only together with SLIP_AI_CONSENT_VERSION.
  */
 export const SLIP_AI_CONSENT_POINTS: readonly string[] = [
-  'มือถือหาเฉพาะรูปที่มี QR ของสลิปก่อน รูปอื่นไม่ออกจากเครื่อง',
-  'รูปสลิปถูกส่งผ่านเซิร์ฟเวอร์ MindPay ไปให้ AI ของ Google (Gemini) อ่าน และไม่ถูกเก็บไว้บนเซิร์ฟเวอร์ MindPay',
+  'ตอนแอปหาสลิปในแกลเลอรีเอง มือถือเลือกเฉพาะรูปที่มี QR (สลิปธนาคาร หรือภาพหน้าจอ e-wallet) รูปอื่นไม่ออกจากเครื่อง ส่วนรูปที่คุณเลือกเองจะถูกส่งไปอ่านทุกรูป',
+  'รูปสลิปถูกส่งผ่านเซิร์ฟเวอร์ MindPay ไปให้ AI อ่าน (Google Gemini หรือ Anthropic Claude ตามที่ระบบตั้งไว้) และไม่ถูกเก็บไว้บนเซิร์ฟเวอร์ MindPay',
   'ในสลิปมีชื่อและเลขบัญชีบางส่วนของคุณ และของคนที่โอนกับคุณ',
-  'ช่วงทดลองใช้ Gemini แบบฟรี ซึ่ง Google อาจเก็บข้อมูลที่ส่งไปเพื่อปรับปรุง AI',
-  'MindPay เก็บเฉพาะยอดเงิน วันที่ ชื่อผู้รับหรือร้าน และเลขอ้างอิง เป็นรายการในบัญชีของคุณ',
+  'ถ้าระบบใช้ Gemini แบบฟรี Google อาจเก็บข้อมูลที่ส่งไปเพื่อปรับปรุง AI',
+  'MindPay เก็บเฉพาะยอดเงิน วันที่ ชื่อผู้รับหรือร้าน ธนาคาร เลขอ้างอิง และรหัสตรวจรูปซ้ำ (ไม่ใช่ตัวรูป) เป็นรายการในบัญชีของคุณ',
   'ไม่ยินยอมก็ได้ ยังจดเองและพูดจดได้ตามปกติ และเปลี่ยนใจได้ทุกเมื่อในตั้งค่า',
 ];
