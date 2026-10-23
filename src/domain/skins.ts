@@ -26,6 +26,7 @@ export type SkinId =
   | 'pioneer'
   | 'songkran2569'
   | 'loykrathong2568'
+  | 'loykrathong2569'
   | 'newyear2570'
   | 'pumpkin'
   | 'sheetghost'
@@ -87,6 +88,15 @@ export const SKINS: readonly Skin[] = [
   { id: 'mummy', name: 'มัมมี่', blurb: 'พันผ้าทั้งตัว ปลอดภัยไว้ก่อนเหมือนเงินสำรอง', kind: 'limited', window: HALLOWEEN, candies: 20, event: 'halloween2569', tint: '#B9A882' },
   { id: 'vampire', name: 'แวมไพร์', blurb: 'ผ้าคลุมคอตั้งกับเขี้ยวเล็ก ๆ ไม่กัดใครหรอก', kind: 'limited', window: HALLOWEEN, candies: 30, event: 'halloween2569', tint: '#8E1F2E' },
   { id: 'frankenstein', name: 'แฟรงเกนสไตน์', blurb: 'ผมทรงแบน รอยเย็บ และน็อตที่คอ ตัวเขียวแต่ใจดี', kind: 'limited', window: HALLOWEEN, candies: 40, event: 'halloween2569', tint: '#4E8A3E' },
+  {
+    // วันลอยกระทง 2569 = อังคาร 24 พ.ย. 2569 (ขึ้น 15 ค่ำ เดือน 12); the window is two days either side, like 2568.
+    id: 'loykrathong2569',
+    name: 'ลอยกระทง 2569',
+    blurb: 'มาลัยดาวเรืองรอบหัวกับโคมลอยดวงน้อย ปล่อยความกังวลเรื่องเงินลอยไปกับแสงโคม',
+    kind: 'limited',
+    window: { from: '2026-11-22', to: '2026-11-26' },
+    tint: '#E8892B',
+  },
   {
     id: 'songkran2569',
     name: 'สงกรานต์ 2569',

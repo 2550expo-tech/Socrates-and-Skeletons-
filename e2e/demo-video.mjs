@@ -111,7 +111,10 @@ try {
   await page.getByText('ยอดคงเหลือ').waitFor({ timeout: 10000 });
 
   if (FLOW === 'android') {
-    // 4a. Nothing to tap: the new slips in the gallery are found and read by themselves.
+    // 4a. One yes to the consent card (PDPA), then the new slips in the gallery are found and read by themselves.
+    await page.getByText('ขออนุญาตก่อนให้', { exact: false }).first().waitFor({ timeout: 15000 });
+    await pause(2600);
+    await button('ยินยอม และหาสลิปเองตอนเปิดแอป').click();
     await page.getByText('จดให้แล้ว', { exact: false }).first().waitFor({ timeout: 40000 });
     await pause(4200);
   } else {
@@ -121,6 +124,9 @@ try {
     await page.getByRole('button', { name: 'เพิ่มรายการ', exact: true }).first().click();
     await pause(1200);
     await page.getByRole('button', { name: 'เลือกสลิปจากแกลเลอรี', exact: true }).first().click();
+    await page.getByText('ขออนุญาตก่อนให้', { exact: false }).first().waitFor({ timeout: 10000 });
+    await pause(2600);
+    await button('ยินยอม ให้อ่านรูปที่ฉันเลือก').click();
     await page.getByText('เลือกรูปสลิป', { exact: false }).first().waitFor({ timeout: 10000 });
     await pause(900);
     const chooser = page.waitForEvent('filechooser');

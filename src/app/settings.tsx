@@ -3,6 +3,9 @@
  * start, reserve line, budget), how the app looks, น้องกล้า (voice, skins), slip
  * reading on the phone, then the rest; privacy notes fold open; sign out sits
  * at the very bottom, away from everyday taps.
+ * Privacy starts with this account's answer about sending slip photos to the AI
+ * (PDPA, domain/consent.ts): what it covers, when it was given, and a way to
+ * withdraw it (or give it) that works at once.
  */
 import { router } from 'expo-router';
 import appConfig from '../../app.json';
@@ -17,7 +20,9 @@ import { pinQuickWidget, widgetAvailable } from '../services/quickWidget';
 import { deleteAllSlipCopies, slipCopyStats } from '../services/slipCopies';
 import { forgetScanned } from '../services/slips';
 import { amountToInput, formatSatang, parseBahtToSatang } from '../domain/money';
-import { Button, Divider, Ionicons, Row, Segmented, T, Toggle, type IconName } from '../ui/components';
+import { bkkDayKey, bkkTime, formatThaiDay } from '../domain/dates';
+import { Badge, Button, Divider, Ionicons, Row, Segmented, T, Toggle, type IconName } from '../ui/components';
+import { ConsentPoints } from '../ui/SlipConsent';
 import { setKlaSound, useKlaSound } from '../ui/kla/useKlaTalk';
 import { ThemePicker } from '../ui/ThemePicker';
 import { setThemeMode, useThemeMode, type ThemeMode } from '../ui/themeMode';
@@ -391,7 +396,7 @@ function SettingsForm({ profile }: { profile: Profile }) {
             />
             <LinkRow icon="shirt-outline" label="ตู้สกินน้องกล้า" onPress={() => router.push('/skins')} />
           </Group>
-          {auto.available ? (
+          {auto.available && auto.consent === 'granted' ? (
             <Group title="อ่านสลิปอัตโนมัติ">
               <ToggleRow
                 icon="images-outline"
@@ -445,15 +450,55 @@ function SettingsForm({ profile }: { profile: Profile }) {
             ) : null}
           </Group>
           <Group title="ความเป็นส่วนตัว">
+            {repo?.mode === 'cloud' && auto.consent ? (
+              <View style={{ paddingVertical: space.md, gap: space.md }}>
+                <Row gap={space.md}>
+                  <RowIcon icon="shield-checkmark-outline" color={auto.consent === 'granted' ? theme.good : theme.inkSoft} />
+                  <View style={{ flex: 1, gap: 1 }}>
+                    <T v="body" color={theme.ink}>
+                      ส่งรูปสลิปให้ AI อ่าน
+                    </T>
+                    {auto.prefs.aiConsent ? (
+                      <T v="micro">
+                        ตอบเมื่อ {formatThaiDay(bkkDayKey(auto.prefs.aiConsent.at))} {bkkTime(new Date(auto.prefs.aiConsent.at))} น.
+                      </T>
+                    ) : null}
+                  </View>
+                  <Badge
+                    label={auto.consent === 'granted' ? 'ยินยอมแล้ว' : auto.consent === 'declined' ? 'ไม่ยินยอม' : 'ยังไม่ได้ตอบ'}
+                    tone={auto.consent === 'granted' ? 'good' : 'neutral'}
+                  />
+                </Row>
+                <ConsentPoints />
+                {auto.consent === 'granted' ? (
+                  <Button
+                    label="ถอนความยินยอม"
+                    kind="soft"
+                    small
+                    icon="close-circle-outline"
+                    style={{ alignSelf: 'flex-start' }}
+                    onPress={() => auto.setConsent(false).then(() => toast({ message: 'ถอนความยินยอมแล้ว แอปจะไม่ส่งรูปสลิปออกจากเครื่อง' }))}
+                  />
+                ) : (
+                  <Button
+                    label="ยินยอมให้อ่านสลิป"
+                    kind="soft"
+                    small
+                    icon="checkmark-circle-outline"
+                    style={{ alignSelf: 'flex-start' }}
+                    onPress={() => auto.setConsent(true).then(() => toast({ message: 'ยินยอมแล้ว อ่านสลิปได้ที่ปุ่ม +' }))}
+                  />
+                )}
+                <T v="micro">ถอนแล้วแอปหยุดส่งรูปทันที รายการที่บันทึกไว้แล้วยังอยู่ในบัญชีของคุณ ลบเองได้ในแท็บรายการ</T>
+              </View>
+            ) : null}
             <View style={{ paddingVertical: space.md, gap: space.sm }}>
               <T v="small">
                 • ข้อมูลรายการของคุณเปิดดูได้เฉพาะบัญชีของคุณ (ฐานข้อมูลล็อกสิทธิ์ทีละรายการ){'\n'}
                 • รูปสลิปที่อ่านแล้วเก็บเป็นสำเนาในเครื่องนี้เท่านั้น ไม่ได้อัปโหลดเก็บบน server
                 {showPrivacy ? (
                   <>
-                    {'\n'}• รูปในแกลเลอรีถูกตรวจบนมือถือก่อน เฉพาะรูปที่มี QR ของสลิปจะถูกส่งให้ AI (Google Gemini หรือ Anthropic Claude ตามที่ระบบตั้งไว้) อ่าน และไม่ถูกเก็บบนเซิร์ฟเวอร์ MindPay{'\n'}
-                    • ถ้าใช้ Gemini แบบฟรี Google อาจเก็บข้อมูลที่ส่งไปเพื่อปรับปรุง AI ตามเงื่อนไขของ Google{'\n'}
-                    • น้องกล้า (โค้ช AI) เห็นเฉพาะยอดรวมตามหมวด ไม่เห็นรูปสลิป เลขบัญชี หรือชื่อคนที่คุณโอนให้{'\n'}
+                    {'\n'}• น้องกล้า (โค้ช AI) เห็นเฉพาะยอดรวมตามหมวด ไม่เห็นรูปสลิป เลขบัญชี หรือชื่อคนที่คุณโอนให้{'\n'}
                     • เสียงของน้องกล้าใช้เสียงอ่านภาษาไทยที่มากับมือถือหรือเบราว์เซอร์ของคุณ (ข้อความที่อ่านเป็นคำตอบของโค้ชเท่านั้น)
                   </>
                 ) : null}
@@ -461,14 +506,14 @@ function SettingsForm({ profile }: { profile: Profile }) {
               <Pressable
                 onPress={() => setShowPrivacy((v) => !v)}
                 accessibilityRole="button"
-                accessibilityLabel={showPrivacy ? 'ย่อความเป็นส่วนตัว' : 'อ่านความเป็นส่วนตัวทั้งหมด 6 ข้อ'}
+                accessibilityLabel={showPrivacy ? 'ย่อความเป็นส่วนตัว' : 'อ่านความเป็นส่วนตัวทั้งหมด 4 ข้อ'}
                 aria-expanded={showPrivacy}
                 hitSlop={8}
                 style={{ minHeight: 40, justifyContent: 'center', alignSelf: 'flex-start' }}
               >
                 <Row gap={4}>
                   <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi }}>
-                    {showPrivacy ? 'ย่อ' : 'อ่านทั้งหมด (6 ข้อ)'}
+                    {showPrivacy ? 'ย่อ' : 'อ่านทั้งหมด (4 ข้อ)'}
                   </T>
                   <Ionicons name={showPrivacy ? 'chevron-up' : 'chevron-down'} size={16} color={theme.ink} />
                 </Row>

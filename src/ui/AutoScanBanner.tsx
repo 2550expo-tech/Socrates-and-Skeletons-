@@ -9,6 +9,7 @@ import { useAutoScan } from '../services/AutoScanProvider';
 import { Buddy } from './Buddy';
 import { Button, Card, IconButton, Money, ProgressBar, Row, T } from './components';
 import { Reveal, ScanBeam } from './effects';
+import { SlipConsent } from './SlipConsent';
 import { useToast } from './feedback';
 import { space, useTheme } from './theme';
 import { WaitNotice } from './WaitNotice';
@@ -16,7 +17,7 @@ import { WaitNotice } from './WaitNotice';
 export function AutoScanBanner() {
   const theme = useTheme();
   const toast = useToast();
-  const { state, available, grantAndRun, undoLast, dismiss } = useAutoScan();
+  const { state, available, grantAndRun, undoLast, dismiss, setConsent } = useAutoScan();
   if (!available || state.phase === 'idle') return null;
 
   if (state.phase === 'scanning') {
@@ -41,9 +42,13 @@ export function AutoScanBanner() {
     );
   }
 
+  if (state.phase === 'needs_consent') {
+    return <SlipConsent autoOption onAnswer={(granted, autoScan) => setConsent(granted, { autoScan })} />;
+  }
+
   if (state.phase === 'needs_permission') {
     return (
-      <Card style={{ borderColor: theme.accent, borderWidth: 1.5 }}>
+      <Card style={{ borderColor: theme.accentInk, borderWidth: 1.5 }}>
         <Row gap={space.md} align="flex-start">
           <Buddy mood="happy" size={52} />
           <View style={{ flex: 1, gap: 4 }}>

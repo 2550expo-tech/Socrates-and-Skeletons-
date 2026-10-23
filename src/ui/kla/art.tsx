@@ -273,6 +273,16 @@ export function KlaArm({ id, skin, side, mood }: { id: string; skin: SkinId; sid
           <Ellipse cx={hand.x - 3} cy={hand.y - 8} rx={11} ry={2.5} fill="#7CC7F2" />
         </G>
       ) : null}
+      {side === 'R' && skin === 'loykrathong2569' ? (
+        <G>
+          {/* A small sky lantern (โคมลอย) held up beside the hand, clear of the leaves: warm paper, a glow, the flame below. */}
+          <Circle cx={hand.x + 14} cy={hand.y - 8} r={11} fill="rgba(255,190,90,0.3)" />
+          <Path d={`M${hand.x + 2} ${hand.y - 2} L${hand.x + 11} ${hand.y + 3}`} stroke="#8C6A3A" strokeWidth={1.2} strokeLinecap="round" />
+          <Path d={`M${hand.x + 6} ${hand.y - 18} q8 -5 16 0 l-3 20 q-5 3 -10 0 z`} fill="#F6B04A" stroke="#C9762A" strokeWidth={1.1} />
+          <Path d={`M${hand.x + 9} ${hand.y - 15} q5 -2.5 10 0`} stroke="#FFE2A8" strokeWidth={1.4} strokeLinecap="round" fill="none" />
+          <Ellipse cx={hand.x + 14} cy={hand.y + 4} rx={1.8} ry={2.6} fill="#FFDD66" />
+        </G>
+      ) : null}
       {side === 'R' && skin === 'loykrathong2568' ? (
         <G>
           <Path d={`M${hand.x - 4} ${hand.y - 4} q14 10 28 0 q-14 -4 -28 0 z`} fill="#3E9A5E" />
@@ -505,6 +515,17 @@ export function KlaHead({ id, skin, mood }: { id: string; skin: SkinId; mood: Bu
             <G key={x}>
               <Circle cx={x} cy={y} r={6} fill="#FFFFFF" />
               <Circle cx={x} cy={y} r={2.5} fill="#F2C94C" />
+            </G>
+          ))}
+        </G>
+      ) : null}
+      {skin === 'loykrathong2569' ? (
+        <G>
+          {/* A ring of marigolds (ดาวเรือง) across the top of the head. */}
+          {[[66, 100], [78, 84], [92, 76], [108, 76], [122, 84], [134, 100]].map(([x, y]) => (
+            <G key={`m${x}`}>
+              <Circle cx={x} cy={y} r={7} fill="#F59A1E" stroke="#C9670E" strokeWidth={1} />
+              <Circle cx={x} cy={y} r={3.2} fill="#FFC94A" />
             </G>
           ))}
         </G>

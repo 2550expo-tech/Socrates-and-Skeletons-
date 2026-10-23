@@ -101,10 +101,12 @@ export default function AddSheet() {
   }, [close]);
 
   // Android app: read today's slips in the gallery right now (the automatic scan, on demand).
+  // Without consent yet, the scan screen asks first (PDPA, domain/consent.ts), right where the user is going.
   const pullToday = useCallback(() => {
+    if (auto.consent !== 'granted') return choose('/scan');
     auto.grantAndRun().catch(() => {});
     close();
-  }, [auto, close]);
+  }, [auto, close, choose]);
 
   return (
     <View style={{ flex: 1, justifyContent: 'flex-end' }}>

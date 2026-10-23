@@ -362,6 +362,8 @@ function SkinCard({
         accessibilityLabel={`สกิน ${skin.name} ${skin.kind === 'limited' ? 'สกินลิมิเต็ด ' : ''}${label}`}
         aria-selected={picked}
         style={({ pressed }) => ({
+          // Cards in one row share the height of the tallest (a two-line name).
+          flex: 1,
           borderRadius: radius.lg,
           // Selected like every other choice in the app (primary); no outline otherwise, like Card.
           borderWidth: 2,
@@ -391,7 +393,7 @@ function SkinCard({
             <Ionicons name={ended ? 'time-outline' : 'lock-closed'} size={12} color={theme.inkSoft} />
           </View>
         ) : null}
-        <T v="small" color={theme.ink} center numberOfLines={1} style={{ fontFamily: fonts.sansSemi }}>
+        <T v="small" color={theme.ink} center numberOfLines={2} style={{ fontFamily: fonts.sansSemi }}>
           {skin.name}
         </T>
         {progress && (state.kind === 'locked' || state.kind === 'candy') ? (

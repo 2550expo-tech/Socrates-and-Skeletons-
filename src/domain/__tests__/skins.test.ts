@@ -8,7 +8,7 @@ import { DEFAULT_SKIN, formatWindow, isSkinId, limitedOpenToday, skinById, SKINS
 describe('Skins', () => {
   it('TC-73 every skin has a unique id and a Thai name; limited skins have a window', () => {
     expect(new Set(SKINS.map((s) => s.id)).size).toBe(SKINS.length);
-    expect(SKINS.length).toBe(19);
+    expect(SKINS.length).toBe(20);
     for (const s of SKINS) {
       expect(s.name).toMatch(/[฀-๿]/);
       expect(!!s.window).toBe(s.kind === 'limited');
@@ -34,6 +34,19 @@ describe('Skins', () => {
     expect(skinStatusLine(skinById('songkran2569'), { kind: 'limited_ended' })).toBe('สกินลิมิเต็ด · หมดเวลาแล้ว หาไม่ได้อีก (แจกช่วง 10–16 เม.ย. 2569)');
     expect(skinStatusLine(skinById('newyear2570'), { kind: 'limited_soon', from: '2026-12-25' })).toContain('25 ธ.ค. 2569 – 5 ม.ค. 2570');
     expect(formatWindow({ from: '2025-12-25', to: '2026-01-05' })).toBe('25 ธ.ค. 2568 – 5 ม.ค. 2569');
+  });
+
+  it('TC-103 ลอยกระทง 2569: free when the app is opened 22–26 พ.ย. 2569 (วันลอยกระทง อังคาร 24 พ.ย.), "เร็ว ๆ นี้" before', () => {
+    const none = new Set<string>();
+    const lk = skinById('loykrathong2569');
+    expect(lk.kind).toBe('limited');
+    expect(skinState(lk, none, '2026-10-23')).toEqual({ kind: 'limited_soon', from: '2026-11-22' });
+    expect(skinStatusLine(lk, { kind: 'limited_soon', from: '2026-11-22' })).toContain('22–26 พ.ย. 2569');
+    expect(limitedOpenToday('2026-11-24')).toEqual(['loykrathong2569']);
+    expect(limitedOpenToday('2026-11-21')).toEqual([]);
+    expect(skinState(lk, none, '2026-11-27')).toEqual({ kind: 'limited_ended' });
+    // Last year's ลอยกระทง skin is a different one and stays ended.
+    expect(skinState(skinById('loykrathong2568'), none, '2026-11-24')).toEqual({ kind: 'limited_ended' });
   });
 
   it('TC-73 mission skins stay locked until owned; the starter look is always there; only owned skins can be worn', () => {
