@@ -146,7 +146,7 @@ export default function Scan() {
         {s.access === 'denied' || s.access === 'blocked' ? (
           <Card tone="alt">
             <T v="h3">ยังไม่ได้อนุญาตให้เข้าถึงรูปภาพ</T>
-            <T v="small">MindPay ต้องเห็นรูปในแกลเลอรีเพื่อหาสลิปเอง ถ้าไม่อยากให้สิทธิ์ ยังกด “เลือกรูปเอง” ได้</T>
+            <T v="small">MyPay ต้องเห็นรูปในแกลเลอรีเพื่อหาสลิปเอง ถ้าไม่อยากให้สิทธิ์ ยังกด “เลือกรูปเอง” ได้</T>
             {s.access === 'blocked' ? (
               <Button label="เปิดการตั้งค่า" kind="soft" small onPress={() => Linking.openSettings()} />
             ) : (
@@ -155,7 +155,7 @@ export default function Scan() {
             <Button label="เลือกรูปเอง" kind="soft" small icon="hand-left-outline" onPress={s.loadPicked} />
           </Card>
         ) : null}
-        {s.access === 'limited' ? <T v="small">คุณอนุญาตเฉพาะบางรูป MindPay จะตรวจได้เฉพาะรูปที่เลือกไว้</T> : null}
+        {s.access === 'limited' ? <T v="small">คุณอนุญาตเฉพาะบางรูป MyPay จะตรวจได้เฉพาะรูปที่เลือกไว้</T> : null}
 
         {galleryAvailable && nothingNew && s.access !== 'denied' && s.access !== 'blocked' && !demo ? (
           <Card style={{ gap: space.md, alignItems: 'center' }}>
@@ -269,7 +269,7 @@ export default function Scan() {
           <Row gap={6}>
             <Ionicons name="shield-checkmark-outline" size={16} color={theme.inkSoft} />
             <T v="micro" style={{ flex: 1 }}>
-              รูปสลิปส่งให้ AI (Google Gemini หรือ Anthropic Claude ตามที่ระบบตั้งไว้) อ่านเฉพาะเมื่อคุณยินยอม และไม่ถูกเก็บบนเซิร์ฟเวอร์ MindPay (ถอนความยินยอมได้ในตั้งค่า) · สลิปที่อ่านชัดทุกช่องรวมในยอดทันที ส่วนที่ไม่ชัดรอให้ตรวจ (ปิดได้ในตั้งค่า)
+              รูปสลิปส่งให้ AI (Google Gemini หรือ Anthropic Claude ตามที่ระบบตั้งไว้) อ่านเฉพาะเมื่อคุณยินยอม และไม่ถูกเก็บบนเซิร์ฟเวอร์ MyPay (ถอนความยินยอมได้ในตั้งค่า) · สลิปที่อ่านชัดทุกช่องรวมในยอดทันที ส่วนที่ไม่ชัดรอให้ตรวจ (ปิดได้ในตั้งค่า)
             </T>
           </Row>
         </View>

@@ -27,9 +27,9 @@ import { supabase } from '../data/supabase';
 export * from './gallery';
 
 // Remember which photos were already checked, so a second scan skips them.
-const scannedKey = (userId: string) => `mindpay.scanned.${userId}`;
+const scannedKey = (userId: string) => `mypay.scanned.${userId}`;
 // How many times the automatic scan failed to read each photo (see MAX_AUTO_ATTEMPTS).
-const failuresKey = (userId: string) => `mindpay.scanFailures.${userId}`;
+const failuresKey = (userId: string) => `mypay.scanFailures.${userId}`;
 
 export async function loadScannedIds(userId: string): Promise<Set<string>> {
   try {

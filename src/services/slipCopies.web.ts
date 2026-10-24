@@ -3,7 +3,7 @@
  * only (IndexedDB), never on the MindPay server. Clearing the browser's site
  * data removes them. Every call is safe when the browser blocks storage.
  */
-const DB_NAME = 'mindpay-slips';
+const DB_NAME = 'mypay-slips';
 const STORE = 'slips';
 
 interface Row {

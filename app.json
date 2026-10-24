@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "MindPay ใหม่",
-    "slug": "mindpay",
+    "name": "MyPay",
+    "slug": "mypay",
     "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.socratesandskeletons.mindpay.v2",
+      "bundleIdentifier": "com.socratesandskeletons.mypay",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "MindPay ตรวจรูปในแกลเลอรีเพื่อหาสลิปโอนเงินและบันทึกรายการให้อัตโนมัติ"
+        "NSPhotoLibraryUsageDescription": "MyPay ตรวจรูปในแกลเลอรีเพื่อหาสลิปโอนเงินและบันทึกรายการให้อัตโนมัติ"
       }
     },
     "android": {
@@ -21,7 +21,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.socratesandskeletons.mindpay.v2",
+      "package": "com.socratesandskeletons.mypay",
       "blockedPermissions": [
         "android.permission.CAMERA",
         "android.permission.READ_MEDIA_VIDEO",
@@ -34,7 +34,7 @@
       "favicon": "./assets/favicon.png",
       "output": "single",
       "bundler": "metro",
-      "name": "MindPay ใหม่",
+      "name": "MyPay",
       "themeColor": "#0E3B2C",
       "backgroundColor": "#F2F5F1"
     },
@@ -46,7 +46,7 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "MindPay ตรวจรูปในแกลเลอรีเพื่อหาสลิปโอนเงินและบันทึกรายการให้อัตโนมัติ",
+          "photosPermission": "MyPay ตรวจรูปในแกลเลอรีเพื่อหาสลิปโอนเงินและบันทึกรายการให้อัตโนมัติ",
           "savePhotosPermission": false,
           "isAccessMediaLocationEnabled": false,
           "granularPermissions": [
@@ -57,9 +57,9 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "เลือกรูปสลิปเพื่อให้ MindPay อ่านรายการ",
+          "photosPermission": "เลือกรูปสลิปเพื่อให้ MyPay อ่านรายการ",
           "cameraPermission": false,
-          "microphonePermission": "MindPay ใช้ไมโครโฟนเมื่อคุณแตะปุ่มไมค์เพื่อพูดจดรายการ เช่น “ข้าว 50 บาท”"
+          "microphonePermission": "MyPay ใช้ไมโครโฟนเมื่อคุณแตะปุ่มไมค์เพื่อพูดจดรายการ เช่น “ข้าว 50 บาท”"
         }
       ],
       [
@@ -73,8 +73,8 @@
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "MindPay ใช้ไมโครโฟนเมื่อคุณแตะปุ่มไมค์เพื่อพูดจดรายการ เช่น “ข้าว 50 บาท”",
-          "speechRecognitionPermission": "MindPay แปลงเสียงที่คุณพูดเป็นรายการรายรับรายจ่าย",
+          "microphonePermission": "MyPay ใช้ไมโครโฟนเมื่อคุณแตะปุ่มไมค์เพื่อพูดจดรายการ เช่น “ข้าว 50 บาท”",
+          "speechRecognitionPermission": "MyPay แปลงเสียงที่คุณพูดเป็นรายการรายรับรายจ่าย",
           "androidSpeechServicePackages": [
             "com.google.android.googlequicksearchbox"
           ]
@@ -85,8 +85,8 @@
         {
           "widgets": [
             {
-              "name": "MindPayQuick",
-              "label": "MindPay ใหม่ · วันนี้",
+              "name": "MyPayQuick",
+              "label": "MyPay · วันนี้",
               "description": "ยอดใช้วันนี้ เงินพอใช้อีกกี่วัน และปุ่มลัด เลือกสลิป พูด และ +",
               "minWidth": "250dp",
               "minHeight": "110dp",
@@ -100,10 +100,7 @@
         }
       ]
     ],
-    "scheme": [
-      "mindpay",
-      "mindpay-v2"
-    ],
+    "scheme": "mypay",
     "experiments": {
       "typedRoutes": true
     },
@@ -111,17 +108,7 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/eb06a5c2-48ad-4602-bbaa-f4af2bcce7f0",
-      "requestHeaders": {
-        "expo-channel-name": "production-v2"
-      },
-      "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
-    },
-    "extra": {
-      "eas": {
-        "projectId": "eb06a5c2-48ad-4602-bbaa-f4af2bcce7f0"
-      }
+      "enabled": false
     },
     "owner": "expokler"
   }

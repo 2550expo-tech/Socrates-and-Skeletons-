@@ -29,6 +29,7 @@ export function AuthNoticeHost() {
   if (authNotice.kind === 'link_error') {
     return <LinkErrorDialog message={authNotice.message} onClose={dismissAuthNotice} />;
   }
+  if (authNotice.kind === 'account_deleted') return <AccountDeletedDialog onClose={dismissAuthNotice} />;
   return <SignedUpDialog name={authNotice.name ?? null} viaEmail={authNotice.kind === 'email_confirmed'} onClose={dismissAuthNotice} />;
 }
 
@@ -183,8 +184,8 @@ function SignedUpDialog({ name, viaEmail, onClose }: { name: string | null; viaE
         สมัครบัญชีสำเร็จ
       </T>
       <T v="body" center color={theme.inkSoft}>
-        {viaEmail ? 'ยืนยันอีเมลเรียบร้อย ' : ''}ยินดีต้อนรับสู่ MindPay{name ? ` คุณ${name}` : ''}
-        {ready ? '' : '\nอีกขั้นเดียว ใส่ยอดเงินตอนนี้ แล้ว MindPay จะเริ่มคำนวณให้ทันที'}
+        {viaEmail ? 'ยืนยันอีเมลเรียบร้อย ' : ''}ยินดีต้อนรับสู่ MyPay{name ? ` คุณ${name}` : ''}
+        {ready ? '' : '\nอีกขั้นเดียว ใส่ยอดเงินตอนนี้ แล้ว MyPay จะเริ่มคำนวณให้ทันที'}
       </T>
       <Button label={ready ? 'เริ่มใช้งาน' : 'ไปตั้งค่าเงิน'} kind="gold" icon="arrow-forward" onPress={onClose} />
     </DialogShell>
@@ -206,6 +207,25 @@ function LinkErrorDialog({ message, onClose }: { message: string; onClose: () =>
       </T>
       <T v="body" center color={theme.inkSoft}>
         {message}
+      </T>
+      <Button label="ตกลง" onPress={onClose} />
+    </DialogShell>
+  );
+}
+
+/** After the account was deleted (Settings → ลบบัญชี): what happened, in one calm message. */
+function AccountDeletedDialog({ onClose }: { onClose: () => void }) {
+  const theme = useTheme();
+  return (
+    <DialogShell label="ลบบัญชีแล้ว">
+      <View style={{ alignItems: 'center' }}>
+        <Ionicons name="checkmark-circle-outline" size={40} color={theme.good} />
+      </View>
+      <T v="h2" center>
+        ลบบัญชีแล้ว
+      </T>
+      <T v="body" center color={theme.inkSoft}>
+        ข้อมูลทั้งหมดของบัญชีถูกลบจากเซิร์ฟเวอร์และจากเครื่องนี้แล้ว ขอบคุณที่ใช้ MyPay นะ อยากกลับมาเมื่อไรก็สมัครใหม่ได้
       </T>
       <Button label="ตกลง" onPress={onClose} />
     </DialogShell>

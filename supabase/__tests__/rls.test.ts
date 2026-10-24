@@ -8,7 +8,8 @@
  * user B (and a visitor with only the public key) try to read, change, delete and
  * plant rows of user A.
  *
- * TC-100 another user cannot touch A's data · TC-101 guards for future migrations.
+ * TC-100 another user cannot touch A's data · TC-101 guards for future migrations ·
+ * TC-104 consent records (PDPA): own and append-only, and they go with the account.
  * (In the old app on `main` these are TC-90 and TC-91; MindPay ใหม่ already used those numbers.)
  */
 import { readdirSync, readFileSync } from 'node:fs';
@@ -19,6 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const MIGRATIONS = join(__dirname, '..', 'migrations');
 const A = '00000000-0000-4000-8000-00000000000a';
 const B = '00000000-0000-4000-8000-00000000000b';
+const C = '00000000-0000-4000-8000-00000000000c';
 
 /**
  * The parts of a Supabase database the migrations rely on: the API roles, auth.users,
@@ -90,6 +92,7 @@ beforeAll(async () => {
     `insert into public.savings_goals (user_id, title, target_satang, saved_satang) values ($1, 'รองเท้า', 129000, 50000) returning id`, [A],
   ))[0].id as string;
   await owner(`insert into public.ai_usage (user_id, kind) values ($1, 'slip')`, [A]);
+  await owner(`insert into public.consents (user_id, app, purpose, granted, version, answered_at) values ($1, 'mypay', 'slip_ai', true, 1, now())`, [A]);
 }, 60_000);
 
 afterAll(async () => {
@@ -176,13 +179,59 @@ describe('TC-100 another user cannot touch A’s data (real migrations, real RLS
   });
 
   it('someone with only the public key (not signed in) sees and writes nothing', async () => {
-    for (const table of ['transactions', 'profiles', 'savings_goals', 'ai_usage']) {
+    for (const table of ['transactions', 'profiles', 'savings_goals', 'ai_usage', 'consents']) {
       expect((await as('anon', `select * from public.${table}`)).rows).toEqual([]);
     }
     const plant = await as('anon',
       `insert into public.transactions (user_id, kind, amount_satang, category_key, occurred_at) values ($1, 'expense', 100, 'other', now())`, [A]);
     expect(plant.error).not.toBeNull();
     expect((await as('anon', 'update public.profiles set opening_balance_satang = 0 returning id')).rows).toEqual([]);
+  });
+});
+
+describe('TC-104 consent records: own, append-only, and gone with the account', () => {
+  const add = (user: string, owner: string, granted: boolean) =>
+    as({ user }, `insert into public.consents (user_id, app, purpose, granted, version, answered_at) values ($1, 'mypay', 'slip_ai', $2, 1, now()) returning user_id`, [owner, granted]);
+
+  it('A adds and reads A’s own answers', async () => {
+    expect((await as({ user: A }, 'select granted from public.consents')).rows).toEqual([{ granted: true }]);
+    const r = await add(A, A, false);
+    expect(r.error).toBeNull();
+    expect(r.rows).toEqual([{ user_id: A }]);
+  });
+
+  it('B cannot read A’s answers or record an answer in A’s name', async () => {
+    expect((await as({ user: B }, 'select * from public.consents where user_id = $1', [A])).rows).toEqual([]);
+    expect((await add(B, A, true)).error).toMatch(/row-level security/);
+  });
+
+  it('nobody can rewrite or erase an earlier answer through the API, not even its owner', async () => {
+    const upd = await as({ user: A }, 'update public.consents set granted = false returning id');
+    expect(upd.error).toMatch(/permission denied/);
+    const del = await as({ user: A }, 'delete from public.consents returning id');
+    expect(del.error).toMatch(/permission denied/);
+    expect(await owner('select count(*)::int as n from public.consents where user_id = $1', [A])).toEqual([{ n: 1 }]);
+  });
+
+  it('only known apps, purposes and wording versions are accepted', async () => {
+    const r = await as({ user: A }, `insert into public.consents (app, purpose, granted, version, answered_at) values ('other', 'slip_ai', true, 1, now())`);
+    expect(r.error).toMatch(/check constraint/);
+    const v = await as({ user: A }, `insert into public.consents (app, purpose, granted, version, answered_at) values ('mypay', 'slip_ai', true, 0, now())`);
+    expect(v.error).toMatch(/check constraint/);
+  });
+
+  it('deleting an account deletes its consent records and all its other data', async () => {
+    await db.query(`insert into auth.users (id) values ($1)`, [C]);
+    await owner(`insert into public.consents (user_id, app, purpose, granted, version, answered_at) values ($1, 'mypay', 'slip_ai', true, 1, now())`, [C]);
+    await owner(`insert into public.transactions (user_id, kind, amount_satang, category_key, occurred_at) values ($1, 'expense', 100, 'food', now())`, [C]);
+    await owner(`insert into public.savings_goals (user_id, title, target_satang) values ($1, 'ทริป', 100)`, [C]);
+    await owner(`insert into public.ai_usage (user_id, kind) values ($1, 'coach')`, [C]);
+    await db.query('delete from auth.users where id = $1', [C]);
+    for (const [table, col] of [['consents', 'user_id'], ['transactions', 'user_id'], ['savings_goals', 'user_id'], ['ai_usage', 'user_id'], ['profiles', 'id']]) {
+      expect(await owner(`select count(*)::int as n from public.${table} where ${col} = $1`, [C]), table).toEqual([{ n: 0 }]);
+    }
+    // Other people's data stays.
+    expect(await owner('select count(*)::int as n from public.transactions where user_id = $1', [A])).toEqual([{ n: 1 }]);
   });
 });
 

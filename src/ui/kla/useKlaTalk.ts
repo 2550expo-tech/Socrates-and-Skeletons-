@@ -16,7 +16,7 @@ import { hush, say, thaiVoice } from '../../services/tts';
 // Sound on/off, one shared setting
 // ---------------------------------------------------------------------------
 
-const KEY = 'mindpay.klaVoice';
+const KEY = 'mypay.klaVoice';
 let soundOn = true;
 let loaded = false;
 const listeners = new Set<() => void>();

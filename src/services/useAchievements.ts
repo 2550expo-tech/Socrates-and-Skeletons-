@@ -16,7 +16,12 @@ import { useApp, useMoney } from '../data/AppProvider';
 import { Storage } from '../data/storage';
 import { computeBadges, computeStreak, newlyEarned } from '../domain/achievements';
 
-const key = (who: string) => `mindpay.badges.${who}`;
+const key = (who: string) => `mypay.badges.${who}`;
+
+/** After the account is deleted: the medals already announced on this phone are forgotten. */
+export async function forgetBadges(who: string) {
+  await Storage.removeItem(key(who)).catch(() => {});
+}
 
 type Seen = { who: string; ids: ReadonlySet<string>; seeding?: boolean } | null;
 let current: Seen = null;

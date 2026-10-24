@@ -243,13 +243,13 @@ export default function Welcome() {
           {theme.colorTheme === 'halloween' ? <SpookyHeroDecor /> : null}
           {/* The cover: น้องกล้า, the MindPay mascot, says hello (and hops when tapped). */}
           <Reveal zoom from={10}>
-            <Pressable onPress={() => setHop((h) => h + 1)} accessibilityRole="button" accessibilityLabel="น้องกล้า มาสคอตของ MindPay แตะเพื่อทักทาย">
+            <Pressable onPress={() => setHop((h) => h + 1)} accessibilityRole="button" accessibilityLabel="น้องกล้า มาสคอตของ MyPay แตะเพื่อทักทาย">
               <KlaStage skin="classic" mood="happy" width={136} hop={hop} onDark />
             </Pressable>
           </Reveal>
           <Reveal index={2} from={14}>
             <View style={{ overflow: 'hidden', borderRadius: radius.md, marginTop: space.sm, paddingHorizontal: space.sm }}>
-              <T v="display" color={theme.heroInk}>MindPay</T>
+              <T v="display" color={theme.heroInk}>MyPay</T>
             </View>
           </Reveal>
           <Reveal index={3} from={12}>
@@ -560,7 +560,7 @@ function SentCard({
         <T v="micro">
           {confirm
             ? 'ถ้าในอีเมลมีแต่ลิงก์ กดลิงก์ได้เลย แล้วกลับมากด "ยืนยันผ่านลิงก์แล้ว"'
-            : 'ถ้าในอีเมลมีแต่ลิงก์ กดลิงก์ได้เลย MindPay จะเปิดช่องตั้งรหัสผ่านใหม่ให้'}
+            : 'ถ้าในอีเมลมีแต่ลิงก์ กดลิงก์ได้เลย MyPay จะเปิดช่องตั้งรหัสผ่านใหม่ให้'}
         </T>
       </View>
       {confirm ? <TextLink label="ยืนยันผ่านลิงก์แล้ว เข้าสู่ระบบ" onPress={onConfirmed} /> : null}

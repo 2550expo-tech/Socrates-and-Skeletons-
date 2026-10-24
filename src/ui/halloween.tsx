@@ -453,7 +453,7 @@ export function HalloweenCard() {
 // (Halloween theme, during the event). Closable for the rest of the day.
 // ---------------------------------------------------------------------------
 
-const STRIP_KEY = 'mindpay.halloweenStrip.hiddenDay';
+const STRIP_KEY = 'mypay.halloweenStrip.hiddenDay';
 let stripHidden: string | null | undefined;
 const stripListeners = new Set<() => void>();
 const stripSub = (l: () => void) => {
@@ -598,7 +598,7 @@ export function closeHalloweenInvite() {
 // Invite to the Halloween theme (other themes, during the event)
 // ---------------------------------------------------------------------------
 
-const INVITE_KEY = 'mindpay.halloweenInvite';
+const INVITE_KEY = 'mypay.halloweenInvite';
 let inviteClosed: boolean | null = null;
 const inviteListeners = new Set<() => void>();
 const inviteSub = (l: () => void) => {

@@ -4,8 +4,8 @@
 // by an in-memory stand-in below, so no real account, email or data is touched.
 //
 // Run:
-//   EXPO_WEB_BASE_URL=/Socrates-and-Skeletons- npx expo export --platform web --output-dir dist
-//   EXPO_WEB_BASE_URL=/Socrates-and-Skeletons- node scripts/web-home-screen.mjs dist && cp dist/index.html dist/404.html
+//   EXPO_WEB_BASE_URL=/mypay npx expo export --platform web --output-dir dist
+//   EXPO_WEB_BASE_URL=/mypay node scripts/web-home-screen.mjs dist && cp dist/index.html dist/404.html
 //   npx playwright install chromium   # once
 //   node e2e/web-auth.mjs dist e2e-shots
 //
@@ -57,7 +57,7 @@ const visible = (page, text, timeout = 6000) => page.getByText(text, { exact: fa
 const gone = (page, text, timeout = 6000) => page.getByText(text, { exact: false }).first().waitFor({ state: 'hidden', timeout }).then(() => true, () => false);
 // Right after page.goto the opening animation may not be on the page yet: wait for it to appear (briefly), then to go.
 const introGone = async (page) => {
-  const intro = page.getByLabel('กำลังเปิด MindPay');
+  const intro = page.getByLabel('กำลังเปิด MyPay');
   await intro.waitFor({ state: 'attached', timeout: 1200 }).catch(() => {});
   await intro.waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
 };
@@ -110,12 +110,12 @@ try {
   {
     const { ctx, page } = await freshPage('intro');
     await page.goto(APP);
-    const introSeen = await page.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'attached', timeout: 8000 }).then(() => true, () => false);
+    const introSeen = await page.getByLabel('กำลังเปิด MyPay').waitFor({ state: 'attached', timeout: 8000 }).then(() => true, () => false);
     await page.waitForTimeout(400);
     await shot(page, '01-intro-mid');
     check('Opening animation is shown on launch', introSeen);
     check('Opening animation lifts away and shows the welcome screen', await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000));
-    const removed = await page.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);
+    const removed = await page.getByLabel('กำลังเปิด MyPay').waitFor({ state: 'detached', timeout: 5000 }).then(() => true, () => false);
     check('Opening animation is removed after it ends', removed);
     await shot(page, '02-welcome');
     await ctx.close();
@@ -161,7 +161,7 @@ try {
     check('After the popup: money setup (step 3) with the nickname filled in', (await visible(page, 'ขั้นที่ 3 จาก 3')) && (await page.locator('#ob-name').inputValue()) === 'มิ้นท์');
     await shot(page, '06-onboarding');
     await page.fill('#ob-balance', '3500');
-    await button(page, 'เริ่มใช้ MindPay').click();
+    await button(page, 'เริ่มใช้ MyPay').click();
     const home1 = await visible(page, 'ยอดคงเหลือ', 8000);
     await shot(page, '06b-after-onboarding');
     check('Onboarding finishes on the home screen', home1);
@@ -263,13 +263,13 @@ try {
     await page.fill('#email', 'mint@example.com');
     await button(page, 'ส่งลิงก์ตั้งรหัสผ่านใหม่').click();
     check('Reset: code screen', await visible(page, 'ตั้งรหัสผ่านใหม่'));
-    const introBefore = await page.getByLabel('กำลังเปิด MindPay').count();
+    const introBefore = await page.getByLabel('กำลังเปิด MyPay').count();
     await page.fill('#otp', '123456');
     const timeline = [];
     let introAgain = false;
     for (let i = 0; i < 15; i++) {
       await page.waitForTimeout(200);
-      const intro = await page.getByLabel('กำลังเปิด MindPay').count();
+      const intro = await page.getByLabel('กำลังเปิด MyPay').count();
       if (intro) introAgain = true;
       timeline.push(`${i * 200}ms intro=${intro} dialog=${await page.getByText('บันทึกรหัสผ่านใหม่').count()} home=${await page.getByText('ยอดคงเหลือ').count()}`);
       if (i === 2) await shot(page, '11a-after-code');
@@ -363,7 +363,7 @@ try {
     await visible(page, 'สมัครบัญชีสำเร็จ');
     await button(page, 'ไปตั้งค่าเงิน').click();
     await page.fill('#ob-balance', '1000');
-    await button(page, 'เริ่มใช้ MindPay').click();
+    await button(page, 'เริ่มใช้ MyPay').click();
     await visible(page, 'ยอดคงเหลือ', 8000);
     await page.goto(`${APP}scan`);
     await introGone(page);
@@ -378,6 +378,16 @@ try {
     await page.waitForTimeout(1500);
     await shot(page, '13b-scan-consent');
     await button(page, 'ยินยอม ให้อ่านรูปที่ฉันเลือก').click();
+    {
+      const scanId = state.users.get('scan@example.com')?.id;
+      for (let i = 0; i < 20 && !state.consentRows.some((r) => r.user_id === scanId); i++) await page.waitForTimeout(150);
+      const kept = state.consentRows.filter((r) => r.user_id === scanId);
+      check(
+        'The answer is kept with the account: app, purpose, wording version, yes, and when',
+        kept.length === 1 && kept[0].app === 'mypay' && kept[0].purpose === 'slip_ai' && kept[0].version === 1 && kept[0].granted === true && !!Date.parse(kept[0].answered_at),
+        JSON.stringify(kept),
+      );
+    }
     check('Web scan: one button to choose photos, no range to pick first', (await visible(page, 'เลือกรูปสลิป แล้ว')) && !(await page.getByText('ย้อนหลังกี่วัน').count()));
     await shot(page, '14-scan-start');
     const chooser = page.waitForEvent('filechooser');
@@ -485,9 +495,9 @@ try {
     const page = await reduced.newPage();
     await page.route(`${SUPA}/**`, supabase);
     await page.goto(APP);
-    const shown = await page.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'attached', timeout: 8000 }).then(() => true, () => false);
+    const shown = await page.getByLabel('กำลังเปิด MyPay').waitFor({ state: 'attached', timeout: 8000 }).then(() => true, () => false);
     const t0 = Date.now();
-    await page.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
+    await page.getByLabel('กำลังเปิด MyPay').waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
     const introMs = Date.now() - t0;
     check('Reduce motion: the opening screen still shows, then leaves quickly', shown && introMs < 1500, `${introMs} ms on screen`);
     await page.getByText('ลองใช้ด้วยข้อมูลตัวอย่าง').click();
@@ -501,7 +511,7 @@ try {
 
     const { ctx, page: p2 } = await freshPage('idle');
     await p2.goto(APP);
-    await p2.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
+    await p2.getByLabel('กำลังเปิด MyPay').waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
     const t1 = Date.now();
     await introGone(p2);
     const fullMs = Date.now() - t1;
@@ -654,7 +664,7 @@ try {
     await visible(page, 'สมัครบัญชีสำเร็จ');
     await button(page, 'ไปตั้งค่าเงิน').click();
     await page.fill('#ob-balance', '2000');
-    await button(page, 'เริ่มใช้ MindPay').click();
+    await button(page, 'เริ่มใช้ MyPay').click();
     await visible(page, 'ยอดคงเหลือ', 8000);
     await page.goto(`${APP}coach`);
     await introGone(page);
@@ -699,7 +709,7 @@ try {
     await slider.scrollIntoViewIfNeeded();
     // A raw mouse drag does not wait like click() does: make sure the opening animation has fully gone.
     const introWait = Date.now();
-    await page.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'detached', timeout: 20000 }).catch(() => {});
+    await page.getByLabel('กำลังเปิด MyPay').waitFor({ state: 'detached', timeout: 20000 }).catch(() => {});
     const introMs = Date.now() - introWait;
     // Wait until the page stops moving (cards slide in), so the drag starts on the thumb.
     let box = await slider.boundingBox();
@@ -771,7 +781,7 @@ try {
     await visible(page, 'สมัครบัญชีสำเร็จ');
     await button(page, 'ไปตั้งค่าเงิน').click();
     await page.fill('#ob-balance', '1000');
-    await button(page, 'เริ่มใช้ MindPay').click();
+    await button(page, 'เริ่มใช้ MyPay').click();
     await visible(page, 'ยอดคงเหลือ', 8000);
     await page.goto(`${APP}scan`);
     await introGone(page);
@@ -816,7 +826,7 @@ try {
     await visible(page, 'สมัครบัญชีสำเร็จ');
     await button(page, 'ไปตั้งค่าเงิน').click();
     await page.fill('#ob-balance', '1000');
-    await button(page, 'เริ่มใช้ MindPay').click();
+    await button(page, 'เริ่มใช้ MyPay').click();
     await visible(page, 'ยอดคงเหลือ', 8000);
     await page.goto(`${APP}scan`);
     await introGone(page);
@@ -866,7 +876,7 @@ try {
     await button(page, 'ไปตั้งค่าเงิน').click();
     await page.fill('#ob-balance', '5000');
     const aiBefore = state.calls.filter((c) => c.startsWith('POST /functions/v1/parse-slip')).length;
-    await button(page, 'เริ่มใช้ MindPay').click();
+    await button(page, 'เริ่มใช้ MyPay').click();
     await visible(page, 'ยอดคงเหลือ', 8000);
     // PDPA: before the first automatic scan the home screen asks; nothing is sent until the user says yes.
     const askedHome = await visible(page, 'ขออนุญาตก่อนให้', 10000);
@@ -908,6 +918,90 @@ try {
     await page.waitForTimeout(1500);
     check('After withdrawing: the scan screen does not read the gallery and offers to change the answer', askedAgain && slipsSent() === sentBefore, `${slipsSent() - sentBefore} sent`);
     check('After withdrawing: the slips already recorded stay in the account', state.txRows.some((r) => r.title === 'ร้านข้าวมันไก่'));
+    {
+      const autoId = state.users.get('auto@example.com')?.id;
+      const answers = state.consentRows.filter((r) => r.user_id === autoId).map((r) => r.granted);
+      check('Withdrawing is kept with the account as a new answer; the earlier yes stays in the record', JSON.stringify(answers) === '[true,false]', JSON.stringify(answers));
+    }
+    await ctx.close();
+    state.confirmEmail = true;
+  }
+
+  // 17a. The answer follows the account to another phone (a new browser = a new phone)
+  {
+    const { ctx, page } = await freshPage('consent-new-phone');
+    await page.goto(APP);
+    await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
+    await introGone(page);
+    await page.fill('#email', 'scan@example.com');
+    await page.fill('#password', 'secret123');
+    await button(page, 'เข้าสู่ระบบ').click();
+    await visible(page, 'ยอดคงเหลือ', 10000);
+    const rowsBefore = state.consentRows.length;
+    await page.goto(`${APP}scan`);
+    await introGone(page);
+    const picker = await visible(page, 'เลือกรูปสลิป แล้ว', 10000);
+    const asked = await page.getByText('ขออนุญาตก่อนให้').count();
+    check('Another phone: the account’s yes is used, so the scan screen does not ask again', picker && asked === 0, `asked=${asked}`);
+    check('Another phone: nothing new is recorded when the answer is the same', state.consentRows.length === rowsBefore, `${state.consentRows.length - rowsBefore} new`);
+    await ctx.close();
+  }
+
+  // 17c. Deleting the account: password again, one last confirmation, then everything goes
+  {
+    state.confirmEmail = false;
+    const { ctx, page } = await freshPage('delete-account');
+    await page.goto(APP);
+    await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง', 8000);
+    await introGone(page);
+    await page.getByText('สมัครสมาชิก', { exact: true }).click();
+    await page.fill('#name', 'ลาก่อน');
+    await page.fill('#email', 'bye@example.com');
+    await page.fill('#password', 'secret123');
+    await button(page, 'สร้างบัญชี').click();
+    await visible(page, 'สมัครบัญชีสำเร็จ');
+    await button(page, 'ไปตั้งค่าเงิน').click();
+    await page.fill('#ob-balance', '1500');
+    await button(page, 'เริ่มใช้ MyPay').click();
+    await visible(page, 'ยอดคงเหลือ', 8000);
+    const byeId = state.users.get('bye@example.com')?.id;
+    state.txRows.push({ id: 'tx-bye', user_id: byeId, kind: 'expense', amount_satang: 4500, category_key: 'food', title: 'ข้าวก่อนลา', note: null, occurred_at: new Date().toISOString(), source: 'manual', status: 'confirmed', slip_ref: null, slip_image_hash: null, ocr_confidence: null, review_flags: null, created_at: new Date().toISOString() });
+    state.consentRows.push({ id: 999, user_id: byeId, app: 'mypay', purpose: 'slip_ai', granted: true, version: 1, answered_at: new Date().toISOString(), created_at: new Date().toISOString() });
+    await page.goto(`${APP}settings`);
+    await introGone(page);
+    await button(page, 'ลบบัญชี').click();
+    const told = (await visible(page, 'ลบบัญชีและข้อมูลทั้งหมด', 8000)) && (await visible(page, 'กระปุกออมทั้งหมด')) && (await visible(page, 'ใช้ร่วมกับแอป MindPay'));
+    await page.waitForTimeout(800);
+    await shot(page, '21-delete-account');
+    check('Delete account: says what goes (server and this phone), that MindPay shares the account, and that it cannot be undone', told && (await visible(page, 'กู้คืนไม่ได้')));
+
+    await page.fill('#delete-password', 'wrong-one');
+    await button(page, 'ลบบัญชีถาวร').click();
+    await button(page, 'ลบถาวร').click();
+    const wrong = await visible(page, 'รหัสผ่านไม่ถูกต้อง', 8000);
+    check('Delete account: a wrong password deletes nothing and says so', wrong && state.users.has('bye@example.com') && state.txRows.some((r) => r.user_id === byeId));
+
+    await page.fill('#delete-password', 'secret123');
+    await button(page, 'ลบบัญชีถาวร').click();
+    await page.waitForTimeout(400);
+    await shot(page, '21b-delete-confirm');
+    await button(page, 'ลบถาวร').click();
+    const doneDialog = await visible(page, 'ลบบัญชีแล้ว', 10000);
+    await page.waitForTimeout(600);
+    await shot(page, '21c-account-deleted');
+    check('Delete account: the welcome screen says the account was deleted', doneDialog && (await visible(page, 'ลองใช้ด้วยข้อมูลตัวอย่าง')));
+    check(
+      'Delete account: the account and all its rows are gone from the server (transactions, profile, consent record)',
+      !state.users.has('bye@example.com') && !state.profiles.has(byeId) && !state.txRows.some((r) => r.user_id === byeId) && !state.consentRows.some((r) => r.user_id === byeId),
+    );
+    const leftovers = await page.evaluate((id) => Object.keys(localStorage).filter((k) => k.includes(id)), byeId);
+    const prefs = await page.evaluate(() => localStorage.getItem('mypay.scanPrefs.v1') ?? '');
+    check('Delete account: what this phone kept for the account is gone too', leftovers.length === 0 && !prefs.includes(byeId), leftovers.join(','));
+    await button(page, 'ตกลง').click();
+    await page.fill('#email', 'bye@example.com');
+    await page.fill('#password', 'secret123');
+    await button(page, 'เข้าสู่ระบบ').click();
+    check('Delete account: the old email and password no longer sign in', await visible(page, 'อีเมลหรือรหัสผ่านไม่ถูกต้อง', 8000));
     await ctx.close();
     state.confirmEmail = true;
   }
@@ -929,7 +1023,7 @@ try {
     await button(page, 'ไปตั้งค่าเงิน').click();
     await page.fill('#ob-balance', '2000');
     const before = slipsSent();
-    await button(page, 'เริ่มใช้ MindPay').click();
+    await button(page, 'เริ่มใช้ MyPay').click();
     await visible(page, 'ขออนุญาตก่อนให้', 10000);
     await button(page, 'ไม่ยินยอม').click();
     const cardGone = await gone(page, 'ขออนุญาตก่อนให้');
@@ -968,7 +1062,7 @@ try {
     await visible(page, 'สมัครบัญชีสำเร็จ');
     await button(page, 'ไปตั้งค่าเงิน').click();
     await page.fill('#ob-balance', '5000');
-    await button(page, 'เริ่มใช้ MindPay').click();
+    await button(page, 'เริ่มใช้ MyPay').click();
     await visible(page, 'ยอดคงเหลือ', 8000);
     await page.goto(`${APP}scan`);
     await introGone(page);

@@ -42,3 +42,36 @@ describe('TC-102 consent before slip photos go to the AI', () => {
     expect(text).toMatch(/ตั้งค่า/);
   });
 });
+
+describe('TC-106 the consent answer is kept with the account and follows it to another phone', async () => {
+  const { consentFromRow, consentToRow, reconcileConsent } = await import('../consent');
+  const yes = (at: number) => answerConsent(true, at);
+  const no = (at: number) => answerConsent(false, at);
+
+  it('a new phone takes the account’s answer (nothing to send)', () => {
+    expect(reconcileConsent(null, yes(100))).toEqual({ use: yes(100), send: false });
+    expect(reconcileConsent(undefined, null)).toEqual({ use: null, send: false });
+  });
+
+  it('an answer given on this phone (or offline) and not on the server yet is sent', () => {
+    expect(reconcileConsent(yes(100), null)).toEqual({ use: yes(100), send: true });
+    expect(reconcileConsent(no(300), yes(100))).toEqual({ use: no(300), send: true });
+  });
+
+  it('a later answer from another phone wins: withdrawing there stops sending here', () => {
+    expect(reconcileConsent(yes(100), no(300))).toEqual({ use: no(300), send: false });
+    expect(maySendSlips(reconcileConsent(yes(100), no(300)).use)).toBe(false);
+  });
+
+  it('the same answer on both sides: nothing to do', () => {
+    expect(reconcileConsent(yes(100), yes(100))).toEqual({ use: yes(100), send: false });
+  });
+
+  it('rows carry the app, the purpose, the wording version and the time; bad rows are ignored', () => {
+    const row = consentToRow(yes(Date.UTC(2026, 9, 25, 3, 0, 0)));
+    expect(row).toEqual({ app: 'mypay', purpose: 'slip_ai', granted: true, version: SLIP_AI_CONSENT_VERSION, answered_at: '2026-10-25T03:00:00.000Z' });
+    expect(consentFromRow(row)).toEqual(yes(Date.UTC(2026, 9, 25, 3, 0, 0)));
+    expect(consentFromRow({ granted: true, version: 1, answered_at: 'not a date' })).toBeNull();
+    expect(consentFromRow({ granted: 'yes' as never, version: 1, answered_at: row.answered_at })).toBeNull();
+  });
+});

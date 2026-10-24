@@ -3,7 +3,7 @@
 // MindPay name and icon, and the app opens full screen without browser bars.
 //
 // Usage (after `expo export --platform web --output-dir dist`):
-//   EXPO_WEB_BASE_URL=/Socrates-and-Skeletons- node scripts/web-home-screen.mjs dist
+//   EXPO_WEB_BASE_URL=/mypay node scripts/web-home-screen.mjs dist
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -16,8 +16,8 @@ for (const name of ['apple-touch-icon.png', 'icon-192.png', 'icon-512.png']) {
 }
 
 const manifest = {
-  name: 'MindPay ใหม่',
-  short_name: 'MindPay ใหม่',
+  name: 'MyPay',
+  short_name: 'MyPay',
   description: 'แอปจดเงินของนักศึกษา อ่านสลิปให้เอง และบอกว่าเงินพอใช้ถึงวันไหน',
   lang: 'th',
   start_url: `${base}/`,
@@ -37,7 +37,7 @@ const tags = [
   `<link rel="apple-touch-icon" href="${base}/apple-touch-icon.png">`,
   '<meta name="apple-mobile-web-app-capable" content="yes">',
   '<meta name="mobile-web-app-capable" content="yes">',
-  '<meta name="apple-mobile-web-app-title" content="MindPay ใหม่">',
+  '<meta name="apple-mobile-web-app-title" content="MyPay">',
   '<meta name="apple-mobile-web-app-status-bar-style" content="default">',
   `<meta name="description" content="${manifest.description}">`,
   // Brand green while the app loads, so the page does not flash white before the opening animation.

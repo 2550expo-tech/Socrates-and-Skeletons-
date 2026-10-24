@@ -15,20 +15,20 @@ const { app, close } = await serveDist(new URL('../dist', import.meta.url).pathn
 const { supabase } = createFakeSupabase();
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'th-TH', colorScheme: scheme });
-await ctx.addInitScript((c) => { try { localStorage.setItem('mindpay.colorTheme', c); } catch {} }, color);
+await ctx.addInitScript((c) => { try { localStorage.setItem('mypay.colorTheme', c); } catch {} }, color);
 const page = await ctx.newPage();
 page.on('pageerror', (e) => console.log('pageerror', e.message));
 await page.route(`${SUPA}/**`, supabase);
 await routeQrDecoder(page);
 await page.goto(app);
 await page.getByText('ลองใช้ด้วยข้อมูลตัวอย่าง').first().waitFor();
-await page.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
+await page.getByLabel('กำลังเปิด MyPay').waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
 if (name.startsWith('welcome')) { await page.waitForTimeout(2500); await page.screenshot({ path: `${OUT}${name}.png` }); await browser.close(); close(); process.exit(0); }
 await page.getByText('ลองใช้ด้วยข้อมูลตัวอย่าง').click();
 await page.getByText('ยอดคงเหลือ').first().waitFor();
 if (path) {
   await page.goto(app + path);
-  await page.getByLabel('กำลังเปิด MindPay').waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
+  await page.getByLabel('กำลังเปิด MyPay').waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
 }
 await page.waitForTimeout(2200);
 if (click) { await page.getByRole('button', { name: click }).first().click().catch((e) => console.log('click', e.message.slice(0, 100))); await page.waitForTimeout(900); }

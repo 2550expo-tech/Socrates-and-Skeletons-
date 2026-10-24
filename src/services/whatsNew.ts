@@ -7,7 +7,7 @@ import { Storage } from '../data/storage';
 
 /** Change this when a new "มีอะไรใหม่" page is written. */
 export const WHATS_NEW_VERSION = '2026-10-13-redesign';
-const KEY = 'mindpay.whatsNewSeen';
+const KEY = 'mypay.whatsNewSeen';
 
 let seen: boolean | null = null; // null = not loaded yet
 const listeners = new Set<() => void>();

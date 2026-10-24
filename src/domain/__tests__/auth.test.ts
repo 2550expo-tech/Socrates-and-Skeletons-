@@ -14,7 +14,7 @@ import {
   parseAuthLink,
 } from '../auth';
 
-const BASE = 'https://2550expo-tech.github.io/Socrates-and-Skeletons-/';
+const BASE = 'https://2550expo-tech.github.io/mypay/';
 
 describe('Email links', () => {
   it('TC-43 reads the session from a confirm or reset link (web and app)', () => {
@@ -24,7 +24,7 @@ describe('Email links', () => {
       refreshToken: 'rrr',
       type: 'signup',
     });
-    expect(parseAuthLink('mindpay://#access_token=x.y.z&refresh_token=r2&type=recovery')?.type).toBe('recovery');
+    expect(parseAuthLink('mypay://#access_token=x.y.z&refresh_token=r2&type=recovery')?.type).toBe('recovery');
     expect(parseAuthLink(`${BASE}?code=0f3a1c9e-77b2-4a55-9d1f-2c1e0b9a7f10`)).toEqual({
       kind: 'code',
       code: '0f3a1c9e-77b2-4a55-9d1f-2c1e0b9a7f10',
@@ -44,7 +44,7 @@ describe('Email links', () => {
     expect(parseAuthLink(BASE)).toBeNull();
     expect(parseAuthLink(`${BASE}transactions?range=7d`)).toBeNull();
     expect(parseAuthLink(`${BASE}#access_token=only`)).toBeNull();
-    expect(parseAuthLink('mindpay://scan')).toBeNull();
+    expect(parseAuthLink('mypay://scan')).toBeNull();
     expect(parseAuthLink(`${BASE}?code=1`)).toBeNull();
   });
 });

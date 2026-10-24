@@ -45,6 +45,9 @@ export const supabase: SupabaseClient | null =
     ? createClient(url, key, {
         auth: {
           storage: localStorage,
+          // Its own key: on the web MyPay shares the github.io address with MindPay, and a shared
+          // key would sign both in and out together (the accounts are the same Supabase ones).
+          storageKey: 'mypay.auth',
           autoRefreshToken: true,
           persistSession: true,
           detectSessionInUrl: false,

@@ -114,7 +114,7 @@ export default function GoalForm() {
             </Row>
             <T v="micro">{due ? `ถึงวันที่ ${formatThaiDay(due)}` : 'ไม่กำหนดวัน ค่อย ๆ เก็บไปเรื่อย ๆ'}</T>
           </View>
-          <T v="micro">เงินที่หยอดกระปุกยังอยู่ในบัญชีของคุณ แต่ MindPay จะกันไว้ ไม่นับเป็นเงินที่ใช้ได้ในหน้า “เงินพอถึง”</T>
+          <T v="micro">เงินที่หยอดกระปุกยังอยู่ในบัญชีของคุณ แต่ MyPay จะกันไว้ ไม่นับเป็นเงินที่ใช้ได้ในหน้า “เงินพอถึง”</T>
           <Button label={existing ? 'บันทึก' : 'ตั้งกระปุก'} kind="gold" icon="checkmark" shine onPress={save} loading={busy} />
         </ScrollView>
       </KeyboardAvoid>

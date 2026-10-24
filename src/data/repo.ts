@@ -9,6 +9,7 @@ import { Storage } from './storage';
 import { buildSampleTransactions, DEMO_OPENING_BALANCE_SATANG } from '../domain/sample';
 import type { Profile, Transaction, TransactionInput } from '../domain/types';
 import type { GoalInput, SavingsGoal } from '../domain/goals';
+import { CONSENT_APP, CONSENT_PURPOSE, consentFromRow, consentToRow, type ConsentRecord, type ConsentRow } from '../domain/consent';
 import { supabase } from './supabase';
 
 export class DuplicateSlipError extends Error {
@@ -35,6 +36,10 @@ export interface Repo {
   insertGoal(input: GoalInput): Promise<SavingsGoal>;
   updateGoal(id: string, patch: Partial<GoalInput>): Promise<SavingsGoal>;
   removeGoal(id: string): Promise<void>;
+  /** The newest answer this account gave about sending slip photos to the AI (PDPA), or null. */
+  latestConsent(): Promise<ConsentRecord | null>;
+  /** Keep an answer with the account. The record is append-only: each answer is a new row. */
+  saveConsent(record: ConsentRecord): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -254,6 +259,22 @@ export function createCloudRepo(userId: string): Repo {
       const { error } = await db.from('savings_goals').delete().eq('id', id);
       if (error) throw error;
     },
+    async latestConsent() {
+      const { data, error } = await db
+        .from('consents')
+        .select('granted, version, answered_at')
+        .eq('app', CONSENT_APP)
+        .eq('purpose', CONSENT_PURPOSE)
+        .order('answered_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      return data && data.length ? consentFromRow(data[0] as ConsentRow) : null;
+    },
+    async saveConsent(record) {
+      const { error } = await db.from('consents').insert(consentToRow(record));
+      if (error) throw error;
+    },
   };
 }
 
@@ -262,7 +283,7 @@ export function createCloudRepo(userId: string): Repo {
 // ---------------------------------------------------------------------------
 
 // v2: rebalanced sample data (v1 could show a negative balance). Old v1 data is simply ignored.
-const DEMO_KEY = 'mindpay.demo.v2';
+const DEMO_KEY = 'mypay.demo.v2';
 
 interface DemoState {
   profile: Profile;
@@ -385,5 +406,10 @@ export function createDemoRepo(): Repo {
       s.goals = (s.goals ?? []).filter((g) => g.id !== id);
       await save();
     },
+    // The demo cannot read slips, so there is nothing to agree to: no record.
+    async latestConsent() {
+      return null;
+    },
+    async saveConsent() {},
   };
 }

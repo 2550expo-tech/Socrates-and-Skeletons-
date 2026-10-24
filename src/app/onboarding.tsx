@@ -95,7 +95,7 @@ export default function Onboarding() {
           />
         </Card>
         </Reveal>
-        <Button label="เริ่มใช้ MindPay" kind="gold" shine onPress={finish} loading={busy} />
+        <Button label="เริ่มใช้ MyPay" kind="gold" shine onPress={finish} loading={busy} />
         <T v="micro" center>แก้ไขทุกค่าได้ภายหลังในหน้าตั้งค่า</T>
     </Screen>
   );

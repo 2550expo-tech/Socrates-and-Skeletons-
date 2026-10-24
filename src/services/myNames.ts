@@ -5,7 +5,7 @@
 import { Storage } from '../data/storage';
 import { addPayer, EMPTY_NAME_STATS, type NameStats } from '../domain/slipNames';
 
-const key = (userId: string) => `mindpay.slipNames.${userId}`;
+const key = (userId: string) => `mypay.slipNames.${userId}`;
 const cache = new Map<string, NameStats>();
 
 export async function loadNames(userId: string): Promise<NameStats> {

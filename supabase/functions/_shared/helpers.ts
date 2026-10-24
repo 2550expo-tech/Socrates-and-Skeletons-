@@ -439,3 +439,43 @@ function mergeTwo(a: SlipReadingOut | null, b: SlipReadingOut | null): { reading
   };
   return { reading, check: { verified: Object.keys(disagree).length === 0, reads: 2, disagree } };
 }
+
+// ---------------------------------------------------------------------------
+// Deleting an account (delete-account)
+// ---------------------------------------------------------------------------
+
+/** The app sends this word with the request, so a stray or replayed call cannot delete an account. */
+export const DELETE_CONFIRM = 'DELETE_MY_ACCOUNT';
+
+export function isDeleteConfirmed(body: unknown): boolean {
+  return !!body && typeof body === 'object' && (body as { confirm?: unknown }).confirm === DELETE_CONFIRM;
+}
+
+/** The claims of a session token (already checked by Supabase Auth); null when it cannot be read. */
+export function jwtPayload(token: string | null | undefined): Record<string, unknown> | null {
+  const part = token?.split('.')[1];
+  if (!part) return null;
+  try {
+    const b64 = part.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(part.length / 4) * 4, '=');
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const value = JSON.parse(new TextDecoder().decode(bytes));
+    return value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Did the person sign in (password or e-mail code) within the last `maxAgeSec` seconds?
+ * Supabase puts each sign-in in the token's "amr" list with its time, and keeps it when the
+ * token is refreshed, so an old session (or a stolen refresh token) does not count. The app
+ * asks for the password again right before deleting. Without "amr", the token's own issue
+ * time ("iat") is used instead.
+ */
+export function signedInWithin(payload: Record<string, unknown> | null, nowSec: number, maxAgeSec: number): boolean {
+  if (!payload) return false;
+  const amr = Array.isArray(payload.amr) ? (payload.amr as { timestamp?: unknown }[]) : [];
+  const times = amr.map((a) => Number(a?.timestamp)).filter((t) => Number.isFinite(t) && t > 0);
+  const last = times.length ? Math.max(...times) : Number(payload.iat);
+  return Number.isFinite(last) && last <= nowSec + 60 && nowSec - last <= maxAgeSec;
+}

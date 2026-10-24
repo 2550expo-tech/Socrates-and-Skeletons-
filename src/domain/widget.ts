@@ -10,15 +10,15 @@
 import { bkkDayKey, daysBetween } from './dates';
 import { formatBaht } from './money';
 
-export const WIDGET_NAME = 'MindPayQuick';
-export const WIDGET_SNAPSHOT_KEY = 'mindpay.widget.snapshot';
+export const WIDGET_NAME = 'MyPayQuick';
+export const WIDGET_SNAPSHOT_KEY = 'mypay.widget.snapshot';
 /** Deep links the widget's buttons open (a scheme only MindPay ใหม่ has, so Android never asks which app). */
 export const WIDGET_LINKS = {
-  open: 'mindpay-v2://',
-  add: 'mindpay-v2://add',
-  scan: 'mindpay-v2://scan',
-  voice: 'mindpay-v2://voice',
-  today: 'mindpay-v2://transactions',
+  open: 'mypay://',
+  add: 'mypay://add',
+  scan: 'mypay://scan',
+  voice: 'mypay://voice',
+  today: 'mypay://transactions',
 } as const;
 
 export interface WidgetColors {
@@ -64,7 +64,7 @@ export function shortBaht(satang: number): string {
 export function widgetView(s: WidgetSnapshot | null | undefined, nowMs: number = Date.now()): WidgetView {
   const colors = s?.colors ?? DEFAULT_WIDGET_COLORS;
   if (!s || !s.signedIn) {
-    return { label: 'MindPay ใหม่', amount: '฿0', sub: 'เปิดแอปเพื่อเริ่มใช้', spoken: 'MindPay ใหม่ เปิดแอปเพื่อเริ่มใช้', colors };
+    return { label: 'MyPay', amount: '฿0', sub: 'เปิดแอปเพื่อเริ่มใช้', spoken: 'MyPay เปิดแอปเพื่อเริ่มใช้', colors };
   }
   const today = bkkDayKey(nowMs);
   const spent = s.day === today ? s.spentSatang : 0;

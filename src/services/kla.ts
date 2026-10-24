@@ -31,7 +31,12 @@ interface Wardrobe {
 }
 
 const EMPTY: Wardrobe = { owned: [DEFAULT_SKIN], seen: [DEFAULT_SKIN], equipped: DEFAULT_SKIN, opens: [], ghosts: {}, seeded: false };
-const key = (who: string) => `mindpay.kla.${who}`;
+const key = (who: string) => `mypay.kla.${who}`;
+
+/** After the account is deleted: its skins, medals seen and ghost catches leave this phone too. */
+export async function forgetWardrobe(who: string) {
+  await Storage.removeItem(key(who)).catch(() => {});
+}
 
 type Snap = { who: string; data: Wardrobe } | null;
 let current: Snap = null;

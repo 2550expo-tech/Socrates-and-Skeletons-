@@ -10,7 +10,7 @@ import { Storage } from '../data/storage';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
-const KEY = 'mindpay.themeMode';
+const KEY = 'mypay.themeMode';
 let mode: ThemeMode = 'system';
 let loaded = false;
 const listeners = new Set<() => void>();
@@ -74,7 +74,7 @@ export function useSchemeChoice(): 'light' | 'dark' {
 // Colour theme (ธีมสี)
 // ---------------------------------------------------------------------------
 
-const COLOR_KEY = 'mindpay.colorTheme';
+const COLOR_KEY = 'mypay.colorTheme';
 const COLOR_KEYS = ['forest', 'redvelvet', 'purple', 'sapphire', 'amber', 'sunset', 'rose', 'onyx', 'halloween'] as const;
 export type ColorThemeChoice = (typeof COLOR_KEYS)[number];
 let color: ColorThemeChoice = 'forest';

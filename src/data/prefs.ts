@@ -19,7 +19,7 @@ export interface ScanPrefs {
   aiConsent: ConsentRecord | null;
 }
 
-const KEY = 'mindpay.scanPrefs.v1';
+const KEY = 'mypay.scanPrefs.v1';
 export const DEFAULT_SCAN_PREFS: ScanPrefs = { autoScan: true, autoConfirm: true, lastAutoScanAt: 0, askedGalleryOnce: false, aiConsent: null };
 
 /** Stored form: the switches belong to this phone, the scan window and consent to each account on it. */
@@ -59,4 +59,14 @@ export async function saveScanPrefs(patch: Partial<ScanPrefs>, userId?: string |
   if (aiConsent && userId) next.aiConsentBy = { ...s.aiConsentBy, [userId]: aiConsent };
   await Storage.setItem(KEY, JSON.stringify(next));
   return loadScanPrefs(userId);
+}
+
+/** After the account is deleted: its scan window and consent answer leave this phone (the phone's switches stay). */
+export async function forgetScanPrefsFor(userId: string): Promise<void> {
+  const s = await loadStored();
+  const lastAutoScanBy = { ...s.lastAutoScanBy };
+  const aiConsentBy = { ...s.aiConsentBy };
+  delete lastAutoScanBy[userId];
+  delete aiConsentBy[userId];
+  await Storage.setItem(KEY, JSON.stringify({ ...s, lastAutoScanBy, aiConsentBy }));
 }

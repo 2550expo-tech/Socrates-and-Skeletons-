@@ -37,6 +37,48 @@ export function answerConsent(granted: boolean, nowMs: number): ConsentRecord {
 }
 
 /**
+ * The answer is kept on the phone (checked before every photo, works offline) and with the
+ * account on the server (public.consents, append-only), so it follows the person to another
+ * phone and shows what they agreed to and when.
+ */
+export const CONSENT_APP = 'mypay';
+export const CONSENT_PURPOSE = 'slip_ai';
+
+export interface ConsentRow {
+  app: typeof CONSENT_APP;
+  purpose: typeof CONSENT_PURPOSE;
+  granted: boolean;
+  version: number;
+  answered_at: string;
+}
+
+export function consentToRow(r: ConsentRecord): ConsentRow {
+  return { app: CONSENT_APP, purpose: CONSENT_PURPOSE, granted: r.granted, version: r.version, answered_at: new Date(r.at).toISOString() };
+}
+
+export function consentFromRow(row: Pick<ConsentRow, 'granted' | 'version' | 'answered_at'>): ConsentRecord | null {
+  const at = Date.parse(row.answered_at);
+  if (typeof row.granted !== 'boolean' || !Number.isFinite(at) || !Number.isInteger(row.version)) return null;
+  return { granted: row.granted, at, version: row.version };
+}
+
+/**
+ * The phone's answer and the account's newest answer, put together: the later one wins.
+ * `use` is the answer in force (also saved on the phone); `send` is true when the phone's
+ * answer is newer than the server's (it was given offline, or on this phone just now) and
+ * still has to be kept with the account.
+ */
+export function reconcileConsent(
+  local: ConsentRecord | null | undefined,
+  server: ConsentRecord | null | undefined,
+): { use: ConsentRecord | null; send: boolean } {
+  if (!local) return { use: server ?? null, send: false };
+  if (!server) return { use: local, send: true };
+  if (local.at > server.at) return { use: local, send: true };
+  return { use: server.at > local.at ? server : local, send: false };
+}
+
+/**
  * What the person is told before they answer (also shown in Settings). Keep it true to the
  * code:
  * - the QR check on the phone applies when the app searches the gallery by itself
@@ -50,9 +92,9 @@ export function answerConsent(granted: boolean, nowMs: number): ConsentRecord {
  */
 export const SLIP_AI_CONSENT_POINTS: readonly string[] = [
   'ตอนแอปหาสลิปในแกลเลอรีเอง มือถือเลือกเฉพาะรูปที่มี QR (สลิปธนาคาร หรือภาพหน้าจอ e-wallet) รูปอื่นไม่ออกจากเครื่อง ส่วนรูปที่คุณเลือกเองจะถูกส่งไปอ่านทุกรูป',
-  'รูปสลิปถูกส่งผ่านเซิร์ฟเวอร์ MindPay ไปให้ AI อ่าน (Google Gemini หรือ Anthropic Claude ตามที่ระบบตั้งไว้) และไม่ถูกเก็บไว้บนเซิร์ฟเวอร์ MindPay',
+  'รูปสลิปถูกส่งผ่านเซิร์ฟเวอร์ MyPay ไปให้ AI อ่าน (Google Gemini หรือ Anthropic Claude ตามที่ระบบตั้งไว้) และไม่ถูกเก็บไว้บนเซิร์ฟเวอร์ MyPay',
   'ในสลิปมีชื่อและเลขบัญชีบางส่วนของคุณ และของคนที่โอนกับคุณ',
   'ถ้าระบบใช้ Gemini แบบฟรี Google อาจเก็บข้อมูลที่ส่งไปเพื่อปรับปรุง AI',
-  'MindPay เก็บเฉพาะยอดเงิน วันที่ ชื่อผู้รับหรือร้าน ธนาคาร เลขอ้างอิง และรหัสตรวจรูปซ้ำ (ไม่ใช่ตัวรูป) เป็นรายการในบัญชีของคุณ',
+  'MyPay เก็บเฉพาะยอดเงิน วันที่ ชื่อผู้รับหรือร้าน ธนาคาร เลขอ้างอิง และรหัสตรวจรูปซ้ำ (ไม่ใช่ตัวรูป) เป็นรายการในบัญชีของคุณ',
   'ไม่ยินยอมก็ได้ ยังจดเองและพูดจดได้ตามปกติ และเปลี่ยนใจได้ทุกเมื่อในตั้งค่า',
 ];

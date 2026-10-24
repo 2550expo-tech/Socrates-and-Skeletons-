@@ -20,10 +20,10 @@ import { supabase } from './supabase';
 import { clearWidget } from '../services/quickWidget';
 import { deleteSlipCopy } from '../services/slipCopies';
 
-const MODE_KEY = 'mindpay.mode';
-const LAST_DAY_KEY = 'mindpay.lastOpenDay';
+const MODE_KEY = 'mypay.mode';
+const LAST_DAY_KEY = 'mypay.lastOpenDay';
 /** Fingerprints of email links already used (never the link itself: it holds sign-in tokens). */
-const USED_LINKS_KEY = 'mindpay.usedAuthLinks';
+const USED_LINKS_KEY = 'mypay.usedAuthLinks';
 
 /** A short fingerprint of a link (FNV-1a), enough to recognise it again. */
 function linkFingerprint(url: string): string {
@@ -54,7 +54,8 @@ export type AuthNotice =
   | { kind: 'signed_up'; name?: string | null }
   | { kind: 'email_confirmed'; name?: string | null }
   | { kind: 'recovery' }
-  | { kind: 'link_error'; message: string };
+  | { kind: 'link_error'; message: string }
+  | { kind: 'account_deleted' };
 
 interface AppContextValue {
   status: AuthStatus;
@@ -83,6 +84,11 @@ interface AppContextValue {
   refresh(): Promise<void>;
   startDemo(): Promise<void>;
   signOut(): Promise<void>;
+  /**
+   * After services/account.ts deleted the account on the server: leave it on this phone
+   * (no server call, the account is gone) and say on the welcome screen that it was deleted.
+   */
+  finishAccountDeletion(): Promise<void>;
   saveProfile(patch: Partial<Omit<Profile, 'id'>>): Promise<void>;
   addTx(input: TransactionInput): Promise<Transaction>;
   updateTx(id: string, patch: Partial<TransactionInput>): Promise<Transaction>;
@@ -423,6 +429,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (r?.mode === 'cloud') await supabase?.auth.signOut();
         if (r?.mode === 'demo') await resetDemoData();
         clear();
+      },
+      async finishAccountDeletion() {
+        await Storage.setItem(MODE_KEY, '').catch(() => {});
+        await supabase?.auth.signOut({ scope: 'local' }).catch(() => {});
+        clear();
+        setAuthNotice({ kind: 'account_deleted' });
       },
       // After each save the result is shown only if the same account is still open
       // (an account switch during the save must not mix the two).

@@ -1,19 +1,19 @@
-# Builds an installable Android APK of "MindPay ใหม่" (the redesign, branch v2)
-# on GitHub's servers. It is a separate app (package ...mindpay.v2), so it
-# installs next to the original MindPay instead of replacing it.
+# Builds an installable Android APK of MyPay on GitHub's servers.
+# MyPay is its own app (package com.socratesandskeletons.mypay): it installs
+# next to MindPay and "MindPay ใหม่" instead of replacing them.
 #
-# Runs on every push to v2 (and can be started by hand from the Actions tab).
-# The finished APK is attached to the release "MindPay ใหม่ (latest APK)":
-#   https://github.com/2550expo-tech/Socrates-and-Skeletons-/releases/tag/latest-apk-v2
-# Open that page on an Android phone, tap mind-pay-v2.apk, and install.
+# Runs on every push to main (and can be started by hand from the Actions tab).
+# The finished APK is attached to the release "MyPay (latest APK)":
+#   https://github.com/2550expo-tech/mypay/releases/tag/latest-apk
+# Open that page on an Android phone, tap mypay.apk, and install.
 #
 # The APK is signed with the Android debug key: fine for testing and for the
 # class demo, not for the Play Store (use EAS Build for that, see README).
-name: Build Android APK (MindPay ใหม่)
+name: Build Android APK (MyPay)
 
 on:
   push:
-    branches: [v2]
+    branches: [main]
     # Editing documents only does not need a new APK.
     paths-ignore: ['**.md', 'docs/**']
   workflow_dispatch:
@@ -24,7 +24,7 @@ permissions:
 # A build that already started runs to the end; newer pushes wait in line
 # (only the newest waiting push is kept).
 concurrency:
-  group: android-apk-v2
+  group: android-apk
   cancel-in-progress: false
 
 jobs:
@@ -74,20 +74,20 @@ jobs:
         run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a -x lintVitalAnalyzeRelease --stacktrace
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk mind-pay-v2.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk mypay.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: mind-pay-v2-apk
-          path: mind-pay-v2.apk
+          name: mypay-apk
+          path: mypay.apk
 
-      - name: Publish to the "latest-apk-v2" release
+      - name: Publish to the "latest-apk" release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete latest-apk-v2 --yes --cleanup-tag || true
-          gh release create latest-apk-v2 mind-pay-v2.apk \
+          gh release delete latest-apk --yes --cleanup-tag || true
+          gh release create latest-apk mypay.apk \
             --target "$GITHUB_SHA" \
-            --title "MindPay ใหม่ (latest APK)" \
-            --notes "The redesign (branch v2), a separate app that installs next to the original MindPay. Built from ${GITHUB_SHA::7} on $(date -u +'%Y-%m-%d %H:%M UTC'). Open this page on an Android phone, tap mind-pay-v2.apk, and install. Debug-signed build for testing." \
+            --title "MyPay (latest APK)" \
+            --notes "MyPay, its own app (installs next to MindPay). Built from ${GITHUB_SHA::7} on $(date -u +'%Y-%m-%d %H:%M UTC'). Open this page on an Android phone, tap mypay.apk, and install. Debug-signed build for testing." \
             --prerelease

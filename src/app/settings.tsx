@@ -325,8 +325,8 @@ function SettingsForm({ profile }: { profile: Profile }) {
                 )}
               </View>
               <View style={{ flex: 1 }}>
-                <T v="h3" numberOfLines={1}>{profile.displayName || 'ผู้ใช้ MindPay'}</T>
-                <T v="small" numberOfLines={1}>{repo?.mode === 'demo' ? 'โหมดทดลอง (ข้อมูลในเครื่อง)' : (email ?? 'บัญชี MindPay')}</T>
+                <T v="h3" numberOfLines={1}>{profile.displayName || 'ผู้ใช้ MyPay'}</T>
+                <T v="small" numberOfLines={1}>{repo?.mode === 'demo' ? 'โหมดทดลอง (ข้อมูลในเครื่อง)' : (email ?? 'บัญชี MyPay')}</T>
               </View>
             </Row>
             {repo?.mode === 'cloud' ? <LinkRow icon="key-outline" label="เปลี่ยนรหัสผ่าน" onPress={() => showAuthNotice({ kind: 'recovery' })} /> : null}
@@ -336,7 +336,7 @@ function SettingsForm({ profile }: { profile: Profile }) {
             <InputRow
               id="st-opening"
               icon="wallet-outline"
-              label="ยอดเงินตอนเริ่มใช้ MindPay (บาท)"
+              label="ยอดเงินตอนเริ่มใช้ MyPay (บาท)"
               value={opening}
               onChangeText={setOpening}
               money
@@ -432,7 +432,7 @@ function SettingsForm({ profile }: { profile: Profile }) {
                 label="เพิ่มวิดเจ็ต: ยอดใช้วันนี้ + ปุ่มลัด"
                 onPress={() =>
                   pinQuickWidget().then((ok) => {
-                    if (!ok) toast({ message: 'กดค้างที่หน้าจอโฮม → วิดเจ็ต → MindPay ใหม่' });
+                    if (!ok) toast({ message: 'กดค้างที่หน้าจอโฮม → วิดเจ็ต → MyPay' });
                   })
                 }
               />
@@ -498,7 +498,9 @@ function SettingsForm({ profile }: { profile: Profile }) {
                 • รูปสลิปที่อ่านแล้วเก็บเป็นสำเนาในเครื่องนี้เท่านั้น ไม่ได้อัปโหลดเก็บบน server
                 {showPrivacy ? (
                   <>
-                    {'\n'}• น้องกล้า (โค้ช AI) เห็นเฉพาะยอดรวมตามหมวด ไม่เห็นรูปสลิป เลขบัญชี หรือชื่อคนที่คุณโอนให้{'\n'}
+                    {'\n'}• คำตอบเรื่องความยินยอม (ยินยอมหรือไม่ และเวลาที่ตอบ) เก็บไว้กับบัญชี จึงใช้ได้ทุกเครื่องที่เข้าสู่ระบบ{'\n'}
+                    • ลบบัญชีและข้อมูลทั้งหมดได้ที่ปุ่ม “ลบบัญชี” ด้านล่างสุด{'\n'}
+                    • น้องกล้า (โค้ช AI) เห็นเฉพาะยอดรวมตามหมวด ไม่เห็นรูปสลิป เลขบัญชี หรือชื่อคนที่คุณโอนให้{'\n'}
                     • เสียงของน้องกล้าใช้เสียงอ่านภาษาไทยที่มากับมือถือหรือเบราว์เซอร์ของคุณ (ข้อความที่อ่านเป็นคำตอบของโค้ชเท่านั้น)
                   </>
                 ) : null}
@@ -506,14 +508,14 @@ function SettingsForm({ profile }: { profile: Profile }) {
               <Pressable
                 onPress={() => setShowPrivacy((v) => !v)}
                 accessibilityRole="button"
-                accessibilityLabel={showPrivacy ? 'ย่อความเป็นส่วนตัว' : 'อ่านความเป็นส่วนตัวทั้งหมด 4 ข้อ'}
+                accessibilityLabel={showPrivacy ? 'ย่อความเป็นส่วนตัว' : 'อ่านความเป็นส่วนตัวทั้งหมด 6 ข้อ'}
                 aria-expanded={showPrivacy}
                 hitSlop={8}
                 style={{ minHeight: 40, justifyContent: 'center', alignSelf: 'flex-start' }}
               >
                 <Row gap={4}>
                   <T v="small" color={theme.ink} style={{ fontFamily: fonts.sansSemi }}>
-                    {showPrivacy ? 'ย่อ' : 'อ่านทั้งหมด (4 ข้อ)'}
+                    {showPrivacy ? 'ย่อ' : 'อ่านทั้งหมด (6 ข้อ)'}
                   </T>
                   <Ionicons name={showPrivacy ? 'chevron-up' : 'chevron-down'} size={16} color={theme.ink} />
                 </Row>
@@ -522,6 +524,7 @@ function SettingsForm({ profile }: { profile: Profile }) {
           </Group>
           <Group>
             <LinkRow icon="log-out-outline" label={repo?.mode === 'demo' ? 'ออกจากโหมดทดลอง' : 'ออกจากระบบ'} danger onPress={() => setAskOut(true)} />
+            {repo?.mode === 'cloud' ? <LinkRow icon="trash-outline" label="ลบบัญชี" danger onPress={() => router.push('/delete-account')} /> : null}
           </Group>
           <T v="micro" center style={{ marginTop: space.md }}>
             {appConfig.expo.name} เวอร์ชัน {appConfig.expo.version}

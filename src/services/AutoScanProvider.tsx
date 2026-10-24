@@ -29,7 +29,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 import { autoScanSince, MAX_AUTO_ATTEMPTS, MAX_IMAGES_PER_RUN, nextAutoScanMark, shouldAutoScan } from '../domain/autoScan';
-import { answerConsent, consentState, type ConsentState } from '../domain/consent';
+import { answerConsent, consentState, reconcileConsent, type ConsentState } from '../domain/consent';
 import { rangeDays } from '../domain/dates';
 import { buildDuplicateIndex } from '../domain/slip';
 import type { Transaction } from '../domain/types';
@@ -128,15 +128,46 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
     setStateUser(userId);
     setState(IDLE);
   }
+  /**
+   * The consent answer is kept on the phone and with the account (public.consents). Once per
+   * account per session, the two are put together (the later answer wins): a new phone gets
+   * the account's answer, and an answer given offline is sent when the server can be reached.
+   * Until then, or when offline, the phone's own answer stands.
+   */
+  const consentSynced = useRef<{ user: string; done: Promise<void> } | null>(null);
+  const syncConsent = useCallback(async (): Promise<ScanPrefs> => {
+    const user = userId;
+    const r = repo;
+    if (user && r?.mode === 'cloud') {
+      let job = consentSynced.current?.user === user ? consentSynced.current : null;
+      if (!job) {
+        const done = (async () => {
+          const local = (await loadScanPrefs(user)).aiConsent;
+          const { use, send } = reconcileConsent(local, await r.latestConsent());
+          if (use && use !== local) await saveScanPrefs({ aiConsent: use }, user);
+          if (send && use) await r.saveConsent(use);
+        })();
+        job = { user, done };
+        consentSynced.current = job;
+        // Offline or refused: the next call tries again.
+        done.catch(() => {
+          if (consentSynced.current === job) consentSynced.current = null;
+        });
+      }
+      await job.done.catch(() => {});
+    }
+    return loadScanPrefs(user);
+  }, [userId, repo]);
+
   useEffect(() => {
     runGen.current += 1;
-    loadScanPrefs(userId)
+    syncConsent()
       .then((p) => {
         setPrefsState(p);
         setPrefsFor(userId);
       })
       .catch(() => {});
-  }, [userId]);
+  }, [userId, syncConsent]);
   const consent: ConsentState | null = prefsFor === userId && userId ? consentState(prefs.aiConsent) : null;
 
   const available = galleryAvailable && repo?.mode === 'cloud';
@@ -283,16 +314,16 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
    * home screen asks (not answered yet) or the user is told how to change a "no".
    */
   const consentFirst = useCallback(async () => {
-    const c = consentState((await loadScanPrefs(userId)).aiConsent);
+    const c = consentState((await syncConsent()).aiConsent);
     if (c === 'granted') return true;
     if (c === 'ask') setState({ ...IDLE, phase: 'needs_consent' });
     else toast({ message: 'ยังไม่ได้ยินยอมให้ส่งรูปสลิปให้ AI อ่าน เปลี่ยนได้ในตั้งค่า → ความเป็นส่วนตัว' });
     return false;
-  }, [userId, toast]);
+  }, [syncConsent, toast]);
 
   const maybeRun = useCallback(async () => {
     if (!available || running.current || scanLock.manual) return;
-    let p = await loadScanPrefs(userId);
+    let p = await syncConsent();
     setPrefsState(p);
     if (!shouldAutoScan({ enabled: p.autoScan, lastAutoScanAt: p.lastAutoScanAt, nowMs: Date.now(), alreadyRunning: running.current })) return;
     // Consent before anything else, even before the phone's photo permission dialog.
@@ -314,7 +345,7 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
       return;
     }
     await run(p);
-  }, [available, run, userId]);
+  }, [available, run, userId, syncConsent]);
 
   // On open (once the user is in the app) and whenever the app returns to the foreground.
   useEffect(() => {
@@ -347,6 +378,13 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
         setPrefsState(next);
         setPrefsFor(userId);
         setState(IDLE);
+        // Kept with the account too. If that fails (offline), the next sync sends it.
+        if (repo?.mode === 'cloud' && patch.aiConsent) {
+          const job = consentSynced.current;
+          repo.saveConsent(patch.aiConsent).catch(() => {
+            if (consentSynced.current === job) consentSynced.current = null;
+          });
+        }
         // A yes to "scan by itself": the first scan (and the phone's photo prompt) follows right away.
         if (granted && next.autoScan && available && inApp) await maybeRun();
       },
@@ -376,7 +414,7 @@ export function AutoScanProvider({ children }: { children: ReactNode }) {
         setState(IDLE);
       },
     }),
-    [state, prefs, available, consent, run, maybeRun, inApp, userId, consentFirst],
+    [state, prefs, available, consent, run, maybeRun, inApp, userId, consentFirst, repo],
   );
 
   return <AutoScanContext.Provider value={value}>{children}</AutoScanContext.Provider>;

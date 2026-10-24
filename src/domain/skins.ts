@@ -68,7 +68,7 @@ export const SKINS: readonly Skin[] = [
   {
     id: 'pioneer',
     name: 'ผู้บุกเบิก',
-    blurb: 'ใบทองประกายกับดาวผู้บุกเบิก สำหรับผู้ใช้ MindPay รุ่นแรก',
+    blurb: 'ใบทองประกายกับดาวผู้บุกเบิก สำหรับผู้ใช้ MyPay รุ่นแรก',
     kind: 'limited',
     window: { from: '2026-09-29', to: '2026-10-31' },
     tint: '#E2B64A',

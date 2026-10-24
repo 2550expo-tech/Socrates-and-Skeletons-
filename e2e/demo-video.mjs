@@ -107,7 +107,7 @@ try {
   await pause(600);
   await typeSlowly('#ob-balance', '12000');
   await pause(300);
-  await button('เริ่มใช้ MindPay').click();
+  await button('เริ่มใช้ MyPay').click();
   await page.getByText('ยอดคงเหลือ').waitFor({ timeout: 10000 });
 
   if (FLOW === 'android') {

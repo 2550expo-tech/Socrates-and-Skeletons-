@@ -112,7 +112,7 @@ export function LaunchIntro({ ready, fontsReady, onDone }: { ready: boolean; fon
   return (
     <Animated.View
       pointerEvents={ready && minTimePassed ? 'none' : 'auto'}
-      accessibilityLabel="กำลังเปิด MindPay"
+      accessibilityLabel="กำลังเปิด MyPay"
       onLayout={() => {
         if (laidOut) return;
         setLaidOut(true);
@@ -190,7 +190,7 @@ export function LaunchIntro({ ready, fontsReady, onDone }: { ready: boolean; fon
         {fontsReady ? (
           <>
             <View style={{ overflow: 'hidden', paddingHorizontal: 10 }}>
-              <Animated.Text style={{ fontFamily: fonts.serifBold, fontSize: 34, lineHeight: 48, color: '#F4F1E6' }}>MindPay</Animated.Text>
+              <Animated.Text style={{ fontFamily: fonts.serifBold, fontSize: 34, lineHeight: 48, color: '#F4F1E6' }}>MyPay</Animated.Text>
               <Shine times={1} delay={620} duration={620} color="rgba(255,226,150,0.6)" />
             </View>
             <Animated.Text

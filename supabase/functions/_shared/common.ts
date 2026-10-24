@@ -52,6 +52,15 @@ export async function requireUser(req: Request): Promise<string | null> {
   return data.user.id;
 }
 
+/**
+ * Deletes a user for good. Every table holding the user's data references auth.users with
+ * "on delete cascade" (profiles, transactions, savings_goals, ai_usage, consents), so it all goes.
+ */
+export async function deleteUser(userId: string): Promise<void> {
+  const { error } = await admin().auth.admin.deleteUser(userId);
+  if (error) throw error;
+}
+
 function admin() {
   return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
     auth: { persistSession: false },

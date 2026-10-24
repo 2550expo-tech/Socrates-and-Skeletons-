@@ -27,13 +27,13 @@ function matchesFilters(row, params) {
   return true;
 }
 
-export const BASE_PATH = '/Socrates-and-Skeletons-';
+export const BASE_PATH = '/mypay';
 export const SUPA = 'https://dufvcdwswcaqsfbxjwat.supabase.co';
 export const ZXING_WASM = new URL('../node_modules/zxing-wasm/dist/reader/zxing_reader.wasm', import.meta.url).pathname;
 
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.png': 'image/png', '.ttf': 'font/ttf', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.ico': 'image/x-icon' };
 
-/** Serve the exported web app (dist) at http://localhost:<port>/Socrates-and-Skeletons-/ like GitHub Pages does. */
+/** Serve the exported web app (dist) at http://localhost:<port>/mypay/ like GitHub Pages does. */
 export async function serveDist(dist, port) {
   const app = `http://localhost:${port}${BASE_PATH}/`;
   const server = createServer(async (req, res) => {
@@ -69,6 +69,8 @@ export function createFakeSupabase() {
     calls: [],
     txRows: [], // transactions saved through the REST API
     goalRows: [], // savings_goals table
+    consentRows: [], // consents table (append-only: no update or delete through the API)
+    deletedEmails: [], // accounts removed by the delete-account function
     slipReadings: [], // queue of answers from the slip reader (parse-slip): a reading, or { reading, check }
     slipBusy: 0, // this many next parse-slip calls answer "AI busy" (free-tier rate limit)
     slipOffline: 0, // this many next parse-slip calls fail as if the phone lost its connection
@@ -124,6 +126,7 @@ export function createFakeSupabase() {
         const u = state.users.get(body.email);
         if (!u || u.password !== body.password) return reply(err(400, 'invalid_credentials', 'Invalid login credentials'));
         if (!u.confirmed) return reply(err(400, 'email_not_confirmed', 'Email not confirmed'));
+        u.passwordAt = Date.now(); // a fresh sign-in, which delete-account asks for
         return reply({ body: session(u) });
       }
       if (grant === 'refresh_token') {
@@ -195,6 +198,37 @@ export function createFakeSupabase() {
         return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' } });
       }
       return reply({ body: state.goalRows.filter((r) => r.user_id === u.id) });
+    }
+    if (p === '/rest/v1/consents') {
+      const u = byToken(req.headers().authorization);
+      if (!u) return reply({ status: 401, body: {} });
+      if (req.method() === 'POST') {
+        const rows = Array.isArray(body) ? body : [body];
+        for (const r of rows) state.consentRows.push({ ...r, id: state.consentRows.length + 1, user_id: u.id, created_at: new Date().toISOString() });
+        return reply({ status: 201, body: [] });
+      }
+      if (req.method() !== 'GET') return reply({ status: 403, body: { code: '42501', message: 'permission denied for table consents' } });
+      const app = (url.searchParams.get('app') ?? '').replace(/^eq\./, '');
+      const purpose = (url.searchParams.get('purpose') ?? '').replace(/^eq\./, '');
+      const rows = state.consentRows
+        .filter((r) => r.user_id === u.id && (!app || r.app === app) && (!purpose || r.purpose === purpose))
+        .sort((a, b) => Date.parse(b.answered_at) - Date.parse(a.answered_at) || b.id - a.id);
+      const limit = Number(url.searchParams.get('limit') ?? rows.length);
+      return reply({ body: rows.slice(0, limit).map(({ granted, version, answered_at }) => ({ granted, version, answered_at })) });
+    }
+    if (p === '/functions/v1/delete-account') {
+      const u = byToken(req.headers().authorization);
+      if (!u) return reply({ status: 401, body: { error: { code: 'unauthorized', message: 'x' } } });
+      if (body?.confirm !== 'DELETE_MY_ACCOUNT') return reply({ status: 400, body: { error: { code: 'not_confirmed', message: 'x' } } });
+      if (!u.passwordAt || Date.now() - u.passwordAt > 10 * 60_000) return reply({ status: 403, body: { error: { code: 'reauth', message: 'x' } } });
+      // Like "on delete cascade": the account and every row of it.
+      state.users.delete(u.email);
+      state.profiles.delete(u.id);
+      state.txRows = state.txRows.filter((r) => r.user_id !== u.id);
+      state.goalRows = state.goalRows.filter((r) => r.user_id !== u.id);
+      state.consentRows = state.consentRows.filter((r) => r.user_id !== u.id);
+      state.deletedEmails.push(u.email);
+      return reply({ body: { deleted: true } });
     }
     if (p.startsWith('/functions/v1/') && state.aiDelayMs) await new Promise((r) => setTimeout(r, state.aiDelayMs));
     if (p === '/functions/v1/coach') return reply(state.coach);

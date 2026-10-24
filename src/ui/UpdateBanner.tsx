@@ -53,7 +53,7 @@ function UpdateBannerInner() {
       <Pressable
         onPress={() => Updates.reloadAsync().catch(() => setHidden(true))}
         accessibilityRole="button"
-        accessibilityLabel="มี MindPay เวอร์ชันใหม่ แตะเพื่อเปิดใหม่"
+        accessibilityLabel="มี MyPay เวอร์ชันใหม่ แตะเพื่อเปิดใหม่"
         style={({ pressed }) => ({
           flexDirection: 'row',
           alignItems: 'center',

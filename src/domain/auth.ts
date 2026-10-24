@@ -98,7 +98,7 @@ export function authErrorMessage(error: AuthErrorLike | null | undefined): strin
     case 'email_address_invalid':
       return 'ใช้อีเมลนี้ไม่ได้ ลองอีเมลอื่น';
     case 'email_address_not_authorized':
-      return 'ตอนนี้ส่งอีเมลยืนยันไปที่อีเมลนี้ไม่ได้ ลองใหม่ภายหลัง หรือแจ้งทีม MindPay';
+      return 'ตอนนี้ส่งอีเมลยืนยันไปที่อีเมลนี้ไม่ได้ ลองใหม่ภายหลัง หรือแจ้งทีม MyPay';
     case 'signup_disabled':
     case 'email_provider_disabled':
       return 'ตอนนี้ปิดรับสมัครสมาชิกอยู่';

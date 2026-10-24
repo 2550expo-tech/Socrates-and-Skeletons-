@@ -238,3 +238,40 @@ describe('Slip read twice (accuracy)', () => {
     expect(mergeReadings(normalizeReading({ isSlip: false }), normalizeReading({ isSlip: false })).reading.isSlip).toBe(false);
   });
 });
+
+describe('TC-105 delete-account: only with the confirmation word and a fresh sign-in', async () => {
+  const { DELETE_CONFIRM, isDeleteConfirmed, jwtPayload, signedInWithin } = await import('../helpers');
+  const token = (claims: Record<string, unknown>) =>
+    `x.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.sig`;
+  const now = 1_790_000_000;
+
+  it('needs the exact confirmation word in the body', () => {
+    expect(isDeleteConfirmed({ confirm: DELETE_CONFIRM })).toBe(true);
+    expect(isDeleteConfirmed({ confirm: 'yes' })).toBe(false);
+    expect(isDeleteConfirmed({})).toBe(false);
+    expect(isDeleteConfirmed(null)).toBe(false);
+    expect(isDeleteConfirmed('DELETE_MY_ACCOUNT')).toBe(false);
+  });
+
+  it('reads the token claims, including Thai names, and survives a broken token', () => {
+    expect(jwtPayload(token({ sub: 'u1', name: 'สมชาย' }))).toEqual({ sub: 'u1', name: 'สมชาย' });
+    expect(jwtPayload('not-a-token')).toBeNull();
+    expect(jwtPayload('a.%%%.c')).toBeNull();
+    expect(jwtPayload(null)).toBeNull();
+  });
+
+  it('a password typed in the last 10 minutes counts; an older sign-in does not, even on a refreshed token', () => {
+    expect(signedInWithin({ iat: now, amr: [{ method: 'password', timestamp: now - 120 }] }, now, 600)).toBe(true);
+    expect(signedInWithin({ iat: now, amr: [{ method: 'password', timestamp: now - 3 * 3600 }] }, now, 600)).toBe(false);
+    // The newest sign-in method counts (e-mail code right after sign-up).
+    expect(signedInWithin({ amr: [{ method: 'password', timestamp: now - 9000 }, { method: 'otp', timestamp: now - 30 }] }, now, 600)).toBe(true);
+  });
+
+  it('without amr the token time is used; no time at all, or a time in the future, is refused', () => {
+    expect(signedInWithin({ iat: now - 60 }, now, 600)).toBe(true);
+    expect(signedInWithin({ iat: now - 6000 }, now, 600)).toBe(false);
+    expect(signedInWithin({}, now, 600)).toBe(false);
+    expect(signedInWithin({ amr: [{ method: 'password', timestamp: now + 3600 }] }, now, 600)).toBe(false);
+    expect(signedInWithin(null, now, 600)).toBe(false);
+  });
+});

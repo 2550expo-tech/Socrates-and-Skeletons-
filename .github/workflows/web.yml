@@ -1,21 +1,19 @@
-# Publishes the web version of "MindPay ใหม่" (the redesign on branch v2) to
-# GitHub Pages under /v2/, next to the original MindPay at the site root:
-#   https://2550expo-tech.github.io/Socrates-and-Skeletons-/v2/
-# The original app at the root is kept exactly as it is: this job takes the
-# published site, replaces only the /v2/ folder, and publishes it back.
+# Publishes the web version of MyPay to GitHub Pages:
+#   https://2550expo-tech.github.io/mypay/
+# Every push to main runs the unit and browser tests first; the site is only
+# published when they pass.
 # On iPhone: open the link in Safari -> Share -> Add to Home Screen, and it gets
-# its own "MindPay ใหม่" icon next to the old one. Same accounts and data.
-name: Deploy web app (MindPay ใหม่, /v2/)
+# its own "MyPay" icon. MyPay shares accounts and data with MindPay (same Supabase).
+name: Deploy web app (MyPay)
 
 on:
   push:
-    branches: [v2]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
 
-# Shared with the original app's deploy (branch main): one at a time, none cancelled.
 concurrency:
   group: web-pages
   cancel-in-progress: false
@@ -43,7 +41,7 @@ jobs:
       # The browser tests run on a build at the usual address (the test server serves that path).
       - name: Export a build for the browser tests
         env:
-          EXPO_WEB_BASE_URL: /Socrates-and-Skeletons-
+          EXPO_WEB_BASE_URL: /mypay
         run: |
           npx expo export --platform web --output-dir dist-test
           node scripts/web-home-screen.mjs dist-test
@@ -59,32 +57,14 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-screenshots-v2
+          name: e2e-screenshots
           path: e2e-shots
 
-      - name: Export the build for /v2/
-        env:
-          EXPO_WEB_BASE_URL: /Socrates-and-Skeletons-/v2
-        run: |
-          npx expo export --platform web --output-dir dist-v2
-          node scripts/web-home-screen.mjs dist-v2
-
-      - name: Put it next to the original app
-        run: |
-          mkdir site
-          git fetch --depth=1 origin gh-pages:refs/remotes/origin/gh-pages
-          git archive origin/gh-pages | tar -x -C site
-          # Never publish without the original app at the root.
-          test -f site/index.html || { echo "The original app is missing from gh-pages: not publishing."; exit 1; }
-          rm -rf site/v2
-          cp -r dist-v2 site/v2
-          node scripts/route-v2.mjs site
-          ls site | head -30
-
+      # The tested build is the one published (it was exported for /mypay/).
       - name: Publish to the gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
+          publish_dir: ./dist-test
           force_orphan: true
-          commit_message: 'Deploy web app (MindPay ใหม่ /v2/)'
+          commit_message: 'Deploy web app (MyPay)'

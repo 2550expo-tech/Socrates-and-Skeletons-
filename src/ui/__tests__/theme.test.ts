@@ -68,7 +68,7 @@ describe('TC-78 colour themes stay readable', () => {
   });
 });
 
-describe('TC-95 MindPay ใหม่: control edges and category icons stand out (WCAG 1.4.11, 3:1)', () => {
+describe('TC-95 MyPay: control edges and category icons stand out (WCAG 1.4.11, 3:1)', () => {
   it('every theme, light and dark: inputs/switches use lineStrong, category icons read on their tiles', async () => {
     const { categoryLook } = await import('../category');
     const { CATEGORIES } = await import('../../domain/categories');

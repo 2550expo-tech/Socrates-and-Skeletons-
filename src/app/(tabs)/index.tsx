@@ -53,8 +53,8 @@ const celebrated = new Set<string>();
 
 // ---------------------------------------------------------------- today's promotional turn (one a day)
 
-const TURN_KEY = 'mindpay.attention.turn';
-const RECAP_CLOSED_KEY = 'mindpay.recap.offerClosed';
+const TURN_KEY = 'mypay.attention.turn';
+const RECAP_CLOSED_KEY = 'mypay.recap.offerClosed';
 type Prefs = { turn: PromoTurn | null; recapClosed: string | null };
 let prefs: Prefs | undefined;
 const prefListeners = new Set<() => void>();

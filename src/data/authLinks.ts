@@ -4,9 +4,10 @@
  *
  * The return addresses must be allowed in Supabase Dashboard →
  * Authentication → URL Configuration → Redirect URLs:
- *   https://2550expo-tech.github.io/Socrates-and-Skeletons-/**   (web)
- *   mindpay://**                                                (Android / iOS app)
- * Anything else falls back to the Site URL.
+ *   https://2550expo-tech.github.io/mypay/**   (web)
+ *   mypay://**                                 (Android / iOS app)
+ * Anything else falls back to the Site URL (MindPay's web page: the account is the same,
+ * so the link still confirms it; MyPay then signs in with the code or the password).
  */
 import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
@@ -22,8 +23,7 @@ export function authRedirectUrl(): string {
     const base = (process.env.EXPO_BASE_URL ?? '').replace(/\/$/, '');
     return `${window.location.origin}${base}/`;
   }
-  // MindPay ใหม่ also answers "mindpay-v2://" (its widget's buttons): email links keep "mindpay://".
-  return Linking.createURL('/', { scheme: 'mindpay' });
+  return Linking.createURL('/', { scheme: 'mypay' });
 }
 
 /** The link that opened the app (or web page), if any. */
